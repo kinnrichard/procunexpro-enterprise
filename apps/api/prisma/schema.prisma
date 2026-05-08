@@ -1,0 +1,941 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  MANAGER
+  PROCUREMENT_OFFICER
+  WAREHOUSE_STAFF
+  FINANCE_OFFICER
+  VIEWER
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  BLACKLISTED
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  CONVERTED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  RETURN
+  WRITE_OFF
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum RFQStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  AWARDED
+  CANCELLED
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum BudgetStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  OVERSPENT
+}
+
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  PR_CREATED
+  PR_APPROVED
+  PR_REJECTED
+  PO_CREATED
+  PO_APPROVED
+  PO_SENT
+  PO_RECEIVED
+  STOCK_LOW
+  BUDGET_ALERT
+  CONTRACT_EXPIRY
+  RFQ_PUBLISHED
+  RFQ_AWARDED
+  GENERAL
+}
+
+enum DocumentEntityType {
+  PURCHASE_REQUEST
+  PURCHASE_ORDER
+  VENDOR
+  CONTRACT
+  RFQ
+  PRODUCT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STATUS_CHANGE
+  LOGIN
+  LOGOUT
+}
+
+// ============================================================
+// TENANT & AUTH
+// ============================================================
+
+model Tenant {
+  id          String       @id @default(cuid())
+  companyName String       @unique
+  schemaName  String       @unique
+  domain      String?
+  logo        String?
+  status      TenantStatus @default(ACTIVE)
+  settings    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users              User[]
+  departments        Department[]
+  categories         Category[]
+  vendors            Vendor[]
+  products           Product[]
+  warehouses         Warehouse[]
+  purchaseRequests   PurchaseRequest[]
+  purchaseOrders     PurchaseOrder[]
+  stockMovements     StockMovement[]
+  rfqs               RFQ[]
+  contracts          Contract[]
+  budgets            Budget[]
+  approvalWorkflows  ApprovalWorkflow[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  documents          Document[]
+  supplierScores     SupplierScore[]
+  manufacturers      Manufacturer[]
+  origins            Origin[]
+  currencies         Currency[]
+  taxes              Tax[]
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  username            String
+  email               String
+  passwordHash        String
+  firstName           String
+  lastName            String
+  role                Role      @default(VIEWER)
+  departmentId        String?
+  avatar              String?
+  phone               String?
+  isActive            Boolean   @default(true)
+  mustChangePassword  Boolean   @default(false)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLogin           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  tenant              Tenant     @relation(fields: [tenantId], references: [id])
+  department          Department? @relation(fields: [departmentId], references: [id])
+  refreshTokens       RefreshToken[]
+  purchaseRequests    PurchaseRequest[]
+  purchaseOrders      PurchaseOrder[]
+  approvalSteps       ApprovalStep[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+
+  @@unique([tenantId, username])
+  @@unique([tenantId, email])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// ============================================================
+// ORGANIZATIONAL
+// ============================================================
+
+model Department {
+  id          String  @id @default(cuid())
+  tenantId    String
+  name        String
+  code        String
+  description String?
+  parentId    String?
+  managerId   String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id])
+  parent   Department? @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children Department[] @relation("DepartmentHierarchy")
+  users    User[]
+  purchaseRequests PurchaseRequest[]
+  budgetAllocations BudgetAllocation[]
+
+  @@unique([tenantId, code])
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  tenantId    String
+  name        String
+  code        String
+  description String?
+  parentId    String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  parent   Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  products Product[]
+  subCategoryProducts Product[] @relation("SubCategory")
+  budgetAllocations BudgetAllocation[]
+
+  @@unique([tenantId, code])
+}
+
+// ============================================================
+// VENDORS
+// ============================================================
+
+model Vendor {
+  id              String       @id @default(cuid())
+  tenantId        String
+  name            String
+  code            String
+  contactPerson   String?
+  email           String?
+  phone           String?
+  address         String?
+  city            String?
+  country         String?
+  website         String?
+  taxId           String?
+  status          VendorStatus @default(PENDING)
+  paymentTerms    String?
+  bankName        String?
+  bankAccount     String?
+  bankRouting     String?
+  rating          Float?
+  notes           String?
+  isActive        Boolean      @default(true)
+  approvedAt      DateTime?
+  approvedBy      String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id])
+  products        Product[]
+  purchaseOrders  PurchaseOrder[]
+  purchaseRequestItems PurchaseRequestItem[]
+  rfqQuotes       RFQQuote[]
+  contracts       Contract[]
+  supplierScores  SupplierScore[]
+  productPricings ProductPricing[]
+
+  @@unique([tenantId, code])
+}
+
+// ============================================================
+// MANUFACTURERS & ORIGINS (Config)
+// ============================================================
+
+model Manufacturer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  products Product[]
+
+  @@unique([tenantId, name])
+}
+
+model Origin {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  code      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  products Product[]
+
+  @@unique([tenantId, name])
+}
+
+model Currency {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  code      String
+  symbol    String?
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+}
+
+model Tax {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  rate      Float
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+}
+
+// ============================================================
+// PRODUCTS & INVENTORY
+// ============================================================
+
+model Product {
+  id              String  @id @default(cuid())
+  tenantId        String
+  inventoryType   String  @default("product")
+  name            String
+  slug            String
+  manufacturerId  String
+  modelNumber     String
+  sku             String
+  barcode         String?
+  description     String?
+  categoryId      String
+  subCategoryId   String?
+  vendorId        String?
+  originId        String
+
+  // Specs (optional)
+  length          Float?
+  depth           Float?
+  height          Float?
+  weight          Float?
+
+  // Stock Levels
+  minStock        Int     @default(1)
+  maxStock        Int     @default(1)
+  reorderQuantity Int     @default(1)
+
+  // Original Packaging UOM
+  originalPackagingQty  Int
+  pcsPerPack            Int
+  originalPackagingUom  String
+
+  // Selling Packaging UOM
+  sellingPackagingQty   Int
+  sellingPackagingUom   String
+
+  // Applied pricing
+  appliedPricingId String?
+
+  // Legacy / computed fields
+  unit            String  @default("pcs")
+  costPrice       Float   @default(0)
+  sellingPrice    Float   @default(0)
+  currentStock    Int     @default(0)
+  reorderPoint    Int     @default(0)
+  warehouseId     String?
+  locationId      String?
+  isActive        Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  manufacturer     Manufacturer  @relation(fields: [manufacturerId], references: [id])
+  origin           Origin        @relation(fields: [originId], references: [id])
+  category         Category      @relation(fields: [categoryId], references: [id])
+  subCategory      Category?     @relation("SubCategory", fields: [subCategoryId], references: [id])
+  vendor           Vendor?       @relation(fields: [vendorId], references: [id])
+  warehouse        Warehouse? @relation(fields: [warehouseId], references: [id])
+  location         WarehouseLocation? @relation(fields: [locationId], references: [id])
+  purchaseRequestItems PurchaseRequestItem[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  stockMovements       StockMovement[]
+  images               ProductImage[]
+  pricings             ProductPricing[]
+
+  @@unique([tenantId, sku])
+  @@unique([tenantId, slug])
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  url       String
+  fileName  String?
+  caption   String?
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductPricing {
+  id            String   @id @default(cuid())
+  productId     String
+  vendorId      String
+  type          String   @default("local") // "local" or "imported"
+  unitCost      Float    @default(0)
+  sellingPrice  Float    @default(0)
+  currency      String   @default("USD")
+  minOrderQty   Int      @default(1)
+  leadTimeDays  Int?
+  effectiveDate DateTime @default(now())
+  expiryDate    DateTime?
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vendor  Vendor  @relation(fields: [vendorId], references: [id])
+
+  @@unique([productId, vendorId])
+}
+
+model Warehouse {
+  id          String  @id @default(cuid())
+  tenantId    String
+  name        String
+  code        String
+  address     String?
+  city        String?
+  managerId   String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id])
+  locations WarehouseLocation[]
+  products  Product[]
+  stockMovementsFrom StockMovement[] @relation("FromWarehouse")
+  stockMovementsTo   StockMovement[] @relation("ToWarehouse")
+
+  @@unique([tenantId, code])
+}
+
+model WarehouseLocation {
+  id          String  @id @default(cuid())
+  warehouseId String
+  name        String
+  code        String
+  description String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  products  Product[]
+
+  @@unique([warehouseId, code])
+}
+
+// ============================================================
+// PURCHASE REQUESTS
+// ============================================================
+
+model PurchaseRequest {
+  id            String                @id @default(cuid())
+  tenantId      String
+  requestNumber String
+  title         String
+  description   String?
+  requestedById String
+  departmentId  String?
+  priority      Priority              @default(MEDIUM)
+  status        PurchaseRequestStatus @default(DRAFT)
+  requiredDate  DateTime?
+  totalAmount   Float                 @default(0)
+  notes         String?
+  rejectionNote String?
+  approvedAt    DateTime?
+  approvedBy    String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  requestedBy   User        @relation(fields: [requestedById], references: [id])
+  department    Department? @relation(fields: [departmentId], references: [id])
+  items         PurchaseRequestItem[]
+  purchaseOrders PurchaseOrder[]
+  approvalSteps ApprovalStep[]
+
+  @@unique([tenantId, requestNumber])
+}
+
+model PurchaseRequestItem {
+  id                String  @id @default(cuid())
+  purchaseRequestId String
+  itemNumber        Int     @default(1)
+  description       String
+  uom               String  @default("pcs")
+  quantity          Int
+  estimatedPrice    Float   @default(0)
+  discount          Float   @default(0)
+  taxable           Boolean @default(false)
+  taxIncluded       Boolean @default(false)
+  totalPrice        Float   @default(0)
+  productId         String?
+  vendorId          String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  product         Product?        @relation(fields: [productId], references: [id])
+  vendor          Vendor?         @relation(fields: [vendorId], references: [id])
+}
+
+// ============================================================
+// PURCHASE ORDERS
+// ============================================================
+
+model PurchaseOrder {
+  id                String              @id @default(cuid())
+  tenantId          String
+  orderNumber       String
+  purchaseRequestId String?
+  vendorId          String
+  createdById       String
+  status            PurchaseOrderStatus @default(DRAFT)
+  priority          Priority            @default(MEDIUM)
+  orderDate         DateTime            @default(now())
+  expectedDate      DateTime?
+  deliveryDate      DateTime?
+  subtotal          Float               @default(0)
+  taxAmount         Float               @default(0)
+  shippingCost      Float               @default(0)
+  totalAmount       Float               @default(0)
+  paymentTerms      String?
+  shippingAddress   String?
+  notes             String?
+  rejectionNote     String?
+  approvedAt        DateTime?
+  approvedBy        String?
+  sentAt            DateTime?
+  receivedAt        DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  purchaseRequest PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id])
+  vendor          Vendor           @relation(fields: [vendorId], references: [id])
+  createdBy       User             @relation(fields: [createdById], references: [id])
+  items           PurchaseOrderItem[]
+  stockMovements  StockMovement[]
+  approvalSteps   ApprovalStep[]
+
+  @@unique([tenantId, orderNumber])
+}
+
+model PurchaseOrderItem {
+  id              String  @id @default(cuid())
+  purchaseOrderId String
+  productId       String
+  description     String?
+  quantity        Int
+  unitPrice       Float   @default(0)
+  totalPrice      Float   @default(0)
+  receivedQty     Int     @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+}
+
+// ============================================================
+// STOCK MOVEMENTS
+// ============================================================
+
+model StockMovement {
+  id              String            @id @default(cuid())
+  tenantId        String
+  referenceNumber String
+  productId       String
+  type            StockMovementType
+  quantity        Int
+  fromWarehouseId String?
+  toWarehouseId   String?
+  purchaseOrderId String?
+  reason          String?
+  notes           String?
+  performedBy     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  product       Product        @relation(fields: [productId], references: [id])
+  fromWarehouse Warehouse?     @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse?     @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+
+  @@unique([tenantId, referenceNumber])
+}
+
+// ============================================================
+// RFQ (Phase 2)
+// ============================================================
+
+model RFQ {
+  id          String    @id @default(cuid())
+  tenantId    String
+  rfqNumber   String
+  title       String
+  description String?
+  status      RFQStatus @default(DRAFT)
+  deadline    DateTime?
+  publishedAt DateTime?
+  closedAt    DateTime?
+  awardedAt   DateTime?
+  createdBy   String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
+  items  RFQItem[]
+  quotes RFQQuote[]
+
+  @@unique([tenantId, rfqNumber])
+}
+
+model RFQItem {
+  id          String  @id @default(cuid())
+  rfqId       String
+  description String
+  quantity    Int
+  unit        String  @default("pcs")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rfq        RFQ          @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  quoteItems RFQQuoteItem[]
+}
+
+model RFQQuote {
+  id          String   @id @default(cuid())
+  rfqId       String
+  vendorId    String
+  totalAmount Float    @default(0)
+  leadTime    Int?
+  validUntil  DateTime?
+  isAwarded   Boolean  @default(false)
+  notes       String?
+  submittedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rfq    RFQ            @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendor Vendor         @relation(fields: [vendorId], references: [id])
+  items  RFQQuoteItem[]
+}
+
+model RFQQuoteItem {
+  id         String  @id @default(cuid())
+  quoteId    String
+  rfqItemId  String
+  unitPrice  Float   @default(0)
+  totalPrice Float   @default(0)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  quote   RFQQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  rfqItem RFQItem  @relation(fields: [rfqItemId], references: [id])
+}
+
+// ============================================================
+// CONTRACTS (Phase 2)
+// ============================================================
+
+model Contract {
+  id              String         @id @default(cuid())
+  tenantId        String
+  contractNumber  String
+  title           String
+  vendorId        String
+  status          ContractStatus @default(DRAFT)
+  startDate       DateTime
+  endDate         DateTime
+  totalValue      Float          @default(0)
+  terms           String?
+  autoRenew       Boolean        @default(false)
+  renewalNoticeDays Int          @default(30)
+  notes           String?
+  activatedAt     DateTime?
+  terminatedAt    DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@unique([tenantId, contractNumber])
+}
+
+// ============================================================
+// BUDGETS (Phase 2)
+// ============================================================
+
+model Budget {
+  id          String       @id @default(cuid())
+  tenantId    String
+  name        String
+  fiscalYear  Int
+  period      BudgetPeriod @default(YEARLY)
+  totalAmount Float        @default(0)
+  spentAmount Float        @default(0)
+  status      BudgetStatus @default(DRAFT)
+  startDate   DateTime
+  endDate     DateTime
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  allocations BudgetAllocation[]
+}
+
+model BudgetAllocation {
+  id           String  @id @default(cuid())
+  budgetId     String
+  departmentId String?
+  categoryId   String?
+  amount       Float   @default(0)
+  spentAmount  Float   @default(0)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  budget     Budget      @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  department Department? @relation(fields: [departmentId], references: [id])
+  category   Category?   @relation(fields: [categoryId], references: [id])
+}
+
+// ============================================================
+// APPROVAL WORKFLOWS (Phase 3)
+// ============================================================
+
+model ApprovalWorkflow {
+  id          String  @id @default(cuid())
+  tenantId    String
+  name        String
+  entityType  String
+  minAmount   Float?
+  maxAmount   Float?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id])
+  rules  ApprovalWorkflowRule[]
+}
+
+model ApprovalWorkflowRule {
+  id         String @id @default(cuid())
+  workflowId String
+  stepOrder  Int
+  role       Role
+  isRequired Boolean @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+model ApprovalStep {
+  id                String          @id @default(cuid())
+  purchaseRequestId String?
+  purchaseOrderId   String?
+  stepOrder         Int
+  role              Role
+  userId            String?
+  action            ApprovalAction?
+  comment           String?
+  actionAt          DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  purchaseRequest PurchaseRequest? @relation(fields: [purchaseRequestId], references: [id])
+  purchaseOrder   PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  user            User?            @relation(fields: [userId], references: [id])
+}
+
+// ============================================================
+// SUPPLIER SCORING (Phase 2)
+// ============================================================
+
+model SupplierScore {
+  id         String  @id @default(cuid())
+  tenantId   String
+  vendorId   String
+  period     String
+  quality    Float   @default(0)
+  delivery   Float   @default(0)
+  pricing    Float   @default(0)
+  service    Float   @default(0)
+  overall    Float   @default(0)
+  notes      String?
+  scoredBy   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+
+  @@unique([tenantId, vendorId, period])
+}
+
+// ============================================================
+// NOTIFICATIONS (Phase 3)
+// ============================================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  tenantId  String
+  userId    String
+  type      NotificationType @default(GENERAL)
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+// ============================================================
+// DOCUMENTS (Phase 3)
+// ============================================================
+
+model Document {
+  id         String             @id @default(cuid())
+  tenantId   String
+  entityType DocumentEntityType
+  entityId   String
+  fileName   String
+  fileUrl    String
+  fileSize   Int?
+  mimeType   String?
+  uploadedBy String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ============================================================
+// AUDIT TRAIL (Phase 3)
+// ============================================================
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  tenantId   String
+  userId     String?
+  action     AuditAction
+  entityType String
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+}
