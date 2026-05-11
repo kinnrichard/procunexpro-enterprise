@@ -1,8 +1,25 @@
 import {
   Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
+import { IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PurchaseRequestsService } from './purchase-requests.service';
+
+class FindAllPrQuery {
+  @IsOptional() @IsString() page?: string;
+  @IsOptional() @IsString() limit?: string;
+  @IsOptional() @IsString() search?: string;
+  @IsOptional() @IsString() status?: string;
+  @IsOptional() @IsString() priority?: string;
+  @IsOptional() @IsString() companyId?: string;
+  @IsOptional() @IsString() departmentId?: string;
+  @IsOptional() @IsString() requiredDateFrom?: string;
+  @IsOptional() @IsString() requiredDateTo?: string;
+  @IsOptional() @IsString() createdDateFrom?: string;
+  @IsOptional() @IsString() createdDateTo?: string;
+  @IsOptional() @IsString() amountMin?: string;
+  @IsOptional() @IsString() amountMax?: string;
+}
 
 @Controller('purchase-requests')
 @UseGuards(JwtAuthGuard)
@@ -10,23 +27,16 @@ export class PurchaseRequestsController {
   constructor(private readonly purchaseRequestsService: PurchaseRequestsService) {}
 
   @Get()
-  findAll(
-    @Req() req: any,
-    @Query('page') page?: string, @Query('limit') limit?: string,
-    @Query('search') search?: string, @Query('status') status?: string,
-    @Query('priority') priority?: string, @Query('companyId') companyId?: string,
-    @Query('departmentId') departmentId?: string,
-    @Query('requiredDateFrom') requiredDateFrom?: string, @Query('requiredDateTo') requiredDateTo?: string,
-    @Query('createdDateFrom') createdDateFrom?: string, @Query('createdDateTo') createdDateTo?: string,
-    @Query('amountMin') amountMin?: string, @Query('amountMax') amountMax?: string,
-  ) {
+  findAll(@Req() req: any, @Query() query: FindAllPrQuery) {
     return this.purchaseRequestsService.findAll(req.user.tenantId, {
-      page: page ? Number.parseInt(page) : undefined,
-      limit: limit ? Number.parseInt(limit) : undefined,
-      search, status, priority, companyId, departmentId,
-      requiredDateFrom, requiredDateTo, createdDateFrom, createdDateTo,
-      amountMin: amountMin ? Number.parseFloat(amountMin) : undefined,
-      amountMax: amountMax ? Number.parseFloat(amountMax) : undefined,
+      page: query.page ? Number.parseInt(query.page) : undefined,
+      limit: query.limit ? Number.parseInt(query.limit) : undefined,
+      search: query.search, status: query.status, priority: query.priority,
+      companyId: query.companyId, departmentId: query.departmentId,
+      requiredDateFrom: query.requiredDateFrom, requiredDateTo: query.requiredDateTo,
+      createdDateFrom: query.createdDateFrom, createdDateTo: query.createdDateTo,
+      amountMin: query.amountMin ? Number.parseFloat(query.amountMin) : undefined,
+      amountMax: query.amountMax ? Number.parseFloat(query.amountMax) : undefined,
     });
   }
 
