@@ -31,6 +31,7 @@ import { TaxesModule } from './modules/taxes/taxes.module';
 import { PurchaseTermsModule } from './modules/purchase-terms/purchase-terms.module';
 import { DeliveryTermsModule } from './modules/delivery-terms/delivery-terms.module';
 import { DeliveryTypesModule } from './modules/delivery-types/delivery-types.module';
+import { GlAccountsModule } from './modules/gl-accounts/gl-accounts.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 
@@ -68,6 +69,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     PurchaseTermsModule,
     DeliveryTermsModule,
     DeliveryTypesModule,
+    GlAccountsModule,
     CommentsModule,
     UploadsModule,
   ],

@@ -345,7 +345,7 @@ export class PurchaseRequestsService {
 
   private buildItemUpdate(data: any, existing: any) {
     const updateData: any = {};
-    const simpleFields = ['quantity', 'discount', 'taxable', 'taxIncluded'];
+    const simpleFields = ['quantity', 'discount', 'taxable', 'taxIncluded', 'glAccountId'];
     for (const f of simpleFields) {
       if (data[f] !== undefined) updateData[f] = data[f];
     }

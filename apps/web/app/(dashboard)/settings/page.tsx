@@ -1190,6 +1190,7 @@ export default function SettingsPage() {
           <TabsTrigger value="purchase-terms" className="gap-1.5"><FileText className="h-4 w-4" /> Purchase Terms</TabsTrigger>
           <TabsTrigger value="delivery-terms" className="gap-1.5"><Truck className="h-4 w-4" /> Delivery Terms</TabsTrigger>
           <TabsTrigger value="delivery-types" className="gap-1.5"><Truck className="h-4 w-4" /> Type of Delivery</TabsTrigger>
+          <TabsTrigger value="gl-accounts" className="gap-1.5"><FileText className="h-4 w-4" /> GL Accounts</TabsTrigger>
         </TabsList>
 
         {/* General Tab */}
@@ -1389,6 +1390,11 @@ export default function SettingsPage() {
         {/* Type of Delivery Tab */}
         <TabsContent value="delivery-types">
           <SimpleConfigTable endpoint="delivery-types" label="Delivery Type" />
+        </TabsContent>
+
+        {/* GL Accounts Tab */}
+        <TabsContent value="gl-accounts">
+          <SimpleConfigTable endpoint="gl-accounts" label="GL Account" hasCode />
         </TabsContent>
       </Tabs>
     </div>

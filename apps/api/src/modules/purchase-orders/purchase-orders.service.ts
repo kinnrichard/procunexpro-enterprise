@@ -178,6 +178,7 @@ export class PurchaseOrdersService {
         discount: item.discount || 0,
         taxable: item.taxable || false,
         taxIncluded: item.taxIncluded || false,
+        glAccountId: item.glAccountId || null,
         totalPrice: item.totalPrice || 0,
         notes: item.notes || null,
       }));
@@ -234,7 +235,7 @@ export class PurchaseOrdersService {
     if (!existing) throw new NotFoundException('Item not found');
 
     const updateData: any = {};
-    const fields = ['quantity', 'unitPrice', 'discount', 'taxable', 'taxIncluded', 'notes'];
+    const fields = ['quantity', 'unitPrice', 'discount', 'taxable', 'taxIncluded', 'glAccountId', 'notes'];
     for (const f of fields) {
       if (data[f] !== undefined) updateData[f] = data[f];
     }

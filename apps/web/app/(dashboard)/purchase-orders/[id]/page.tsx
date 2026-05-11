@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import {
@@ -192,6 +193,12 @@ export default function PurchaseOrderDetailPage() {
   });
   const po = poData?.data;
 
+  const { data: glAccountsRes } = useQuery({
+    queryKey: ['gl-accounts-active'],
+    queryFn: () => api.get('/gl-accounts/active'),
+  });
+  const glAccountOptions = (glAccountsRes?.data?.data || []).map((g: any) => ({ value: g.id, label: `${g.code} - ${g.name}` }));
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['po-detail', poId] });
     queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
@@ -225,7 +232,7 @@ export default function PurchaseOrderDetailPage() {
     onError: () => toast({ title: 'Failed', variant: 'destructive' }),
   });
 
-  function inlineSave(itemId: string, field: string, value: number | boolean) {
+  function inlineSave(itemId: string, field: string, value: number | boolean | string | null) {
     updateItemMutation.mutate({ itemId, data: { [field]: value } });
   }
 
@@ -381,6 +388,7 @@ export default function PurchaseOrderDetailPage() {
                       <th className="text-right px-3 py-2.5 w-[70px]">Discount</th>
                       <th className="text-center px-3 py-2.5 w-[55px]">Taxable</th>
                       <th className="text-center px-3 py-2.5 w-[55px]">Tax Incl</th>
+                      <th className="text-left px-3 py-2.5 w-[140px]">GL Account</th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Amount</th>
                     </tr>
                   </thead>
@@ -428,6 +436,18 @@ export default function PurchaseOrderDetailPage() {
                               className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors', isDraft && 'cursor-pointer hover:opacity-80', item.taxIncluded ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground')}>
                               {item.taxIncluded ? 'Yes' : 'No'}
                             </button>
+                          </td>
+                          <td className="px-3 py-2 w-[140px]" onClick={(e) => e.stopPropagation()}>
+                            {isDraft ? (
+                              <SearchableSelect
+                                options={[{ value: '', label: '— None —' }, ...glAccountOptions]}
+                                value={item.glAccountId || ''}
+                                onChange={(v) => inlineSave(item.id, 'glAccountId', v || null)}
+                                placeholder="—"
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{item.glAccount?.code || '—'}</span>
+                            )}
                           </td>
                           <td className="px-3 py-3 text-right font-mono font-medium">{formatCurrency(calcItemAmount(item, vendorId, taxRate))}</td>
                         </tr>

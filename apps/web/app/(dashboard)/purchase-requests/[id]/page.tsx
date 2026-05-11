@@ -351,6 +351,12 @@ export default function PurchaseRequestDetailPage() {
     queryKey: ['currencies-active'],
     queryFn: () => api.get('/currencies/active'),
   });
+
+  const { data: glAccountsRes } = useQuery({
+    queryKey: ['gl-accounts-active'],
+    queryFn: () => api.get('/gl-accounts/active'),
+  });
+  const glAccountOptions = (glAccountsRes?.data?.data || []).map((g: any) => ({ value: g.id, label: `${g.code} - ${g.name}` }));
   const defaultCurrency = (currenciesRes?.data?.data || []).find((c: any) => c.isDefault)?.code || 'USD';
 
   const { data: productsRes } = useQuery({
@@ -371,7 +377,7 @@ export default function PurchaseRequestDetailPage() {
 
   const itemVendors = [...new Map((pr?.items || []).filter((i: any) => i.vendor).map((i: any) => [i.vendor.id, i.vendor])).values()] as { id: string; name: string }[];
 
-  function inlineSave(itemId: string, field: string, value: number) {
+  function inlineSave(itemId: string, field: string, value: number | string | null) {
     updateItemMutation.mutate({ itemId, data: { [field]: value } });
   }
 
@@ -969,6 +975,7 @@ export default function PurchaseRequestDetailPage() {
                       <th className="text-right px-3 py-2.5 w-[70px]">Discount</th>
                       <th className="text-center px-3 py-2.5 w-[55px]"><div className="flex items-center justify-center gap-1">Taxable <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Subject to tax calculation</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-center px-3 py-2.5 w-[55px]"><div className="flex items-center justify-center gap-1">Tax Incl <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Price already includes tax</p></TooltipContent></Tooltip></TooltipProvider></div></th>
+                      <th className="text-left px-3 py-2.5 w-[140px]">GL Account</th>
                       <th className="text-right px-3 py-2.5 w-[80px]"><div className="flex items-center justify-end gap-1">Tax <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Default tax rate: {taxRate}%</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Amount</th>
                       <th className="px-3 py-2.5 w-[60px]"></th>
@@ -1047,6 +1054,18 @@ export default function PurchaseRequestDetailPage() {
                             disabled={!isDraft}
                             className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors', isDraft && 'cursor-pointer hover:opacity-80', item.taxIncluded ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-muted text-muted-foreground')}
                           >{item.taxIncluded ? 'Yes' : 'No'}</button>
+                        </td>
+                        <td className="px-3 py-2 w-[140px]" onClick={e => e.stopPropagation()}>
+                          {isDraft ? (
+                            <SearchableSelect
+                              options={[{ value: '', label: '— None —' }, ...glAccountOptions]}
+                              value={item.glAccountId || ''}
+                              onChange={(v) => inlineSave(item.id, 'glAccountId', v as any)}
+                              placeholder="—"
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{item.glAccount?.code || '—'}</span>
+                          )}
                         </td>
                         <td className="px-3 py-3 text-right font-mono text-xs text-muted-foreground">
                           {item.taxable ? `${taxRate}%` : '—'}

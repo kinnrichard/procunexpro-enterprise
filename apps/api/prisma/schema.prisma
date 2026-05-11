@@ -171,6 +171,7 @@ model Tenant {
   documents          Document[]
   supplierScores     SupplierScore[]
   companies          Company[]
+  glAccounts         GlAccount[]
   comments           Comment[]
   manufacturers      Manufacturer[]
   origins            Origin[]
@@ -436,6 +437,21 @@ model DeliveryType {
   @@unique([tenantId, name])
 }
 
+model GlAccount {
+  id          String   @id @default(cuid())
+  tenantId    String
+  code        String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+}
+
 // ============================================================
 // PRODUCTS & INVENTORY
 // ============================================================
@@ -632,6 +648,7 @@ model PurchaseRequestItem {
   totalPrice        Float   @default(0)
   productId         String?
   vendorId          String?
+  glAccountId       String?
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -696,6 +713,7 @@ model PurchaseOrderItem {
   taxIncluded     Boolean @default(false)
   totalPrice      Float   @default(0)
   receivedQty     Int     @default(0)
+  glAccountId     String?
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
