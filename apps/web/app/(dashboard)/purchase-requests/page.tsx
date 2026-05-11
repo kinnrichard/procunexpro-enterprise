@@ -164,7 +164,7 @@ export default function PurchaseRequestsPage() {
   const form = useForm<PRFormData>({
     resolver: zodResolver(prSchema),
     mode: 'onChange',
-    defaultValues: { title: '', description: '', companyId: '', departmentId: '', priority: 'MEDIUM', requiredDate: null, purchaseTerms: '', deliveryTerms: '', deliveryType: '', notes: '' },
+    defaultValues: { title: '', description: '', companyId: '', departmentId: '', priority: 'MEDIUM', requiredDate: undefined, purchaseTerms: '', deliveryTerms: '', deliveryType: '', notes: '' },
   });
 
   // ─── Mutations ──────────────────────────────────────────
@@ -206,7 +206,7 @@ export default function PurchaseRequestsPage() {
   // ─── Handlers ───────────────────────────────────────────
   const openCreate = () => {
     setEditing(null);
-    form.reset({ title: '', description: '', companyId: '', departmentId: '', priority: 'MEDIUM', requiredDate: null, purchaseTerms: '', deliveryTerms: '', notes: '' });
+    form.reset({ title: '', description: '', companyId: '', departmentId: '', priority: 'MEDIUM', requiredDate: undefined as any, purchaseTerms: '', deliveryTerms: '', deliveryType: '', notes: '' });
     setModalOpen(true);
   };
 
@@ -218,7 +218,7 @@ export default function PurchaseRequestsPage() {
       companyId: pr.companyId || '',
       departmentId: pr.departmentId || '',
       priority: pr.priority,
-      requiredDate: pr.requiredDate ? new Date(pr.requiredDate) : null,
+      requiredDate: pr.requiredDate ? new Date(pr.requiredDate) : undefined as any,
       purchaseTerms: pr.purchaseTerms || '',
       deliveryTerms: pr.deliveryTerms || '',
       deliveryType: pr.deliveryType || '',

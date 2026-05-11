@@ -664,9 +664,11 @@ export default function PurchaseRequestDetailPage() {
   // Header checkbox state
   const headerAllSelected = selectedItemIds.size > 0 && selectedItemIds.size === pr.items?.length;
   const headerSomeSelected = selectedItemIds.size > 0 && !headerAllSelected;
-  let headerCheckboxClass = 'border-border';
-  if (headerAllSelected) headerCheckboxClass = 'bg-primary border-primary';
-  else if (headerSomeSelected) headerCheckboxClass = 'border-primary bg-primary/20';
+  const headerCheckboxClass = (() => {
+    if (headerAllSelected) return 'bg-primary border-primary';
+    if (headerSomeSelected) return 'border-primary bg-primary/20';
+    return 'border-border';
+  })();
 
   return (
     <div className="space-y-6">
@@ -805,10 +807,10 @@ export default function PurchaseRequestDetailPage() {
                 <h2 className="text-base font-semibold">Line Items</h2>
                 {(() => {
                   const totalCount = pr.items?.length || 0;
-                  const pluralSuffix = totalCount !== 1 ? 's' : '';
-                  const itemCountText = filteredItems.length !== totalCount
-                    ? `${filteredItems.length} of ${totalCount} item${pluralSuffix}`
-                    : `${totalCount} item${pluralSuffix}`;
+                  const pluralSuffix = totalCount === 1 ? '' : 's';
+                  const itemCountText = filteredItems.length === totalCount
+                    ? `${totalCount} item${pluralSuffix}`
+                    : `${filteredItems.length} of ${totalCount} item${pluralSuffix}`;
                   return <p className="text-xs text-muted-foreground mt-0.5">{itemCountText}</p>;
                 })()}
               </div>
@@ -902,16 +904,19 @@ export default function PurchaseRequestDetailPage() {
               );
             })()}
 
-            {((!pr.items || pr.items.length === 0) && (
-              <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
-                <p className="text-sm text-muted-foreground mb-2">No line items yet</p>
-                {isDraft && <button onClick={openAddItem} className="text-sm text-primary font-medium hover:underline">+ Add first item</button>}
-              </div>
-            )) || (filteredItems.length === 0 && (
-              <div className="text-center py-8 border border-border rounded-xl">
-                <p className="text-sm text-muted-foreground">No items match your search.</p>
-              </div>
-            )) || (
+            {(() => {
+              if (!pr.items || pr.items.length === 0) return (
+                <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
+                  <p className="text-sm text-muted-foreground mb-2">No line items yet</p>
+                  {isDraft && <button onClick={openAddItem} className="text-sm text-primary font-medium hover:underline">+ Add first item</button>}
+                </div>
+              );
+              if (filteredItems.length === 0) return (
+                <div className="text-center py-8 border border-border rounded-xl">
+                  <p className="text-sm text-muted-foreground">No items match your search.</p>
+                </div>
+              );
+              return (
               <>
               <div className="border border-border rounded-xl overflow-x-auto">
                 <table className="w-full text-sm min-w-[1250px]">
@@ -1085,8 +1090,10 @@ export default function PurchaseRequestDetailPage() {
                 </div>
               )}
             </>
-            ))}
+            );
+            })()}
           </div>
+
 
           {/* ─── Comments & Activity ─────────────────────── */}
           <Separator />
@@ -1242,7 +1249,7 @@ export default function PurchaseRequestDetailPage() {
                   {addingItems && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {(() => {
                     const countLabel = selectedProducts.size > 0 ? ` ${selectedProducts.size}` : '';
-                    const itemPlural = selectedProducts.size !== 1 ? 's' : '';
+                    const itemPlural = selectedProducts.size === 1 ? '' : 's';
                     return `Add${countLabel} Item${itemPlural}`;
                   })()}
                 </Button>
