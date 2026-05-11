@@ -320,13 +320,13 @@ function SimpleConfigTable({ endpoint, label, hasCode }: Readonly<{ endpoint: st
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post(`/${endpoint}`, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [endpoint] }); closeModal(); toast({ title: `${label} created` }) },
-    onError: () => toast({ title: 'Error', description: `Failed to create ${label.toLowerCase()}.`, variant: 'destructive' }),
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || `Failed to create ${label.toLowerCase()}.`, variant: 'destructive' }),
   })
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/${endpoint}/${id}`, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [endpoint] }); closeModal(); toast({ title: `${label} updated` }) },
-    onError: () => toast({ title: 'Error', description: `Failed to update ${label.toLowerCase()}.`, variant: 'destructive' }),
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || `Failed to update ${label.toLowerCase()}.`, variant: 'destructive' }),
   })
 
   const deleteMutation = useMutation({
@@ -1190,7 +1190,7 @@ export default function SettingsPage() {
           <TabsTrigger value="purchase-terms" className="gap-1.5"><FileText className="h-4 w-4" /> Purchase Terms</TabsTrigger>
           <TabsTrigger value="delivery-terms" className="gap-1.5"><Truck className="h-4 w-4" /> Delivery Terms</TabsTrigger>
           <TabsTrigger value="delivery-types" className="gap-1.5"><Truck className="h-4 w-4" /> Type of Delivery</TabsTrigger>
-          <TabsTrigger value="gl-accounts" className="gap-1.5"><FileText className="h-4 w-4" /> GL Accounts</TabsTrigger>
+          <TabsTrigger value="gl-accounts" className="gap-1.5"><FileText className="h-4 w-4" /> Chart of Accounts</TabsTrigger>
         </TabsList>
 
         {/* General Tab */}
@@ -1394,7 +1394,7 @@ export default function SettingsPage() {
 
         {/* GL Accounts Tab */}
         <TabsContent value="gl-accounts">
-          <SimpleConfigTable endpoint="gl-accounts" label="GL Account" hasCode />
+          <SimpleConfigTable endpoint="gl-accounts" label="Account" hasCode />
         </TabsContent>
       </Tabs>
     </div>

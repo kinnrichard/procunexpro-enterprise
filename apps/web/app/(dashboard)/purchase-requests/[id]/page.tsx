@@ -975,7 +975,7 @@ export default function PurchaseRequestDetailPage() {
                       <th className="text-right px-3 py-2.5 w-[70px]">Discount</th>
                       <th className="text-center px-3 py-2.5 w-[55px]"><div className="flex items-center justify-center gap-1">Taxable <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Subject to tax calculation</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-center px-3 py-2.5 w-[55px]"><div className="flex items-center justify-center gap-1">Tax Incl <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Price already includes tax</p></TooltipContent></Tooltip></TooltipProvider></div></th>
-                      <th className="text-left px-3 py-2.5 w-[140px]">GL Account</th>
+                      <th className="text-left px-3 py-2.5 w-[140px]">Account</th>
                       <th className="text-right px-3 py-2.5 w-[80px]"><div className="flex items-center justify-end gap-1">Tax <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Default tax rate: {taxRate}%</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Amount</th>
                       <th className="px-3 py-2.5 w-[60px]"></th>

@@ -388,7 +388,7 @@ export default function PurchaseOrderDetailPage() {
                       <th className="text-right px-3 py-2.5 w-[70px]">Discount</th>
                       <th className="text-center px-3 py-2.5 w-[55px]">Taxable</th>
                       <th className="text-center px-3 py-2.5 w-[55px]">Tax Incl</th>
-                      <th className="text-left px-3 py-2.5 w-[140px]">GL Account</th>
+                      <th className="text-left px-3 py-2.5 w-[140px]">Account</th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Amount</th>
                     </tr>
                   </thead>
