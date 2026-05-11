@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -242,6 +243,7 @@ const priorityColors: Record<string, string> = {
 };
 
 export default function PurchaseOrdersPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -356,7 +358,7 @@ export default function PurchaseOrdersPage() {
     { key: 'orderDate', label: 'Date', sortable: true, render: (v: string) => formatDate(v) },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
+        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
           {row.status === 'DRAFT' && (
             <>
               <button onClick={() => actionMut.mutate({ id: row.id, action: 'submit' })} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Submit"><Send className="h-3.5 w-3.5" /></button>
@@ -373,7 +375,7 @@ export default function PurchaseOrdersPage() {
           {(row.status === 'SENT' || row.status === 'PARTIALLY_RECEIVED') && (
             <button onClick={() => actionMut.mutate({ id: row.id, action: 'receive' })} className="p-1.5 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600" title="Receive"><PackageCheck className="h-3.5 w-3.5" /></button>
           )}
-        </button>
+        </div>
       ),
     },
   ];
@@ -425,6 +427,7 @@ export default function PurchaseOrdersPage() {
         searchPlaceholder="Search orders..."
         isLoading={isLoading}
         emptyMessage="No purchase orders found"
+        onRowClick={(row: any) => router.push(`/purchase-orders/${row.id}`)}
         toolbar={
           <div className="flex items-center gap-1.5 flex-wrap">
             {statusFilters.map(s => (

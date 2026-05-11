@@ -393,14 +393,14 @@ export default function PurchaseRequestsPage() {
     {
       key: 'actions', label: '',
       render: (_: any, row: any) => (
-        <button type="button" className="flex items-center gap-0.5" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
+        <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
           {row.status === 'DRAFT' && (
             <>
               <button onClick={() => submitMutation.mutate(row.id)} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Submit for Approval"><Send className="h-3.5 w-3.5" /></button>
               <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="Edit"><Pencil className="h-3.5 w-3.5" /></button>
             </>
           )}
-        </button>
+        </div>
       ),
     },
   ];

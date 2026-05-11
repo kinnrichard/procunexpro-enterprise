@@ -134,7 +134,7 @@ export default function ContractsPage() {
     { key: 'status', label: 'Status', render: (v: string) => <StatusBadge status={v} /> },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
+        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
           {row.status === 'DRAFT' && (
             <>
               <button onClick={() => actionMut.mutate({ id: row.id, action: 'activate' })} className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600" title="Activate"><Play className="h-3.5 w-3.5" /></button>
@@ -145,7 +145,7 @@ export default function ContractsPage() {
           {row.status === 'ACTIVE' && (
             <button onClick={() => actionMut.mutate({ id: row.id, action: 'terminate' })} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500" title="Terminate"><XCircle className="h-3.5 w-3.5" /></button>
           )}
-        </button>
+        </div>
       ),
     },
   ];

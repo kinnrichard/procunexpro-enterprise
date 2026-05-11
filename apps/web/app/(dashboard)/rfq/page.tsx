@@ -201,7 +201,7 @@ export default function RFQPage() {
     { key: 'createdAt', label: 'Created', sortable: true, render: (v: string) => formatDate(v) },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
+        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
           <button onClick={() => { setDetailRfq(row); setCompareView(false); }} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="View"><Eye className="h-3.5 w-3.5" /></button>
           {row.status === 'DRAFT' && (
             <>
@@ -213,7 +213,7 @@ export default function RFQPage() {
           {row.status === 'PUBLISHED' && (
             <button onClick={() => actionMut.mutate({ id: row.id, action: 'close' })} className="p-1.5 rounded-md hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600" title="Close"><Lock className="h-3.5 w-3.5" /></button>
           )}
-        </button>
+        </div>
       ),
     },
   ];

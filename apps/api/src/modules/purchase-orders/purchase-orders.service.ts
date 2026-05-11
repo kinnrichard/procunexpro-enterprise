@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Priority } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
@@ -167,8 +168,8 @@ export class PurchaseOrdersService {
     const createdPOs: any[] = [];
     for (const [vendorId, vendorItems] of byVendor.entries()) {
       const orderNumber = await this.generateOrderNumber(tenantId);
-      const poItems = vendorItems.map((item, idx) => ({
-        productId: item.productId || undefined,
+      const poItems = vendorItems.map((item) => ({
+        product: { connect: { id: item.productId! } },
         description: item.product?.name || item.description,
         quantity: item.quantity,
         unitPrice: item.estimatedPrice || 0,
@@ -187,7 +188,7 @@ export class PurchaseOrdersService {
           createdById: userId,
           purchaseRequestId: prIds.length === 1 ? prIds[0] : null,
           status: 'DRAFT',
-          priority: data.priority || 'MEDIUM',
+          priority: (data.priority as Priority) || 'MEDIUM',
           expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
           subtotal,
           taxAmount: 0,

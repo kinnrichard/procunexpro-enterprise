@@ -265,7 +265,7 @@ export default function VendorsPage() {
       label: '',
       className: 'w-[80px]',
       render: (_value: any, row: Vendor) => (
-        <button type="button" className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => openEdit(row)}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -278,7 +278,7 @@ export default function VendorsPage() {
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
-        </button>
+        </div>
       ),
     },
   ]
