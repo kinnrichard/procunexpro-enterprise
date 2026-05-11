@@ -200,15 +200,21 @@ function matchesSearch(item: any, query: string): boolean {
   return name.includes(q) || sku.includes(q) || vendor.includes(q);
 }
 
+function matchesBoolFilter(value: boolean, filter: string): boolean {
+  if (filter === 'yes') return value;
+  if (filter === 'no') return !value;
+  return true;
+}
+
 function filterLineItems(items: any[], filters: { vendorId: string; taxable: string; taxIncl: string; priceMin: string; priceMax: string; search: string }) {
+  const minPrice = filters.priceMin ? Number.parseFloat(filters.priceMin) : null;
+  const maxPrice = filters.priceMax ? Number.parseFloat(filters.priceMax) : null;
   return items.filter((item: any) => {
     if (filters.vendorId && item.vendor?.id !== filters.vendorId) return false;
-    if (filters.taxable === 'yes' && !item.taxable) return false;
-    if (filters.taxable === 'no' && item.taxable) return false;
-    if (filters.taxIncl === 'yes' && !item.taxIncluded) return false;
-    if (filters.taxIncl === 'no' && item.taxIncluded) return false;
-    if (filters.priceMin && (item.estimatedPrice || 0) < Number.parseFloat(filters.priceMin)) return false;
-    if (filters.priceMax && (item.estimatedPrice || 0) > Number.parseFloat(filters.priceMax)) return false;
+    if (!matchesBoolFilter(item.taxable, filters.taxable)) return false;
+    if (!matchesBoolFilter(item.taxIncluded, filters.taxIncl)) return false;
+    if (minPrice !== null && (item.estimatedPrice || 0) < minPrice) return false;
+    if (maxPrice !== null && (item.estimatedPrice || 0) > maxPrice) return false;
     if (filters.search && !matchesSearch(item, filters.search)) return false;
     return true;
   });
