@@ -6,8 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -26,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   FileSignature, Plus, Pencil, Trash2, Play, XCircle, AlertTriangle,
-  Clock, CheckCircle, Building2,
+  CheckCircle,
 } from 'lucide-react';
 
 const contractSchema = z.object({
@@ -135,7 +134,7 @@ export default function ContractsPage() {
     { key: 'status', label: 'Status', render: (v: string) => <StatusBadge status={v} /> },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           {row.status === 'DRAFT' && (
             <>
               <button onClick={() => actionMut.mutate({ id: row.id, action: 'activate' })} className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600" title="Activate"><Play className="h-3.5 w-3.5" /></button>
@@ -146,7 +145,7 @@ export default function ContractsPage() {
           {row.status === 'ACTIVE' && (
             <button onClick={() => actionMut.mutate({ id: row.id, action: 'terminate' })} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500" title="Terminate"><XCircle className="h-3.5 w-3.5" /></button>
           )}
-        </div>
+        </button>
       ),
     },
   ];

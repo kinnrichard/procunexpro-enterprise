@@ -17,8 +17,8 @@ export class NotificationsController {
     @Query('isRead') isRead?: string,
   ) {
     return this.notificationsService.findAll(req.user.tenantId, req.user.id, {
-      page: page ? parseInt(page) : undefined,
-      limit: limit ? parseInt(limit) : undefined,
+      page: page ? Number.parseInt(page) : undefined,
+      limit: limit ? Number.parseInt(limit) : undefined,
       isRead,
     });
   }

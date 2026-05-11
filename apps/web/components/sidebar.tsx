@@ -2,9 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { cn, getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/lib/auth';
-import { getInitials } from '@/lib/utils';
 import {
   Tooltip,
   TooltipContent,
@@ -25,7 +24,7 @@ import {
   TrendingUp,
   BarChart3,
   ScrollText,
-  Network,
+
   Users,
   GitBranch,
   Settings,
@@ -100,7 +99,7 @@ interface SidebarProps {
   onToggle: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle }: Readonly<SidebarProps>) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -124,15 +123,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       >
         {/* Logo */}
         <div className="flex h-16 items-center border-b border-sidebar-border px-4">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent font-bold text-sidebar-accent-foreground text-sm">
-              PE
-            </div>
-            {!collapsed && (
-              <span className="text-lg font-semibold tracking-tight whitespace-nowrap">
-                ProcunexPro
-              </span>
-            )}
+          <div className="flex items-center overflow-hidden">
+            <img src="/logo-primary.png" alt="Procunex" className={cn('shrink-0 transition-all duration-300', collapsed ? 'h-7' : 'h-9')} />
           </div>
         </div>
 
@@ -151,16 +143,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                   const Icon = item.icon;
 
+                  let navItemStateClass: string
+                  if (item.disabled) navItemStateClass = 'opacity-40 cursor-not-allowed'
+                  else if (isActive) navItemStateClass = 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  else navItemStateClass = 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+
                   const content = (
                     <div
                       className={cn(
                         'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
                         collapsed && 'justify-center px-0',
-                        item.disabled
-                          ? 'opacity-40 cursor-not-allowed'
-                          : isActive
-                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                        navItemStateClass
                       )}
                     >
                       <Icon className="h-4.5 w-4.5 shrink-0" size={18} />
@@ -232,7 +225,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   {user ? `${user.firstName} ${user.lastName}` : 'User'}
                 </p>
                 <p className="truncate text-xs text-sidebar-foreground/50">
-                  {user?.role?.replace(/_/g, ' ') || 'Role'}
+                  {user?.role?.replaceAll('_', ' ') || 'Role'}
                 </p>
               </div>
             )}

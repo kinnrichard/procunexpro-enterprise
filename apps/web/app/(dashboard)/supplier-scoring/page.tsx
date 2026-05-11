@@ -18,10 +18,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { BarChart3, Plus, Pencil, Trash2, Trophy, Star, TrendingUp, Users } from 'lucide-react';
+import { BarChart3, Plus, Pencil, Trash2, Trophy, Star, Users } from 'lucide-react';
 
 const scoreSchema = z.object({
   vendorId: z.string().min(1, 'Vendor required'),
@@ -48,6 +47,20 @@ const scoreBarColor = (score: number) => {
   if (score >= 4) return 'bg-amber-500';
   return 'bg-red-500';
 };
+
+function ScoreBar({ label, value }: Readonly<{ label: string; value: number }>) {
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={cn('font-semibold', scoreColor(value))}>{value.toFixed(1)}</span>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div className={cn('h-full rounded-full transition-all', scoreBarColor(value))} style={{ width: `${(value / 10) * 100}%` }} />
+      </div>
+    </div>
+  );
+}
 
 export default function SupplierScoringPage() {
   const { toast } = useToast();
@@ -122,18 +135,6 @@ export default function SupplierScoringPage() {
     else createMut.mutate(data);
   };
 
-  const ScoreBar = ({ label, value }: { label: string; value: number }) => (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className={cn('font-semibold', scoreColor(value))}>{value.toFixed(1)}</span>
-      </div>
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <div className={cn('h-full rounded-full transition-all', scoreBarColor(value))} style={{ width: `${(value / 10) * 100}%` }} />
-      </div>
-    </div>
-  );
-
   const columns = [
     { key: 'vendor', label: 'Vendor', sortable: true, render: (_: any, row: any) => <span className="font-medium">{row.vendor?.name || '—'}</span> },
     { key: 'period', label: 'Period', render: (v: string) => <span className="font-mono text-sm">{v}</span> },
@@ -142,19 +143,24 @@ export default function SupplierScoringPage() {
     { key: 'pricing', label: 'Pricing', render: (v: number) => <span className={cn('font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
     { key: 'service', label: 'Service', render: (v: number) => <span className={cn('font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
     {
-      key: 'overall', label: 'Overall', sortable: true, render: (v: number) => (
-        <div className="flex items-center gap-1.5">
-          <Star className={cn('h-4 w-4', v >= 8 ? 'text-amber-400 fill-amber-400' : v >= 6 ? 'text-amber-400' : 'text-gray-300')} />
-          <span className={cn('font-bold', scoreColor(v))}>{v.toFixed(1)}</span>
-        </div>
-      ),
+      key: 'overall', label: 'Overall', sortable: true, render: (v: number) => {
+        let starClass = 'text-gray-300';
+        if (v >= 8) starClass = 'text-amber-400 fill-amber-400';
+        else if (v >= 6) starClass = 'text-amber-400';
+        return (
+          <div className="flex items-center gap-1.5">
+            <Star className={cn('h-4 w-4', starClass)} />
+            <span className={cn('font-bold', scoreColor(v))}>{v.toFixed(1)}</span>
+          </div>
+        );
+      },
     },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
           <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-        </div>
+        </button>
       ),
     },
   ];
@@ -192,12 +198,17 @@ export default function SupplierScoringPage() {
               <Card key={entry.vendorId} className={cn(i === 0 && 'ring-2 ring-amber-400')}>
                 <CardContent className="py-4 px-5">
                   <div className="flex items-center gap-4">
-                    <div className={cn(
-                      'w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
-                      i === 0 ? 'bg-amber-100 text-amber-700' : i === 1 ? 'bg-gray-100 text-gray-600' : i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-muted text-muted-foreground'
-                    )}>
-                      #{i + 1}
-                    </div>
+                    {(() => {
+                      let rankClass = 'bg-muted text-muted-foreground';
+                      if (i === 0) rankClass = 'bg-amber-100 text-amber-700';
+                      else if (i === 1) rankClass = 'bg-gray-100 text-gray-600';
+                      else if (i === 2) rankClass = 'bg-orange-100 text-orange-700';
+                      return (
+                        <div className={cn('w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0', rankClass)}>
+                          #{i + 1}
+                        </div>
+                      );
+                    })()}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h4 className="font-semibold truncate">{entry.vendorName || entry.vendor?.name || 'Unknown'}</h4>

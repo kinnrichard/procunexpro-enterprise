@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { formatDateTime } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatDateTime, cn } from '@/lib/utils';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -90,9 +89,72 @@ export default function NotificationsPage() {
     },
   });
 
+  function renderNotificationsList() {
+    if (isLoading) {
+      return (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="animate-pulse">
+              <Card><CardContent className="py-4"><div className="h-12 bg-muted rounded" /></CardContent></Card>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    if (items.length === 0) {
+      return (
+        <div className="text-center py-16">
+          <Bell className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+          <h3 className="font-medium text-muted-foreground">No notifications</h3>
+          <p className="text-sm text-muted-foreground/70 mt-1">You're all caught up!</p>
+        </div>
+      )
+    }
+    return (
+      <div className="space-y-2">
+        {items.map((notif: any) => {
+          const Icon = typeIcons[notif.type] || Info;
+          const colorClass = typeColors[notif.type] || typeColors.GENERAL;
+
+          return (
+            <Card
+              key={notif.id}
+              className={cn(
+                'transition-colors cursor-pointer hover:bg-accent/30',
+                !notif.isRead && 'border-l-4 border-l-primary bg-primary/[0.02]'
+              )}
+              onClick={() => !notif.isRead && markReadMut.mutate(notif.id)}
+            >
+              <CardContent className="py-3 px-4">
+                <div className="flex items-start gap-3">
+                  <div className={cn('w-9 h-9 rounded-full flex items-center justify-center shrink-0', colorClass)}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className={cn('text-sm', notif.isRead ? 'font-medium text-muted-foreground' : 'font-semibold')}>
+                        {notif.title}
+                      </h4>
+                      {!notif.isRead && <span className="h-2 w-2 rounded-full bg-primary shrink-0" />}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <span className="text-xs text-muted-foreground">{formatDateTime(notif.createdAt)}</span>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">{notif.type.replaceAll('_', ' ')}</Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Notifications" description={`${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`}>
+      <PageHeader title="Notifications" description={`${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`}>
         {unreadCount > 0 && (
           <Button variant="outline" size="sm" onClick={() => markAllReadMut.mutate()} disabled={markAllReadMut.isPending}>
             <CheckCheck className="h-4 w-4 mr-2" /> Mark All Read
@@ -101,74 +163,27 @@ export default function NotificationsPage() {
       </PageHeader>
 
       <div className="flex items-center gap-1.5 mb-4">
-        {(['', 'unread', 'read'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => { setFilter(f); setPage(1); }}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-              filter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
-            )}
-          >
-            {f === '' ? 'All' : f === 'unread' ? `Unread (${unreadCount})` : 'Read'}
-          </button>
-        ))}
+        {(['', 'unread', 'read'] as const).map(f => {
+          let filterLabel: string
+          if (f === '') filterLabel = 'All'
+          else if (f === 'unread') filterLabel = `Unread (${unreadCount})`
+          else filterLabel = 'Read'
+          return (
+            <button
+              key={f}
+              onClick={() => { setFilter(f); setPage(1); }}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                filter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
+              )}
+            >
+              {filterLabel}
+            </button>
+          )
+        })}
       </div>
 
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="animate-pulse">
-              <Card><CardContent className="py-4"><div className="h-12 bg-muted rounded" /></CardContent></Card>
-            </div>
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-16">
-          <Bell className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-          <h3 className="font-medium text-muted-foreground">No notifications</h3>
-          <p className="text-sm text-muted-foreground/70 mt-1">You're all caught up!</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {items.map((notif: any) => {
-            const Icon = typeIcons[notif.type] || Info;
-            const colorClass = typeColors[notif.type] || typeColors.GENERAL;
-
-            return (
-              <Card
-                key={notif.id}
-                className={cn(
-                  'transition-colors cursor-pointer hover:bg-accent/30',
-                  !notif.isRead && 'border-l-4 border-l-primary bg-primary/[0.02]'
-                )}
-                onClick={() => !notif.isRead && markReadMut.mutate(notif.id)}
-              >
-                <CardContent className="py-3 px-4">
-                  <div className="flex items-start gap-3">
-                    <div className={cn('w-9 h-9 rounded-full flex items-center justify-center shrink-0', colorClass)}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className={cn('text-sm', !notif.isRead ? 'font-semibold' : 'font-medium text-muted-foreground')}>
-                          {notif.title}
-                        </h4>
-                        {!notif.isRead && <span className="h-2 w-2 rounded-full bg-primary shrink-0" />}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{notif.message}</p>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-xs text-muted-foreground">{formatDateTime(notif.createdAt)}</span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{notif.type.replace(/_/g, ' ')}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      {renderNotificationsList()}
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">

@@ -3,9 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useQuery } from '@tanstack/react-query';
-import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/lib/auth';
 import { getInitials } from '@/lib/utils';
+import { useAuthStore } from '@/lib/auth';
 import api from '@/lib/api';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import {
@@ -55,7 +54,7 @@ function getPageLabel(pathname: string): string {
   // Exact match
   if (pathLabels[pathname]) return pathLabels[pathname];
   // Try matching the first segment
-  const base = '/' + pathname.split('/').filter(Boolean)[0];
+  const base = '/' + (pathname.split('/').find(Boolean) ?? '');
   return pathLabels[base] || 'Page';
 }
 
@@ -69,7 +68,7 @@ export function Topbar({
   onToggleSidebar,
   sidebarCollapsed,
   onOpenCommandPalette,
-}: TopbarProps) {
+}: Readonly<TopbarProps>) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();

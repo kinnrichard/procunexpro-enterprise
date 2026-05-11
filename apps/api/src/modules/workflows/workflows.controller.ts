@@ -18,8 +18,8 @@ export class WorkflowsController {
     @Query('entityType') entityType?: string,
   ) {
     return this.workflowsService.findAll(req.user.tenantId, {
-      page: page ? parseInt(page) : undefined,
-      limit: limit ? parseInt(limit) : undefined,
+      page: page ? Number.parseInt(page) : undefined,
+      limit: limit ? Number.parseInt(limit) : undefined,
       search,
       entityType,
     });

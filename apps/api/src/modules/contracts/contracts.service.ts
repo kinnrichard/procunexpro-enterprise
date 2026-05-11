@@ -3,11 +3,11 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class ContractsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private generateContractNumber(): string {
     const now = new Date();
-    const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const datePart = now.toISOString().slice(0, 10).replaceAll('-', '');
     const rand = Math.floor(1000 + Math.random() * 9000).toString();
     return `CON-${datePart}-${rand}`;
   }

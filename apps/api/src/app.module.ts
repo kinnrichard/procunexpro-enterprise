@@ -25,8 +25,13 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { ManufacturersModule } from './modules/manufacturers/manufacturers.module';
 import { OriginsModule } from './modules/origins/origins.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { CompaniesModule } from './modules/companies/companies.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { TaxesModule } from './modules/taxes/taxes.module';
+import { PurchaseTermsModule } from './modules/purchase-terms/purchase-terms.module';
+import { DeliveryTermsModule } from './modules/delivery-terms/delivery-terms.module';
+import { DeliveryTypesModule } from './modules/delivery-types/delivery-types.module';
+import { CommentsModule } from './modules/comments/comments.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 
 @Module({
@@ -57,8 +62,13 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     ManufacturersModule,
     OriginsModule,
     TenantsModule,
+    CompaniesModule,
     CurrenciesModule,
     TaxesModule,
+    PurchaseTermsModule,
+    DeliveryTermsModule,
+    DeliveryTypesModule,
+    CommentsModule,
     UploadsModule,
   ],
 })

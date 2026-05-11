@@ -23,11 +23,33 @@ import { useCurrencyStore } from '@/lib/currency'
 import { useTaxStore } from '@/lib/tax'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Textarea } from '@/components/ui/textarea'
-import { StatusBadge } from '@/components/status-badge'
+
 import {
-  Building2, Palette, Bell, Shield, Tags, Factory, Globe, Network, Users, Coins, Star, Percent,
+  Building2, Palette, Bell, Shield, Factory, Globe, Network, Users, Coins, Star, Percent, FileText, Truck,
   Plus, Pencil, Trash2, Loader2, ChevronRight, FolderTree,
 } from 'lucide-react'
+
+// ============================================================
+// Shared Helpers
+// ============================================================
+
+function buildHierarchicalPayload(formData: { name: string; code: string; description: string; parentId: string; [key: string]: any }) {
+  return { ...formData, parentId: formData.parentId || null, description: formData.description || null }
+}
+
+function makeHierarchicalSubmitHandler(
+  formData: { name: string; code: string; description: string; parentId: string; [key: string]: any },
+  editing: { id: string } | null,
+  createMutation: { mutate: (payload: any) => void },
+  updateMutation: { mutate: (args: { id: string; data: any }) => void },
+) {
+  return (e: React.FormEvent) => {
+    e.preventDefault()
+    const payload = buildHierarchicalPayload(formData)
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+}
 
 // ============================================================
 // Categories Config
@@ -99,12 +121,7 @@ function CategoriesConfig() {
 
   function closeModal() { setModalOpen(false); setEditing(null) }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const payload = { ...formData, parentId: formData.parentId || null, description: formData.description || null }
-    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
-    else createMutation.mutate(payload)
-  }
+  const handleSubmit = makeHierarchicalSubmitHandler(formData, editing, createMutation, updateMutation)
 
   function toggleExpand(id: string) {
     setExpandedCategories((prev) => {
@@ -116,6 +133,24 @@ function CategoriesConfig() {
   }
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function renderCategoryContent() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )
+    }
+    if (rootCategories.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No categories found. Add your first category.</div>
+    }
+    return (
+      <div className="divide-y divide-border/30">
+        {rootCategories.map((cat) => renderCategory(cat))}
+      </div>
+    )
+  }
 
   function renderCategory(cat: Category, depth: number = 0) {
     const children = getChildren(cat.id)
@@ -174,6 +209,19 @@ function CategoriesConfig() {
     )
   }
 
+  let categoryModalTitle: string
+  let categoryModalDesc: string
+  if (editing) {
+    categoryModalTitle = 'Edit Category'
+    categoryModalDesc = 'Update category details.'
+  } else if (formData.parentId) {
+    categoryModalTitle = 'Add Subcategory'
+    categoryModalDesc = 'Create a new subcategory.'
+  } else {
+    categoryModalTitle = 'Add Category'
+    categoryModalDesc = 'Create a new root category.'
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -190,27 +238,15 @@ function CategoriesConfig() {
 
       <Card>
         <CardContent className="p-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : rootCategories.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">No categories found. Add your first category.</div>
-          ) : (
-            <div className="divide-y divide-border/30">
-              {rootCategories.map((cat) => renderCategory(cat))}
-            </div>
-          )}
+          {renderCategoryContent()}
         </CardContent>
       </Card>
 
       {/* Category Modal */}
       <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="max-w-md">
-          <DialogTitle>{editing ? 'Edit Category' : formData.parentId ? 'Add Subcategory' : 'Add Category'}</DialogTitle>
-          <DialogDescription>
-            {editing ? 'Update category details.' : formData.parentId ? 'Create a new subcategory.' : 'Create a new root category.'}
-          </DialogDescription>
+          <DialogTitle>{categoryModalTitle}</DialogTitle>
+          <DialogDescription>{categoryModalDesc}</DialogDescription>
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
             <div className="space-y-1.5">
               <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
@@ -258,10 +294,10 @@ type ConfigItem = {
   name: string
   code?: string | null
   isActive: boolean
-  _count: { products: number }
+  _count?: { products?: number }
 }
 
-function SimpleConfigTable({ endpoint, label, hasCode }: { endpoint: string; label: string; hasCode?: boolean }) {
+function SimpleConfigTable({ endpoint, label, hasCode }: Readonly<{ endpoint: string; label: string; hasCode?: boolean }>) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [search, setSearch] = useState('')
@@ -313,6 +349,56 @@ function SimpleConfigTable({ endpoint, label, hasCode }: { endpoint: string; lab
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
+  function renderSimpleContent() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )
+    }
+    if (items.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No {label.toLowerCase()}s found.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            {hasCode && <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Code</th>}
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Products</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-medium">{item.name}</td>
+              {hasCode && <td className="px-4 py-2.5 font-mono text-muted-foreground">{item.code || '-'}</td>}
+              <td className="px-4 py-2.5 text-center text-muted-foreground">{item._count?.products ?? '—'}</td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">
+                  {item.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -329,49 +415,7 @@ function SimpleConfigTable({ endpoint, label, hasCode }: { endpoint: string; lab
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : items.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">No {label.toLowerCase()}s found.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
-                  {hasCode && <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Code</th>}
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Products</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
-                  <th className="w-[80px] px-4 py-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-accent/30 transition-colors">
-                    <td className="px-4 py-2.5 font-medium">{item.name}</td>
-                    {hasCode && <td className="px-4 py-2.5 font-mono text-muted-foreground">{item.code || '-'}</td>}
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">{item._count.products}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-0.5 justify-end">
-                        <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          {renderSimpleContent()}
         </CardContent>
       </Card>
 
@@ -420,222 +464,12 @@ function SimpleConfigTable({ endpoint, label, hasCode }: { endpoint: string; lab
 // Company Config (Multi-Company CRUD)
 // ============================================================
 
-type Tenant = {
-  id: string
-  companyName: string
-  schemaName: string
-  domain: string | null
-  logo: string | null
-  status: string
-  settings: any
-  createdAt: string
-  _count: { users: number; products: number; departments: number }
-}
-
-const STATUS_OPTIONS = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'SUSPENDED', label: 'Suspended' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-]
-
 function CompanyConfig() {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-  const [search, setSearch] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<Tenant | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null)
-  const [formData, setFormData] = useState({ companyName: '', schemaName: '', domain: '', logo: '', status: 'ACTIVE' })
-
-  const { data: response, isLoading } = useQuery({
-    queryKey: ['tenants', search],
-    queryFn: async () => {
-      const params = new URLSearchParams({ limit: '1000' })
-      if (search) params.set('search', search)
-      return (await api.get<{ data: Tenant[] }>(`/tenants?${params}`)).data
-    },
-  })
-
-  const tenants = response?.data ?? []
-
-  const createMutation = useMutation({
-    mutationFn: (data: any) => api.post('/tenants', data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tenants'] }); closeModal(); toast({ title: 'Company created' }) },
-    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to create company.', variant: 'destructive' }),
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/tenants/${id}`, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tenants'] }); closeModal(); toast({ title: 'Company updated' }) },
-    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to update company.', variant: 'destructive' }),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/tenants/${id}`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tenants'] }); setDeleteTarget(null); toast({ title: 'Company deleted' }) },
-    onError: () => toast({ title: 'Error', description: 'Failed to delete company. It may have associated data.', variant: 'destructive' }),
-  })
-
-  function openAdd() {
-    setFormData({ companyName: '', schemaName: '', domain: '', logo: '', status: 'ACTIVE' })
-    setEditing(null)
-    setModalOpen(true)
-  }
-
-  function openEdit(tenant: Tenant) {
-    setFormData({
-      companyName: tenant.companyName,
-      schemaName: tenant.schemaName,
-      domain: tenant.domain || '',
-      logo: tenant.logo || '',
-      status: tenant.status,
-    })
-    setEditing(tenant)
-    setModalOpen(true)
-  }
-
-  function closeModal() { setModalOpen(false); setEditing(null) }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const payload = {
-      companyName: formData.companyName,
-      schemaName: formData.schemaName || undefined,
-      domain: formData.domain || null,
-      logo: formData.logo || null,
-      status: formData.status,
-    }
-    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
-    else createMutation.mutate(payload)
-  }
-
-  const isSubmitting = createMutation.isPending || updateMutation.isPending
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Input
-          placeholder="Search companies..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs h-9"
-        />
-        <Button size="sm" onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-1" /> Add Company
-        </Button>
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : tenants.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">No companies found.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Company Name</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Schema</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Domain</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Users</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Products</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Depts</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
-                  <th className="w-[80px] px-4 py-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {tenants.map((tenant) => (
-                  <tr key={tenant.id} className="hover:bg-accent/30 transition-colors">
-                    <td className="px-4 py-2.5 font-medium">{tenant.companyName}</td>
-                    <td className="px-4 py-2.5 font-mono text-muted-foreground text-xs">{tenant.schemaName}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{tenant.domain || '-'}</td>
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">{tenant._count.users}</td>
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">{tenant._count.products}</td>
-                    <td className="px-4 py-2.5 text-center text-muted-foreground">{tenant._count.departments}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <Badge variant={tenant.status === 'ACTIVE' ? 'default' : tenant.status === 'SUSPENDED' ? 'secondary' : 'destructive'} className="text-[10px]">
-                        {tenant.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-0.5 justify-end">
-                        <button onClick={() => openEdit(tenant)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => setDeleteTarget(tenant)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Company Modal */}
-      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
-        <DialogContent className="max-w-md">
-          <DialogTitle>{editing ? 'Edit Company' : 'Add Company'}</DialogTitle>
-          <DialogDescription>{editing ? 'Update company details.' : 'Create a new company/tenant.'}</DialogDescription>
-          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-            <div className="space-y-1.5">
-              <Label className="text-sm">Company Name <span className="text-red-500">*</span></Label>
-              <Input value={formData.companyName} onChange={(e) => setFormData({ ...formData, companyName: e.target.value })} required placeholder="e.g., Acme Corporation" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Schema Name {!editing && <span className="text-muted-foreground text-xs">(auto-generated if empty)</span>}</Label>
-              <Input
-                value={formData.schemaName}
-                onChange={(e) => setFormData({ ...formData, schemaName: e.target.value })}
-                placeholder="e.g., acme"
-                disabled={!!editing}
-                className={cn(editing && 'bg-muted')}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Domain</Label>
-              <Input value={formData.domain} onChange={(e) => setFormData({ ...formData, domain: e.target.value })} placeholder="e.g., acme.procunexpro.com" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Logo URL</Label>
-              <Input value={formData.logo} onChange={(e) => setFormData({ ...formData, logo: e.target.value })} placeholder="https://..." />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Status</Label>
-              <SearchableSelect
-                options={STATUS_OPTIONS}
-                value={formData.status}
-                onChange={(val) => setFormData({ ...formData, status: val })}
-                placeholder="Select status"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
-              <Button type="submit" disabled={!formData.companyName || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editing ? 'Save' : 'Create'}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete Company"
-        description={`Delete "${deleteTarget?.companyName}"? This will remove all associated data and cannot be undone.`}
-        confirmLabel="Delete"
-        variant="destructive"
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-        isLoading={deleteMutation.isPending}
-      />
-    </div>
+    <SimpleConfigTable
+      endpoint="companies"
+      label="Company"
+    />
   )
 }
 
@@ -702,14 +536,68 @@ function DepartmentsConfig() {
   }
   function closeModal() { setModalOpen(false); setEditing(null) }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const payload = { ...formData, parentId: formData.parentId || null, description: formData.description || null }
-    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
-    else createMutation.mutate(payload)
-  }
+  const handleSubmit = makeHierarchicalSubmitHandler(formData, editing, createMutation, updateMutation)
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function renderDeptsContent() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      )
+    }
+    if (allDepts.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No departments found.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Department</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Code</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Parent</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Users</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {allDepts.map((dept) => (
+            <tr key={dept.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5">
+                <div>
+                  <p className="font-medium">{dept.name}</p>
+                  {dept.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{dept.description}</p>}
+                </div>
+              </td>
+              <td className="px-4 py-2.5 font-mono text-muted-foreground">{dept.code}</td>
+              <td className="px-4 py-2.5 text-muted-foreground">{dept.parent?.name || '-'}</td>
+              <td className="px-4 py-2.5 text-center">
+                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                  <Users className="h-3.5 w-3.5" /> {dept._count.users}
+                </span>
+              </td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={dept.isActive ? 'default' : 'secondary'} className="text-[10px]">
+                  {dept.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button onClick={() => openEdit(dept)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => setDeleteTarget(dept)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -727,58 +615,7 @@ function DepartmentsConfig() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : allDepts.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">No departments found.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Department</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Code</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Parent</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Users</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
-                  <th className="w-[80px] px-4 py-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {allDepts.map((dept) => (
-                  <tr key={dept.id} className="hover:bg-accent/30 transition-colors">
-                    <td className="px-4 py-2.5">
-                      <div>
-                        <p className="font-medium">{dept.name}</p>
-                        {dept.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{dept.description}</p>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-muted-foreground">{dept.code}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{dept.parent?.name || '-'}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className="inline-flex items-center gap-1 text-muted-foreground">
-                        <Users className="h-3.5 w-3.5" /> {dept._count.users}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <Badge variant={dept.isActive ? 'default' : 'secondary'} className="text-[10px]">
-                        {dept.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-0.5 justify-end">
-                        <button onClick={() => openEdit(dept)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => setDeleteTarget(dept)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          {renderDeptsContent()}
         </CardContent>
       </Card>
 
@@ -905,6 +742,58 @@ function CurrenciesConfig() {
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
 
+  function renderCurrenciesContent() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      )
+    }
+    if (items.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No currencies found. Add your first currency.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Code</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Symbol</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Default</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-medium">{item.name}</td>
+              <td className="px-4 py-2.5 font-mono">{item.code}</td>
+              <td className="px-4 py-2.5">{item.symbol || '-'}</td>
+              <td className="px-4 py-2.5 text-center">
+                {item.isDefault && <Star className="h-4 w-4 text-amber-500 mx-auto fill-amber-500" />}
+              </td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">
+                  {item.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -921,51 +810,7 @@ function CurrenciesConfig() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : items.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">No currencies found. Add your first currency.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Code</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Symbol</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Default</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
-                  <th className="w-[80px] px-4 py-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-accent/30 transition-colors">
-                    <td className="px-4 py-2.5 font-medium">{item.name}</td>
-                    <td className="px-4 py-2.5 font-mono">{item.code}</td>
-                    <td className="px-4 py-2.5">{item.symbol || '-'}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      {item.isDefault && <Star className="h-4 w-4 text-amber-500 mx-auto fill-amber-500" />}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">
-                        {item.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-0.5 justify-end">
-                        <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          {renderCurrenciesContent()}
         </CardContent>
       </Card>
 
@@ -1069,17 +914,61 @@ function TaxesConfig() {
   })
 
   function openAdd() { setFormData({ name: '', rate: '', isDefault: false }); setEditing(null); setModalOpen(true) }
-  function openEdit(item: TaxItem) { setFormData({ name: item.name, rate: item.rate as any, isDefault: item.isDefault }); setEditing(item); setModalOpen(true) }
+  function openEdit(item: TaxItem) { setFormData({ name: item.name, rate: String(item.rate), isDefault: item.isDefault }); setEditing(item); setModalOpen(true) }
   function closeModal() { setModalOpen(false); setEditing(null) }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const payload = { name: formData.name, rate: parseFloat(formData.rate as any) || 0, isDefault: formData.isDefault }
+    const payload = { name: formData.name, rate: Number.parseFloat(formData.rate) || 0, isDefault: formData.isDefault }
     if (editing) updateMutation.mutate({ id: editing.id, data: payload })
     else createMutation.mutate(payload)
   }
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function renderTaxesContent() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      )
+    }
+    if (items.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No taxes configured. Add your first tax rate.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Rate</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Default</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-medium">{item.name}</td>
+              <td className="px-4 py-2.5 text-right font-mono">{item.rate}%</td>
+              <td className="px-4 py-2.5 text-center">
+                {item.isDefault && <Star className="h-4 w-4 text-amber-500 mx-auto fill-amber-500" />}
+              </td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">{item.isActive ? 'Active' : 'Inactive'}</Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -1092,43 +981,7 @@ function TaxesConfig() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : items.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">No taxes configured. Add your first tax rate.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
-                  <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Rate</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Default</th>
-                  <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
-                  <th className="w-[80px] px-4 py-2.5"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-accent/30 transition-colors">
-                    <td className="px-4 py-2.5 font-medium">{item.name}</td>
-                    <td className="px-4 py-2.5 text-right font-mono">{item.rate}%</td>
-                    <td className="px-4 py-2.5 text-center">
-                      {item.isDefault && <Star className="h-4 w-4 text-amber-500 mx-auto fill-amber-500" />}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">{item.isActive ? 'Active' : 'Inactive'}</Badge>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-0.5 justify-end">
-                        <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          {renderTaxesContent()}
         </CardContent>
       </Card>
 
@@ -1143,7 +996,7 @@ function TaxesConfig() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm">Rate (%) <span className="text-red-500">*</span></Label>
-              <Input type="number" step="0.01" min="0" max="100" value={formData.rate} onChange={(e) => setFormData({ ...formData, rate: e.target.value as any })} placeholder="e.g., 12" required />
+              <Input type="number" step="0.01" min="0" max="100" value={formData.rate} onChange={(e) => setFormData({ ...formData, rate: e.target.value })} placeholder="e.g., 12" required />
             </div>
             <div className="flex items-center gap-3">
               <Switch checked={formData.isDefault} onCheckedChange={(val) => setFormData({ ...formData, isDefault: val })} />
@@ -1175,6 +1028,145 @@ function TaxesConfig() {
 }
 
 // ============================================================
+// Config Table with Description (Purchase Terms / Delivery Terms)
+// ============================================================
+
+type ConfigWithDescItem = { id: string; name: string; description: string | null; isDefault: boolean; isActive: boolean }
+
+function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{ endpoint: string; label: string; showDefault?: boolean }>) {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<ConfigWithDescItem | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ConfigWithDescItem | null>(null)
+  const [formData, setFormData] = useState({ name: '', description: '', isDefault: false })
+
+  const { data: response, isLoading } = useQuery({
+    queryKey: [endpoint, search],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '1000' })
+      if (search) params.set('search', search)
+      return (await api.get<{ data: ConfigWithDescItem[] }>(`/${endpoint}?${params}`)).data
+    },
+  })
+  const items = response?.data ?? []
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post(`/${endpoint}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [endpoint] }); closeModal(); toast({ title: `${label} created` }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || `Failed to create.`, variant: 'destructive' }),
+  })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/${endpoint}/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [endpoint] }); closeModal(); toast({ title: `${label} updated` }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || `Failed to update.`, variant: 'destructive' }),
+  })
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/${endpoint}/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [endpoint] }); setDeleteTarget(null); toast({ title: `${label} deleted` }) },
+    onError: () => toast({ title: 'Error', description: `Failed to delete.`, variant: 'destructive' }),
+  })
+
+  function openAdd() { setFormData({ name: '', description: '', isDefault: false }); setEditing(null); setModalOpen(true) }
+  function openEdit(item: ConfigWithDescItem) { setFormData({ name: item.name, description: item.description || '', isDefault: item.isDefault }); setEditing(item); setModalOpen(true) }
+  function closeModal() { setModalOpen(false); setEditing(null) }
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const payload = { name: formData.name, description: formData.description || null, isDefault: formData.isDefault }
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function renderConfigWithDescContent() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      )
+    }
+    if (items.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No {label.toLowerCase()}s found.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Description</th>
+            {showDefault && <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Default</th>}
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-medium">{item.name}</td>
+              <td className="px-4 py-2.5 text-muted-foreground text-xs max-w-[300px] truncate">{item.description || '—'}</td>
+              {showDefault && <td className="px-4 py-2.5 text-center">{item.isDefault && <Star className="h-4 w-4 text-amber-500 mx-auto fill-amber-500" />}</td>}
+              <td className="px-4 py-2.5 text-center"><Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">{item.isActive ? 'Active' : 'Inactive'}</Badge></td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Input placeholder={`Search ${label.toLowerCase()}s...`} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs h-9" />
+        <Button size="sm" onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+          <Plus className="h-4 w-4 mr-1" /> Add {label}
+        </Button>
+      </div>
+      <Card>
+        <CardContent className="p-0">
+          {renderConfigWithDescContent()}
+        </CardContent>
+      </Card>
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>{editing ? `Edit ${label}` : `Add ${label}`}</DialogTitle>
+          <DialogDescription>{editing ? `Update details.` : `Add a new ${label.toLowerCase()}.`}</DialogDescription>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder={`e.g., ${label} name`} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Description</Label>
+              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={2} placeholder="Optional description..." />
+            </div>
+            {showDefault && (
+              <div className="flex items-center gap-3">
+                <Switch checked={formData.isDefault} onCheckedChange={(val) => setFormData({ ...formData, isDefault: val })} />
+                <Label className="text-sm">Set as default</Label>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
+              <Button type="submit" disabled={!formData.name || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editing ? 'Save' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} title={`Delete ${label}`} description={`Delete "${deleteTarget?.name}"?`} confirmLabel="Delete" variant="destructive" onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)} isLoading={deleteMutation.isPending} />
+    </div>
+  )
+}
+
+// ============================================================
 // Settings Page
 // ============================================================
 
@@ -1195,6 +1187,9 @@ export default function SettingsPage() {
           <TabsTrigger value="origins" className="gap-1.5"><Globe className="h-4 w-4" /> Origins</TabsTrigger>
           <TabsTrigger value="currencies" className="gap-1.5"><Coins className="h-4 w-4" /> Currencies</TabsTrigger>
           <TabsTrigger value="taxes" className="gap-1.5"><Percent className="h-4 w-4" /> Taxes</TabsTrigger>
+          <TabsTrigger value="purchase-terms" className="gap-1.5"><FileText className="h-4 w-4" /> Purchase Terms</TabsTrigger>
+          <TabsTrigger value="delivery-terms" className="gap-1.5"><Truck className="h-4 w-4" /> Delivery Terms</TabsTrigger>
+          <TabsTrigger value="delivery-types" className="gap-1.5"><Truck className="h-4 w-4" /> Type of Delivery</TabsTrigger>
         </TabsList>
 
         {/* General Tab */}
@@ -1379,6 +1374,21 @@ export default function SettingsPage() {
         {/* Taxes Tab */}
         <TabsContent value="taxes">
           <TaxesConfig />
+        </TabsContent>
+
+        {/* Purchase Terms Tab */}
+        <TabsContent value="purchase-terms">
+          <ConfigTableWithDesc endpoint="purchase-terms" label="Purchase Term" showDefault={false} />
+        </TabsContent>
+
+        {/* Delivery Terms Tab */}
+        <TabsContent value="delivery-terms">
+          <ConfigTableWithDesc endpoint="delivery-terms" label="Delivery Term" showDefault={false} />
+        </TabsContent>
+
+        {/* Type of Delivery Tab */}
+        <TabsContent value="delivery-types">
+          <SimpleConfigTable endpoint="delivery-types" label="Delivery Type" />
         </TabsContent>
       </Tabs>
     </div>

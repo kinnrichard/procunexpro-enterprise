@@ -20,8 +20,8 @@ export class AuditController {
     @Query('userId') userId?: string,
   ) {
     return this.auditService.findAll(req.user.tenantId, {
-      page: page ? parseInt(page) : undefined,
-      limit: limit ? parseInt(limit) : undefined,
+      page: page ? Number.parseInt(page) : undefined,
+      limit: limit ? Number.parseInt(limit) : undefined,
       search,
       entityType,
       action,

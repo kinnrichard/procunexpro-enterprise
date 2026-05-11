@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { formatDate, formatDateTime, getInitials } from '@/lib/utils';
+import { formatDate, formatDateTime, getInitials, cn } from '@/lib/utils';
 import { useCurrencyStore } from '@/lib/currency';
 import { useTaxStore } from '@/lib/tax';
-import { cn } from '@/lib/utils';
 import { StatusBadge } from '@/components/status-badge';
 import { DocumentsPanel } from '@/components/documents-panel';
+import { CommentsPanel } from '@/components/comments-panel';
+import { ActivityPanel } from '@/components/activity-panel';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Input } from '@/components/ui/input';
@@ -23,8 +24,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  ArrowLeft, Plus, Trash2, Loader2, Send, CheckCircle, XCircle, Users,
+  ArrowLeft, Plus, Trash2, Loader2, Send, CheckCircle, XCircle, X, Filter,
   Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info,
 } from 'lucide-react';
 
@@ -46,7 +48,7 @@ const statusSteps = [
   { key: 'CONVERTED', label: 'Converted to PO', icon: Link2 },
 ];
 
-function StatusTimeline({ status, rejectionNote }: { status: string; rejectionNote?: string }) {
+function StatusTimeline({ status, rejectionNote }: Readonly<{ status: string; rejectionNote?: string }>) {
   const isRejected = status === 'REJECTED';
   const isCancelled = status === 'CANCELLED';
   const currentIndex = statusOrder.indexOf(status);
@@ -65,30 +67,44 @@ function StatusTimeline({ status, rejectionNote }: { status: string; rejectionNo
     );
   }
 
-  const stepColors: Record<string, { completed: string; arrow: string }> = {
-    DRAFT: { completed: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300', arrow: 'text-gray-400' },
-    PENDING_APPROVAL: { completed: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', arrow: 'text-amber-400' },
-    APPROVED: { completed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', arrow: 'text-emerald-400' },
-    CONVERTED: { completed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', arrow: 'text-blue-400' },
+  const currentColors: Record<string, { chip: string; arrow: string }> = {
+    DRAFT: { chip: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300', arrow: 'text-gray-400' },
+    PENDING_APPROVAL: { chip: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', arrow: 'text-amber-400' },
+    APPROVED: { chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', arrow: 'text-emerald-400' },
+    CONVERTED: { chip: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', arrow: 'text-blue-400' },
   };
+
+  const doneChip = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+  const doneArrow = 'text-green-400';
 
   return (
     <div className="flex items-center gap-1">
       {statusSteps.map((step, i) => {
-        const isCompleted = currentIndex >= i;
+        const isCurrent = currentIndex === i;
+        const isDone = currentIndex > i;
+        const isActive = currentIndex >= i;
         const Icon = step.icon;
-        const colors = stepColors[step.key];
+        const colors = currentColors[step.key];
+        let chipClass: string;
+        if (isDone) chipClass = doneChip;
+        else if (isCurrent) chipClass = colors.chip;
+        else chipClass = 'bg-muted text-muted-foreground';
+
+        let arrowClass: string;
+        if (isDone) arrowClass = doneArrow;
+        else if (isActive) arrowClass = colors.arrow;
+        else arrowClass = 'text-muted-foreground/30';
         return (
           <div key={step.key} className="flex items-center">
             <div className={cn(
               'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors',
-              isCompleted ? colors.completed : 'bg-muted text-muted-foreground'
+              chipClass
             )}>
               <Icon className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{step.label}</span>
             </div>
             {i < statusSteps.length - 1 && (
-              <ChevronRight className={cn('h-4 w-4 mx-0.5 shrink-0', isCompleted ? colors.arrow : 'text-muted-foreground/30')} />
+              <ChevronRight className={cn('h-4 w-4 mx-0.5 shrink-0', arrowClass)} />
             )}
           </div>
         );
@@ -98,53 +114,90 @@ function StatusTimeline({ status, rejectionNote }: { status: string; rejectionNo
 }
 
 // ─── Inline Edit Cell ─────────────────────────────────────
-function InlineEditCell({ value, onSave, type = 'number', prefix, suffix, align = 'right', disabled }: {
-  value: number; onSave: (val: number) => void; type?: string; prefix?: string; suffix?: string; align?: 'left' | 'right' | 'center'; disabled?: boolean;
-}) {
+function InlineEditCell({ value, onSave, type = 'number', prefix, suffix, align = 'right', disabled, integer, stepper, toast: toastFn }: Readonly<{
+  value: number; onSave: (val: number) => void; type?: string; prefix?: string; suffix?: string; align?: 'left' | 'right' | 'center'; disabled?: boolean; integer?: boolean; stepper?: boolean; toast?: (opts: any) => void;
+}>) {
   const [editing, setEditing] = useState(false);
   const [localVal, setLocalVal] = useState(String(value));
 
-  if (disabled || !editing) {
+  const startEdit = (e: React.MouseEvent) => { e.stopPropagation(); setLocalVal(String(value)); setEditing(true); };
+  const decrement = (e: React.MouseEvent) => { e.stopPropagation(); const n = Math.max(1, value - 1); if (n !== value) onSave(n); };
+  const increment = (e: React.MouseEvent) => { e.stopPropagation(); onSave(value + 1); };
+  let alignClass = '';
+  if (align === 'right') alignClass = 'text-right';
+  else if (align === 'center') alignClass = 'text-center';
+
+  const clampInteger = (num: number): number => {
+    const raw = num;
+    const clamped = Math.min(Math.max(num > 0 ? Math.round(num) : 0, 0), 100);
+    if (raw > 100 && toastFn) toastFn({ title: 'Invalid discount', description: 'Discount cannot exceed 100%.', variant: 'destructive' });
+    else if (raw > 0 && raw < 1 && toastFn) toastFn({ title: 'Invalid discount', description: 'Discount must be at least 1%.', variant: 'destructive' });
+    return clamped;
+  };
+
+  const handleBlur = () => {
+    let num = Number.parseFloat(localVal) || 0;
+    if (integer) num = clampInteger(num);
+    if (num !== value) onSave(num);
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') e.currentTarget.blur();
+    if (e.key === 'Escape') { setLocalVal(String(value)); setEditing(false); }
+  };
+
+  const stepperBtn = (label: string, onClick: (e: React.MouseEvent) => void, borderCls: string) => (
+    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClick} className={`w-6 shrink-0 flex items-center justify-center border ${borderCls} bg-muted hover:bg-accent transition-colors text-muted-foreground text-xs`}>{label}</button>
+  );
+
+  // Idle stepper
+  if (!editing && stepper && !disabled) {
     return (
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); if (!disabled) { setLocalVal(String(value)); setEditing(true); } }}
-        className={cn(
-          'w-full font-mono text-xs px-2 py-1.5 rounded-md transition-colors',
-          disabled ? '' : 'border border-border/60 bg-background hover:border-primary/40 cursor-text',
-          align === 'right' && 'text-right',
-          align === 'center' && 'text-center',
-        )}
-      >
+      <div className="flex items-stretch gap-0">
+        {stepperBtn('−', decrement, 'border-border/60')}
+        <button type="button" onClick={startEdit} className="flex-1 font-mono text-xs px-2 py-1.5 transition-colors border-y border-border/60 bg-background hover:border-primary/40 cursor-text text-center">{prefix}{value}{suffix}</button>
+        {stepperBtn('+', increment, 'border-border/60')}
+      </div>
+    );
+  }
+
+  // Idle display
+  if (!editing) {
+    return (
+      <button type="button" onClick={(e) => { if (!disabled) startEdit(e); }} className={cn('w-full font-mono text-xs px-2 py-1.5 transition-colors', disabled ? '' : 'border border-border/60 bg-background hover:border-primary/40 cursor-text rounded-none', alignClass)}>
         {prefix}{value}{suffix}
       </button>
     );
   }
 
-  return (
-    <input
-      type={type}
-      step="0.01"
-      autoFocus
-      value={localVal}
-      onChange={(e) => setLocalVal(e.target.value)}
-      onClick={(e) => e.stopPropagation()}
-      onBlur={() => {
-        const num = parseFloat(localVal) || 0;
-        if (num !== value) onSave(num);
-        setEditing(false);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.currentTarget.blur(); }
-        if (e.key === 'Escape') { setLocalVal(String(value)); setEditing(false); }
-      }}
-      className={cn(
-        'w-full font-mono text-xs px-1 py-0.5 rounded border border-primary/50 bg-background outline-none focus:ring-1 focus:ring-primary/30',
-        align === 'right' && 'text-right',
-        align === 'center' && 'text-center',
-      )}
-    />
+  // Editing input
+  const inputEl = (
+    <input type={type} step="0.01" autoFocus value={localVal} onChange={(e) => setLocalVal(e.target.value)} onClick={(e) => e.stopPropagation()} onBlur={handleBlur} onKeyDown={handleKeyDown}
+      className={cn('w-full font-mono text-xs px-1 py-0.5 border border-primary/50 bg-background outline-none focus:ring-1 focus:ring-primary/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none', alignClass)} />
   );
+
+  if (stepper) {
+    const stepEdit = (delta: number) => () => { const n = Math.max(1, (Number.parseInt(localVal) || 1) + delta); setLocalVal(String(n)); onSave(n); setEditing(false); };
+    return (
+      <div className="flex items-stretch gap-0">
+        {stepperBtn('−', stepEdit(-1), 'border-primary/50 border-r-0')}
+        {inputEl}
+        {stepperBtn('+', stepEdit(1), 'border-primary/50 border-l-0')}
+      </div>
+    );
+  }
+
+  return inputEl;
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+function getVendorPricing(item: any) {
+  if (item.vendor?.id && item.product?.pricings) {
+    const pricing = item.product.pricings.find((p: any) => p.vendorId === item.vendor.id);
+    if (pricing) return { opQty: pricing.originalPackagingQty || 1, pcsPerPack: pricing.pcsPerPack || 1, uom: pricing.originalPackagingUom || 'pcs' };
+  }
+  return { opQty: 1, pcsPerPack: 1, uom: 'pcs' };
 }
 
 // ─── Main Component ───────────────────────────────────────
@@ -161,21 +214,29 @@ export default function PurchaseRequestDetailPage() {
   const [editItem, setEditItem] = useState<any>(null);
   const [deleteItemTarget, setDeleteItemTarget] = useState<any>(null);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
-  const [editPrOpen, setEditPrOpen] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
+  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
   const [rejectionNote, setRejectionNote] = useState('');
+  const [editPrOpen, setEditPrOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editDepartmentId, setEditDepartmentId] = useState('');
   const [editPriority, setEditPriority] = useState('MEDIUM');
   const [editRequiredDate, setEditRequiredDate] = useState<Date | undefined>();
+  const [editPurchaseTerms, setEditPurchaseTerms] = useState('');
+  const [editDeliveryTerms, setEditDeliveryTerms] = useState('');
+  const [editDeliveryType, setEditDeliveryType] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [quickPriceOpen, setQuickPriceOpen] = useState(false);
   const [quickPriceVendorId, setQuickPriceVendorId] = useState('');
   const [quickPriceType, setQuickPriceType] = useState('local');
   const [quickPriceUnitCost, setQuickPriceUnitCost] = useState('');
   const [quickPriceSellingPrice, setQuickPriceSellingPrice] = useState('');
+  const [quickPriceOpQty, setQuickPriceOpQty] = useState('1');
+  const [quickPricePcsPerPack, setQuickPricePcsPerPack] = useState('1');
+  const [quickPriceUom, setQuickPriceUom] = useState('');
   const [quickPriceSaving, setQuickPriceSaving] = useState(false);
+  const [quickPriceProduct, setQuickPriceProduct] = useState<any>(null);
 
   // Item form state
   const [itemProductId, setItemProductId] = useState('');
@@ -188,12 +249,26 @@ export default function PurchaseRequestDetailPage() {
   const [itemTaxIncluded, setItemTaxIncluded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [productPricings, setProductPricings] = useState<any[]>([]);
-  const [pricingsLoading, setPricingsLoading] = useState(false);
 
   // Multi-select add items
   const [addItemSearch, setAddItemSearch] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<Map<string, { product: any; pricings: any[]; selectedPricingVendorId: string }>>(new Map());
   const [addingItems, setAddingItems] = useState(false);
+
+  // Multi-select delete items
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Line item search, filter & pagination
+  const [itemSearch, setItemSearch] = useState('');
+  const [itemVendorFilter, setItemVendorFilter] = useState('');
+  const [itemTaxableFilter, setItemTaxableFilter] = useState('');
+  const [itemTaxInclFilter, setItemTaxInclFilter] = useState('');
+  const [itemPriceMin, setItemPriceMin] = useState('');
+  const [itemPriceMax, setItemPriceMax] = useState('');
+  const [itemPage, setItemPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
 
   const { data: prData, isLoading } = useQuery({
     queryKey: ['pr-detail', prId],
@@ -215,6 +290,15 @@ export default function PurchaseRequestDetailPage() {
   });
   const departments = (deptData?.data?.data || []).map((d: any) => ({ value: d.id, label: d.name }));
 
+  const { data: ptData } = useQuery({ queryKey: ['purchase-terms-active'], queryFn: () => api.get('/purchase-terms/active') });
+  const purchaseTermOptions = (ptData?.data?.data || []).map((t: any) => ({ value: t.name, label: t.name }));
+
+  const { data: ddData } = useQuery({ queryKey: ['delivery-terms-active'], queryFn: () => api.get('/delivery-terms/active') });
+  const deliveryTermOptions = (ddData?.data?.data || []).map((d: any) => ({ value: d.name, label: d.name }));
+
+  const { data: dtData } = useQuery({ queryKey: ['delivery-types-active'], queryFn: () => api.get('/delivery-types/active') });
+  const deliveryTypeOptions = (dtData?.data?.data || []).map((d: any) => ({ value: d.name, label: d.name }));
+
   const { data: currenciesRes } = useQuery({
     queryKey: ['currencies-active'],
     queryFn: () => api.get('/currencies/active'),
@@ -229,9 +313,37 @@ export default function PurchaseRequestDetailPage() {
 
   const isDraft = pr?.status === 'DRAFT';
 
+  const filteredItems = (pr?.items || []).filter((item: any) => {
+    if (itemVendorFilter && item.vendor?.id !== itemVendorFilter) return false;
+    if (itemTaxableFilter && itemTaxableFilter !== 'all') {
+      if (itemTaxableFilter === 'yes' && !item.taxable) return false;
+      if (itemTaxableFilter === 'no' && item.taxable) return false;
+    }
+    if (itemTaxInclFilter && itemTaxInclFilter !== 'all') {
+      if (itemTaxInclFilter === 'yes' && !item.taxIncluded) return false;
+      if (itemTaxInclFilter === 'no' && item.taxIncluded) return false;
+    }
+    if (itemPriceMin && (item.estimatedPrice || 0) < Number.parseFloat(itemPriceMin)) return false;
+    if (itemPriceMax && (item.estimatedPrice || 0) > Number.parseFloat(itemPriceMax)) return false;
+    if (itemSearch) {
+      const q = itemSearch.toLowerCase();
+      const name = (item.product?.name || item.description || '').toLowerCase();
+      const sku = (item.product?.sku || '').toLowerCase();
+      const vendor = (item.vendor?.name || '').toLowerCase();
+      if (!name.includes(q) && !sku.includes(q) && !vendor.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const itemTotalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+  const paginatedItems = filteredItems.slice((itemPage - 1) * ITEMS_PER_PAGE, itemPage * ITEMS_PER_PAGE);
+
+  const itemVendors = [...new Map((pr?.items || []).filter((i: any) => i.vendor).map((i: any) => [i.vendor.id, i.vendor])).values()] as { id: string; name: string }[];
+
   function calcLineAmount(item: any) {
-    const pkgQty = item.quantity || item.product?.originalPackagingQty || 0;
-    const pcsPerPack = item.product?.pcsPerPack || 0;
+    const vp = getVendorPricing(item);
+    const pkgQty = item.quantity || vp.opQty;
+    const pcsPerPack = vp.pcsPerPack;
     const invQty = pkgQty * pcsPerPack;
     const subtotal = invQty * (item.estimatedPrice || 0);
     const discounted = subtotal - (subtotal * (item.discount || 0) / 100);
@@ -257,7 +369,6 @@ export default function PurchaseRequestDetailPage() {
     if (!productId) return;
 
     // Fetch pricings for selected product
-    setPricingsLoading(true);
     try {
       const { data } = await api.get(`/products/${productId}/pricings-summary`);
       setProductPricings(data.pricings || []);
@@ -270,8 +381,6 @@ export default function PurchaseRequestDetailPage() {
       }
     } catch {
       // No pricing available
-    } finally {
-      setPricingsLoading(false);
     }
   }
 
@@ -287,15 +396,10 @@ export default function PurchaseRequestDetailPage() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['pr-detail', prId] });
     queryClient.invalidateQueries({ queryKey: ['purchase-requests'] });
+    queryClient.invalidateQueries({ queryKey: ['audit', 'PURCHASE_REQUEST', prId] });
   };
 
   // ─── Item Mutations ─────────────────────────────────────
-  const addItemMutation = useMutation({
-    mutationFn: (data: any) => api.post(`/purchase-requests/${prId}/items`, data),
-    onSuccess: () => { invalidate(); closeItemForm(); toast({ title: 'Item added' }); },
-    onError: () => toast({ title: 'Failed to add item', variant: 'destructive' }),
-  });
-
   const updateItemMutation = useMutation({
     mutationFn: ({ itemId, data }: { itemId: string; data: any }) => api.patch(`/purchase-requests/${prId}/items/${itemId}`, data),
     onSuccess: () => { invalidate(); closeItemForm(); toast({ title: 'Item updated' }); },
@@ -308,11 +412,38 @@ export default function PurchaseRequestDetailPage() {
     onError: () => toast({ title: 'Failed to remove item', variant: 'destructive' }),
   });
 
-  const applyVendorMutation = useMutation({
-    mutationFn: (vendorId: string) => api.post(`/purchase-requests/${prId}/items/apply-vendor`, { vendorId }),
-    onSuccess: () => { invalidate(); setApplyVendorOpen(false); setApplyVendorId(''); toast({ title: 'Vendor applied to all items' }); },
-    onError: () => toast({ title: 'Failed to apply vendor', variant: 'destructive' }),
-  });
+  async function handleBulkDelete() {
+    setBulkDeleting(true);
+    try {
+      await Promise.all(
+        Array.from(selectedItemIds).map((id) => api.delete(`/purchase-requests/${prId}/items/${id}`))
+      );
+      invalidate();
+      toast({ title: `${selectedItemIds.size} item${selectedItemIds.size > 1 ? 's' : ''} removed` });
+      setSelectedItemIds(new Set());
+      setBulkDeleteConfirmOpen(false);
+    } catch {
+      toast({ title: 'Failed to remove some items', variant: 'destructive' });
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  function toggleItemSelect(itemId: string) {
+    const next = new Set(selectedItemIds);
+    if (next.has(itemId)) next.delete(itemId);
+    else next.add(itemId);
+    setSelectedItemIds(next);
+  }
+
+  function toggleAllItems() {
+    if (!pr?.items) return;
+    if (selectedItemIds.size === pr.items.length) {
+      setSelectedItemIds(new Set());
+    } else {
+      setSelectedItemIds(new Set(pr.items.map((i: any) => i.id)));
+    }
+  }
 
   // ─── Status Mutations ──────────────────────────────────
   const submitMutation = useMutation({
@@ -329,7 +460,7 @@ export default function PurchaseRequestDetailPage() {
 
   const rejectMutation = useMutation({
     mutationFn: (note: string) => api.put(`/purchase-requests/${prId}/reject`, { rejectionNote: note }),
-    onSuccess: () => { invalidate(); setRejectOpen(false); setRejectionNote(''); toast({ title: 'Purchase request rejected' }); },
+    onSuccess: () => { invalidate(); setRejectConfirmOpen(false); setRejectionNote(''); toast({ title: 'Purchase request rejected' }); },
     onError: () => toast({ title: 'Failed to reject', variant: 'destructive' }),
   });
 
@@ -340,22 +471,25 @@ export default function PurchaseRequestDetailPage() {
     onError: () => toast({ title: 'Failed to update', variant: 'destructive' }),
   });
 
-  const { data: tenantsData } = useQuery({
-    queryKey: ['tenants-all'],
-    queryFn: () => api.get('/tenants', { params: { limit: 1000 } }),
+  const { data: companiesData } = useQuery({
+    queryKey: ['companies-active'],
+    queryFn: () => api.get('/companies/active'),
   });
-  const companies = (tenantsData?.data?.data || []).map((t: any) => ({ value: t.id, label: t.companyName }));
+  const companies = (companiesData?.data?.data || []).map((c: any) => ({ value: c.id, label: c.name }));
 
   const [editCompanyId, setEditCompanyId] = useState('');
 
   function openEditPr() {
     if (!pr) return;
-    setEditCompanyId(pr.tenantId || '');
+    setEditCompanyId(pr.companyId || '');
     setEditTitle(pr.title);
     setEditDescription(pr.description || '');
     setEditDepartmentId(pr.departmentId || '');
     setEditPriority(pr.priority);
     setEditRequiredDate(pr.requiredDate ? new Date(pr.requiredDate) : undefined);
+    setEditPurchaseTerms(pr.purchaseTerms || '');
+    setEditDeliveryTerms(pr.deliveryTerms || '');
+    setEditDeliveryType(pr.deliveryType || '');
     setEditNotes(pr.notes || '');
     setEditPrOpen(true);
   }
@@ -363,12 +497,15 @@ export default function PurchaseRequestDetailPage() {
   function handleEditPrSubmit(e: React.FormEvent) {
     e.preventDefault();
     updatePrMutation.mutate({
-      tenantId: editCompanyId || undefined,
+      companyId: editCompanyId || undefined,
       title: editTitle,
       description: editDescription || null,
       departmentId: editDepartmentId || null,
       priority: editPriority,
       requiredDate: editRequiredDate?.toISOString() || null,
+      purchaseTerms: editPurchaseTerms || null,
+      deliveryTerms: editDeliveryTerms || null,
+      deliveryType: editDeliveryType || null,
       notes: editNotes || null,
     });
   }
@@ -385,7 +522,7 @@ export default function PurchaseRequestDetailPage() {
     setEditItem(item);
     setItemProductId(item.productId || '');
     setItemQty(item.quantity);
-    setItemPrice(item.estimatedPrice != null ? String(item.estimatedPrice) : '');
+    setItemPrice(item.estimatedPrice !== null && item.estimatedPrice !== undefined ? String(item.estimatedPrice) : '');
     setItemVendorId(item.vendorId || '');
     setItemNotes(item.notes || '');
     setItemDiscount(item.discount || 0);
@@ -458,7 +595,7 @@ export default function PurchaseRequestDetailPage() {
     const data = {
       productId: itemProductId,
       quantity: itemQty,
-      estimatedPrice: itemPrice ? parseFloat(itemPrice) : undefined,
+      estimatedPrice: itemPrice ? Number.parseFloat(itemPrice) : undefined,
       vendorId: itemVendorId || null,
       notes: itemNotes || undefined,
       discount: itemDiscount,
@@ -466,6 +603,46 @@ export default function PurchaseRequestDetailPage() {
       taxIncluded: itemTaxIncluded,
     };
     updateItemMutation.mutate({ itemId: editItem.id, data }, { onSettled: () => setIsSubmitting(false) });
+  }
+
+  function openQuickPrice(product: any) {
+    setQuickPriceProduct(product);
+    setQuickPriceVendorId('');
+    setQuickPriceType('local');
+    setQuickPriceUnitCost('');
+    setQuickPriceSellingPrice('');
+    setQuickPriceOpQty('1');
+    setQuickPricePcsPerPack('1');
+    setQuickPriceUom('');
+    setQuickPriceOpen(true);
+  }
+
+  async function handleQuickPriceSave() {
+    if (!quickPriceProduct || !quickPriceVendorId || !quickPriceUnitCost) return;
+    setQuickPriceSaving(true);
+    try {
+      await api.post(`/products/${quickPriceProduct.id}/pricings`, {
+        vendorId: quickPriceVendorId,
+        type: quickPriceType,
+        originalPackagingQty: Number.parseInt(quickPriceOpQty) || 1,
+        pcsPerPack: Number.parseInt(quickPricePcsPerPack) || 1,
+        originalPackagingUom: quickPriceUom || 'pcs',
+        unitCost: Number.parseFloat(quickPriceUnitCost),
+        sellingPrice: quickPriceSellingPrice ? Number.parseFloat(quickPriceSellingPrice) : Number.parseFloat(quickPriceUnitCost),
+        currency: defaultCurrency,
+        minOrderQty: 1,
+        effectiveDate: new Date().toISOString().split('T')[0],
+      });
+      toast({ title: 'Pricing added', description: `Pricing added for ${quickPriceProduct.name}` });
+      setQuickPriceOpen(false);
+      setQuickPriceProduct(null);
+      // Refresh products list so _count updates
+      queryClient.invalidateQueries({ queryKey: ['products-all'] });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to add pricing.', variant: 'destructive' });
+    } finally {
+      setQuickPriceSaving(false);
+    }
   }
 
   // Filtered products for the picker
@@ -483,6 +660,13 @@ export default function PurchaseRequestDetailPage() {
 
   if (isLoading) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Loading…</div>;
   if (!pr) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Purchase request not found</div>;
+
+  // Header checkbox state
+  const headerAllSelected = selectedItemIds.size > 0 && selectedItemIds.size === pr.items?.length;
+  const headerSomeSelected = selectedItemIds.size > 0 && !headerAllSelected;
+  let headerCheckboxClass = 'border-border';
+  if (headerAllSelected) headerCheckboxClass = 'bg-primary border-primary';
+  else if (headerSomeSelected) headerCheckboxClass = 'border-primary bg-primary/20';
 
   return (
     <div className="space-y-6">
@@ -508,17 +692,17 @@ export default function PurchaseRequestDetailPage() {
             </Button>
           )}
           {isDraft && (
-            <Button onClick={() => setSubmitConfirmOpen(true)} disabled={submitMutation.isPending || (pr.items?.length || 0) === 0} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button onClick={() => setSubmitConfirmOpen(true)} disabled={submitMutation.isPending || (pr.items?.length || 0) === 0} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
               {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
               Submit for Approval
             </Button>
           )}
           {pr.status === 'PENDING_APPROVAL' && (
             <>
-              <Button onClick={() => approveMutation.mutate()} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+              <Button onClick={() => setApproveConfirmOpen(true)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
                 <CheckCircle className="h-4 w-4 mr-2" /> Approve
               </Button>
-              <Button variant="destructive" onClick={() => setRejectOpen(true)}>
+              <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}>
                 <XCircle className="h-4 w-4 mr-2" /> Reject
               </Button>
             </>
@@ -539,7 +723,13 @@ export default function PurchaseRequestDetailPage() {
 
         {/* ─── Details Tab ──────────────────────────────── */}
         <TabsContent value="details" className="mt-5 space-y-6">
-          <StatusTimeline status={pr.status} rejectionNote={pr.rejectionNote} />
+          <div className="flex items-start justify-between gap-4">
+            <StatusTimeline status={pr.status} rejectionNote={pr.rejectionNote} />
+            <div className="text-right shrink-0">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total Amount</p>
+              <p className="text-2xl font-bold font-mono text-primary">{formatCurrency(totalAmount)}</p>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-4">
             <div className="space-y-1">
@@ -552,6 +742,10 @@ export default function PurchaseRequestDetailPage() {
               </div>
             </div>
             <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Company</p>
+              <p className="text-sm font-medium flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-muted-foreground" />{pr.company?.name || '—'}</p>
+            </div>
+            <div className="space-y-1">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Department</p>
               <p className="text-sm font-medium flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 text-muted-foreground" />{pr.department?.name || '—'}</p>
             </div>
@@ -560,16 +754,24 @@ export default function PurchaseRequestDetailPage() {
               <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', priorityColors[pr.priority])}>{pr.priority}</span>
             </div>
             <div className="space-y-1">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Total Amount</p>
-              <p className="text-sm font-bold text-primary">{formatCurrency(pr.totalAmount || 0)}</p>
-            </div>
-            <div className="space-y-1">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Required Date</p>
               <p className="text-sm flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-muted-foreground" />{pr.requiredDate ? formatDate(pr.requiredDate) : 'Not specified'}</p>
             </div>
             <div className="space-y-1">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Created</p>
               <p className="text-sm">{pr.createdAt ? formatDateTime(pr.createdAt) : '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Purchase Terms</p>
+              <p className="text-sm font-medium">{pr.purchaseTerms || '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Delivery Terms</p>
+              <p className="text-sm font-medium">{pr.deliveryTerms || '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Type of Delivery</p>
+              <p className="text-sm font-medium">{pr.deliveryType || '—'}</p>
             </div>
             {pr.approvedAt && (
               <div className="space-y-1">
@@ -581,10 +783,11 @@ export default function PurchaseRequestDetailPage() {
 
           {pr.description && (
             <div className="space-y-1">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Description</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Purpose of Request</p>
               <p className="text-sm text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">{pr.description}</p>
             </div>
           )}
+
 
           {pr.notes && (
             <div className="space-y-1">
@@ -600,48 +803,164 @@ export default function PurchaseRequestDetailPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-semibold">Line Items</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {pr.items?.length || 0} item{(pr.items?.length || 0) !== 1 && 's'}
-                  {totalAmount > 0 && <> · Est. total: <span className="font-mono font-semibold">{formatCurrency(totalAmount)}</span></>}
-                </p>
+                {(() => {
+                  const totalCount = pr.items?.length || 0;
+                  const pluralSuffix = totalCount !== 1 ? 's' : '';
+                  const itemCountText = filteredItems.length !== totalCount
+                    ? `${filteredItems.length} of ${totalCount} item${pluralSuffix}`
+                    : `${totalCount} item${pluralSuffix}`;
+                  return <p className="text-xs text-muted-foreground mt-0.5">{itemCountText}</p>;
+                })()}
               </div>
-              {isDraft && (
-                <Button size="sm" onClick={openAddItem} className="bg-gradient-primary text-white">
-                  <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {isDraft && selectedItemIds.size > 0 && (
+                  <Button size="sm" variant="destructive" onClick={() => setBulkDeleteConfirmOpen(true)}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete {selectedItemIds.size}
+                  </Button>
+                )}
+                {isDraft && (
+                  <Button size="sm" onClick={openAddItem} className="bg-gradient-primary text-white">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item
+                  </Button>
+                )}
+              </div>
             </div>
 
-            {(!pr.items || pr.items.length === 0) ? (
+            {(pr.items?.length || 0) > 0 && (() => {
+              const activeItemFilterCount = [itemVendorFilter, itemTaxableFilter && itemTaxableFilter !== 'all' ? itemTaxableFilter : '', itemTaxInclFilter && itemTaxInclFilter !== 'all' ? itemTaxInclFilter : '', itemPriceMin, itemPriceMax].filter(Boolean).length;
+              return (
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Search items..."
+                    value={itemSearch}
+                    onChange={(e) => { setItemSearch(e.target.value); setItemPage(1); }}
+                    className="max-w-[220px] h-8 text-sm"
+                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 relative">
+                        <Filter className="h-3.5 w-3.5 mr-1.5" /> Filters
+                        {activeItemFilterCount > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">{activeItemFilterCount}</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/50">
+                        <p className="text-sm font-semibold">Filters</p>
+                        {activeItemFilterCount > 0 && (
+                          <button onClick={() => { setItemVendorFilter(''); setItemTaxableFilter(''); setItemTaxInclFilter(''); setItemPriceMin(''); setItemPriceMax(''); setItemPage(1); }} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                            <X className="h-3 w-3" /> Clear all
+                          </button>
+                        )}
+                      </div>
+                      <div className="p-4 space-y-4 max-h-[380px] overflow-y-auto">
+                        {itemVendors.length > 0 && (
+                          <div className="space-y-1.5">
+                            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Vendor</Label>
+                            <SearchableSelect
+                              options={[{ value: '', label: 'All Vendors' }, ...itemVendors.map(v => ({ value: v.id, label: v.name }))]}
+                              value={itemVendorFilter}
+                              onChange={setItemVendorFilter}
+                              placeholder="All Vendors"
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Taxable</Label>
+                          <Select value={itemTaxableFilter || 'all'} onValueChange={(v) => setItemTaxableFilter(v === 'all' ? '' : v)}>
+                            <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All</SelectItem>
+                              <SelectItem value="yes">Taxable</SelectItem>
+                              <SelectItem value="no">Not Taxable</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Tax Included</Label>
+                          <Select value={itemTaxInclFilter || 'all'} onValueChange={(v) => setItemTaxInclFilter(v === 'all' ? '' : v)}>
+                            <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All</SelectItem>
+                              <SelectItem value="yes">Tax Included</SelectItem>
+                              <SelectItem value="no">Tax Excluded</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Unit Price</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input type="number" value={itemPriceMin} onChange={(e) => setItemPriceMin(e.target.value)} className="h-9 rounded-lg" placeholder="Min" />
+                            <Input type="number" value={itemPriceMax} onChange={(e) => setItemPriceMax(e.target.value)} className="h-9 rounded-lg" placeholder="Max" />
+                          </div>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              );
+            })()}
+
+            {((!pr.items || pr.items.length === 0) && (
               <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
                 <p className="text-sm text-muted-foreground mb-2">No line items yet</p>
                 {isDraft && <button onClick={openAddItem} className="text-sm text-primary font-medium hover:underline">+ Add first item</button>}
               </div>
-            ) : (
+            )) || (filteredItems.length === 0 && (
+              <div className="text-center py-8 border border-border rounded-xl">
+                <p className="text-sm text-muted-foreground">No items match your search.</p>
+              </div>
+            )) || (
+              <>
               <div className="border border-border rounded-xl overflow-x-auto">
                 <table className="w-full text-sm min-w-[1250px]">
                   <thead>
                     <tr className="bg-muted/50 text-muted-foreground text-[10.5px] uppercase tracking-wider">
+                      {isDraft && (
+                        <th className="px-3 py-2.5 w-[36px]">
+                          <button
+                            onClick={toggleAllItems}
+                            className={cn(
+                              'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+                              headerCheckboxClass
+                            )}
+                          >
+                            {headerAllSelected && <CheckCircle className="h-2.5 w-2.5 text-primary-foreground" />}
+                            {headerSomeSelected && <div className="w-2 h-0.5 bg-primary rounded-full" />}
+                          </button>
+                        </th>
+                      )}
                       <th className="text-left px-3 py-2.5 w-[40px]">#</th>
                       <th className="text-left px-3 py-2.5 w-[180px]">Name</th>
                       <th className="text-left px-3 py-2.5 w-[65px]">OP UOM</th>
                       <th className="text-center px-3 py-2.5 w-[60px]">OP Qty</th>
                       <th className="text-center px-3 py-2.5 w-[65px]">Pcs/Pack</th>
-                      <th className="text-center px-3 py-2.5 w-[70px]">Inv Qty</th>
+                      <th className="text-center px-3 py-2.5 w-[70px]">
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center gap-1 cursor-help">Inv Qty <Info className="h-3 w-3 text-muted-foreground" /></span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">OP Qty × Pcs/Pack</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </th>
                       <th className="text-left px-3 py-2.5 w-[130px]">Vendor</th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Unit Price</th>
                       <th className="text-right px-3 py-2.5 w-[70px]">Discount</th>
                       <th className="text-center px-3 py-2.5 w-[55px]"><div className="flex items-center justify-center gap-1">Taxable <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Subject to tax calculation</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-center px-3 py-2.5 w-[55px]"><div className="flex items-center justify-center gap-1">Tax Incl <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Price already includes tax</p></TooltipContent></Tooltip></TooltipProvider></div></th>
-                      <th className="text-right px-3 py-2.5 w-[65px]"><div className="flex items-center justify-end gap-1">Tax % <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Default tax rate: {taxRate}%</p></TooltipContent></Tooltip></TooltipProvider></div></th>
+                      <th className="text-right px-3 py-2.5 w-[80px]"><div className="flex items-center justify-end gap-1">Tax <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Default tax rate: {taxRate}%</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Amount</th>
-                      {isDraft && <th className="px-3 py-2.5 w-[40px]"></th>}
+                      <th className="px-3 py-2.5 w-[60px]"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pr.items.map((item: any) => {
-                      const pkgQty = item.quantity || item.product?.originalPackagingQty || 0;
-                      const pcsPerPack = item.product?.pcsPerPack || 0;
+                    {paginatedItems.map((item: any) => {
+                      const vp = getVendorPricing(item);
+                      const pkgQty = item.quantity || vp.opQty;
+                      const pcsPerPack = vp.pcsPerPack;
                       const invQty = pkgQty * pcsPerPack;
                       return (
                       <tr
@@ -649,17 +968,30 @@ export default function PurchaseRequestDetailPage() {
                         className={cn('border-t border-border/50 transition-colors', isDraft && 'hover:bg-accent/50 cursor-pointer')}
                         onClick={() => isDraft && openEditItem(item)}
                       >
+                        {isDraft && (
+                          <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                            <button
+                              onClick={() => toggleItemSelect(item.id)}
+                              className={cn(
+                                'w-4 h-4 rounded border-2 flex items-center justify-center transition-colors',
+                                selectedItemIds.has(item.id) ? 'bg-primary border-primary' : 'border-border hover:border-primary/50'
+                              )}
+                            >
+                              {selectedItemIds.has(item.id) && <CheckCircle className="h-2.5 w-2.5 text-primary-foreground" />}
+                            </button>
+                          </td>
+                        )}
                         <td className="px-3 py-3 text-muted-foreground font-mono text-xs">{item.itemNumber}</td>
                         <td className="px-3 py-3">
                           <p className="font-medium">{item.product?.name || item.description || '—'}</p>
                           <p className="font-mono text-xs text-muted-foreground">{item.product?.sku || ''}</p>
                         </td>
-                        <td className="px-3 py-3 text-xs text-muted-foreground">{item.product?.originalPackagingUom || item.uom || '—'}</td>
+                        <td className="px-3 py-3 text-xs text-muted-foreground">{vp.uom?.toUpperCase() || item.uom || '—'}</td>
                         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                          <InlineEditCell value={pkgQty} onSave={(v) => inlineSave(item.id, 'quantity', v)} align="center" disabled={!isDraft} />
+                          <InlineEditCell value={pkgQty} onSave={(v) => inlineSave(item.id, 'quantity', v)} align="center" disabled={!isDraft} stepper />
                         </td>
                         <td className="px-3 py-3 text-center font-mono text-xs">{pcsPerPack || '—'}</td>
-                        <td className="px-3 py-3 text-center font-mono text-xs font-semibold">{invQty || '—'}</td>
+                        <td className="px-3 py-3 text-center font-mono text-xs font-semibold">{invQty ? invQty.toLocaleString() : '—'}</td>
                         <td className="px-3 py-3">
                           {item.vendor ? (
                             <div className="flex items-center gap-1.5">
@@ -677,35 +1009,100 @@ export default function PurchaseRequestDetailPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                          <InlineEditCell value={item.discount || 0} onSave={(v) => inlineSave(item.id, 'discount', v)} suffix="%" align="right" disabled={!isDraft} />
+                          <InlineEditCell value={item.discount || 0} onSave={(v) => inlineSave(item.id, 'discount', v)} suffix="%" align="right" disabled={!isDraft} integer toast={toast} />
+                          {(item.discount || 0) > 0 && (() => {
+                            const subtotal = (pkgQty * pcsPerPack) * (item.estimatedPrice || 0);
+                            const discAmt = subtotal * (item.discount / 100);
+                            return <p className="text-[10px] text-red-500 font-mono text-right mt-0.5">-{formatCurrency(discAmt)}</p>;
+                          })()}
                         </td>
-                        <td className="px-3 py-3 text-center">{item.taxable ? <span className="text-green-600 text-xs font-semibold">Yes</span> : <span className="text-muted-foreground text-xs">No</span>}</td>
-                        <td className="px-3 py-3 text-center">{item.taxIncluded ? <span className="text-blue-600 text-xs font-semibold">Yes</span> : <span className="text-muted-foreground text-xs">No</span>}</td>
-                        <td className="px-3 py-3 text-right font-mono text-xs text-muted-foreground">{item.taxable ? `${taxRate}%` : '—'}</td>
+                        <td className="px-3 py-3 text-center" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => isDraft && updateItemMutation.mutate({ itemId: item.id, data: { taxable: !item.taxable } })}
+                            disabled={!isDraft}
+                            className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors', isDraft && 'cursor-pointer hover:opacity-80', item.taxable ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground')}
+                          >{item.taxable ? 'Yes' : 'No'}</button>
+                        </td>
+                        <td className="px-3 py-3 text-center" onClick={e => e.stopPropagation()}>
+                          <button
+                            onClick={() => isDraft && updateItemMutation.mutate({ itemId: item.id, data: { taxIncluded: !item.taxIncluded } })}
+                            disabled={!isDraft}
+                            className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors', isDraft && 'cursor-pointer hover:opacity-80', item.taxIncluded ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-muted text-muted-foreground')}
+                          >{item.taxIncluded ? 'Yes' : 'No'}</button>
+                        </td>
+                        <td className="px-3 py-3 text-right font-mono text-xs text-muted-foreground">
+                          {item.taxable ? `${taxRate}%` : '—'}
+                          {item.taxable && taxRate > 0 && !item.taxIncluded && (() => {
+                            const sub = (pkgQty * pcsPerPack) * (item.estimatedPrice || 0);
+                            const disc = sub - (sub * (item.discount || 0) / 100);
+                            return <p className="text-[10px] text-muted-foreground/70 mt-0.5">{formatCurrency(disc * taxRate / 100)}</p>;
+                          })()}
+                        </td>
                         <td className="px-3 py-3 text-right font-mono font-medium">{formatCurrency(calcLineAmount(item))}</td>
-                        {isDraft && (
-                          <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => setDeleteItemTarget(item)} className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        )}
+                        <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-0.5">
+                            {item.notes ? (
+                              <TooltipProvider delayDuration={0}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-accent transition-colors">
+                                      <Info className="h-4 w-4" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" className="max-w-[250px]">
+                                    <p className="text-xs">{item.notes}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <div className="w-7" />
+                            )}
+                            {isDraft && (
+                              <button onClick={() => setDeleteItemTarget(item)} className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                     })}
                   </tbody>
-                  {totalAmount > 0 && (
-                    <tfoot>
-                      <tr className="border-t-2 border-border bg-muted/30">
-                        <td colSpan={12} className="px-3 py-3 text-right text-xs font-semibold text-muted-foreground">Total</td>
-                        <td className="px-3 py-3 text-right font-mono font-bold text-primary">{formatCurrency(totalAmount)}</td>
-                        {isDraft && <td></td>}
-                      </tr>
-                    </tfoot>
-                  )}
                 </table>
               </div>
-            )}
+              {itemTotalPages > 1 && (
+                <div className="flex items-center justify-between pt-3">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {(itemPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(itemPage * ITEMS_PER_PAGE, filteredItems.length)} of {filteredItems.length}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" className="h-7 text-xs" disabled={itemPage <= 1} onClick={() => setItemPage(itemPage - 1)}>Prev</Button>
+                    {Array.from({ length: itemTotalPages }, (_, i) => (
+                      <Button key={i} variant={itemPage === i + 1 ? 'default' : 'outline'} size="sm" className="h-7 w-7 text-xs p-0" onClick={() => setItemPage(i + 1)}>{i + 1}</Button>
+                    ))}
+                    <Button variant="outline" size="sm" className="h-7 text-xs" disabled={itemPage >= itemTotalPages} onClick={() => setItemPage(itemPage + 1)}>Next</Button>
+                  </div>
+                </div>
+              )}
+            </>
+            ))}
+          </div>
+
+          {/* ─── Comments & Activity ─────────────────────── */}
+          <Separator />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:h-[500px]">
+            <div className="flex flex-col gap-4 min-h-0">
+              <h2 className="text-base font-semibold shrink-0">Comments</h2>
+              <div className="flex-1 min-h-0">
+                {pr.id && <CommentsPanel entityType="PURCHASE_REQUEST" entityId={pr.id} />}
+              </div>
+            </div>
+            <div className="flex flex-col gap-4 min-h-0">
+              <h2 className="text-base font-semibold shrink-0">Activity</h2>
+              <div className="flex-1 min-h-0">
+                {pr.id && <ActivityPanel entityType="PURCHASE_REQUEST" entityId={pr.id} />}
+              </div>
+            </div>
           </div>
         </TabsContent>
 
@@ -745,36 +1142,58 @@ export default function PurchaseRequestDetailPage() {
               ) : (
                 <div className="space-y-1">
                   {filteredProducts.map((p: any) => {
+                    const hasPricing = (p._count?.pricings || 0) > 0;
                     const isSelected = selectedProducts.has(p.id);
                     const entry = selectedProducts.get(p.id);
+                    let productBtnClass = 'hover:bg-accent border border-transparent';
+                    if (!hasPricing) productBtnClass = 'opacity-50 cursor-not-allowed border border-transparent';
+                    else if (isSelected) productBtnClass = 'bg-primary/5 border border-primary/30';
+                    let productCheckClass = 'border-border';
+                    if (!hasPricing) productCheckClass = 'border-border bg-muted';
+                    else if (isSelected) productCheckClass = 'bg-primary border-primary';
                     return (
                       <div key={p.id}>
-                        <button
-                          type="button"
-                          onClick={() => toggleProductSelect(p)}
-                          className={cn(
-                            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
-                            isSelected ? 'bg-primary/5 border border-primary/30' : 'hover:bg-accent border border-transparent'
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => hasPricing && toggleProductSelect(p)}
+                            disabled={!hasPricing}
+                            className={cn(
+                              'flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
+                              productBtnClass
+                            )}
+                          >
+                            <div className={cn(
+                              'w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+                              productCheckClass
+                            )}>
+                              {isSelected && <CheckCircle className="h-3 w-3 text-primary-foreground" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium truncate">{p.name}</span>
+                                <span className="text-[10px] font-mono text-muted-foreground">{p.sku}</span>
+                                {!hasPricing && <span className="text-[9px] font-medium text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded-full">No Pricing</span>}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                <span>{p.manufacturer?.name || '—'}</span>
+                                <span>·</span>
+                                <span>{p.category?.name || '—'}</span>
+                              </div>
+                            </div>
+                          </button>
+                          {!hasPricing && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0 text-xs h-7 px-2.5"
+                              onClick={() => openQuickPrice(p)}
+                            >
+                              <Plus className="h-3 w-3 mr-1" /> Add Price
+                            </Button>
                           )}
-                        >
-                          <div className={cn(
-                            'w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
-                            isSelected ? 'bg-primary border-primary' : 'border-border'
-                          )}>
-                            {isSelected && <CheckCircle className="h-3 w-3 text-primary-foreground" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium truncate">{p.name}</span>
-                              <span className="text-[10px] font-mono text-muted-foreground">{p.sku}</span>
-                            </div>
-                            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                              <span>{p.manufacturer?.name || '—'}</span>
-                              <span>·</span>
-                              <span>{p.category?.name || '—'}</span>
-                            </div>
-                          </div>
-                        </button>
+                        </div>
 
                         {/* Pricing selection — shown when selected */}
                         {isSelected && entry && entry.pricings.length > 0 && (
@@ -802,9 +1221,6 @@ export default function PurchaseRequestDetailPage() {
                             </div>
                           </div>
                         )}
-                        {isSelected && entry && entry.pricings.length === 0 && (
-                          <p className="ml-8 mr-3 mb-2 mt-1 text-[11px] text-muted-foreground">No pricing configured.</p>
-                        )}
                       </div>
                     );
                   })}
@@ -814,19 +1230,107 @@ export default function PurchaseRequestDetailPage() {
 
             <div className="px-6 py-4 border-t border-border flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                {selectedProducts.size > 0 ? `${selectedProducts.size} product${selectedProducts.size > 1 ? 's' : ''} selected` : 'No products selected'}
+                {(() => {
+                  if (selectedProducts.size === 0) return 'No products selected';
+                  const productPlural = selectedProducts.size > 1 ? 's' : '';
+                  return `${selectedProducts.size} product${productPlural} selected`;
+                })()}
               </div>
               <div className="flex items-center gap-2">
                 <Button type="button" variant="ghost" onClick={closeItemForm}>Cancel</Button>
                 <Button onClick={handleAddSelectedItems} disabled={selectedProducts.size === 0 || addingItems} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
                   {addingItems && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Add {selectedProducts.size > 0 ? selectedProducts.size : ''} Item{selectedProducts.size !== 1 ? 's' : ''}
+                  {(() => {
+                    const countLabel = selectedProducts.size > 0 ? ` ${selectedProducts.size}` : '';
+                    const itemPlural = selectedProducts.size !== 1 ? 's' : '';
+                    return `Add${countLabel} Item${itemPlural}`;
+                  })()}
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ─── Quick Add Pricing Modal ─────────────────────── */}
+      <Dialog open={quickPriceOpen} onOpenChange={(open) => { if (!open) { setQuickPriceOpen(false); setQuickPriceProduct(null); } }}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
+            <DialogTitle>Quick Add Pricing</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">{quickPriceProduct?.name}</p>
+          </DialogHeader>
+          <div className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Vendor <span className="text-red-500">*</span></Label>
+              <SearchableSelect
+                options={vendors.map((v) => ({ value: v.id, label: v.name }))}
+                value={quickPriceVendorId}
+                onChange={setQuickPriceVendorId}
+                placeholder="Select vendor"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Type</Label>
+              <Select value={quickPriceType} onValueChange={setQuickPriceType}>
+                <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local">Local</SelectItem>
+                  <SelectItem value="imported">Imported</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">OP Qty <span className="text-red-500">*</span></Label>
+                <Input type="number" min="1" step="1" value={quickPriceOpQty} onChange={(e) => setQuickPriceOpQty(e.target.value)} placeholder="1" className="h-9 rounded-lg" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Pcs/Pack <span className="text-red-500">*</span></Label>
+                <Input type="number" min="1" step="1" value={quickPricePcsPerPack} onChange={(e) => setQuickPricePcsPerPack(e.target.value)} placeholder="1" className="h-9 rounded-lg" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">UOM <span className="text-red-500">*</span></Label>
+                <SearchableSelect
+                  options={[
+                    { value: 'pcs', label: 'Pieces (pcs)' }, { value: 'box', label: 'Box' }, { value: 'pack', label: 'Pack' },
+                    { value: 'set', label: 'Set' }, { value: 'kg', label: 'Kilogram (kg)' }, { value: 'g', label: 'Gram (g)' },
+                    { value: 'l', label: 'Liter (L)' }, { value: 'ml', label: 'Milliliter (mL)' }, { value: 'm', label: 'Meter (m)' },
+                    { value: 'roll', label: 'Roll' }, { value: 'bag', label: 'Bag' }, { value: 'bottle', label: 'Bottle' },
+                    { value: 'can', label: 'Can' }, { value: 'pair', label: 'Pair' }, { value: 'ream', label: 'Ream' },
+                    { value: 'unit', label: 'Unit' }, { value: 'sheet', label: 'Sheet' }, { value: 'carton', label: 'Carton' },
+                    { value: 'drum', label: 'Drum' }, { value: 'pallet', label: 'Pallet' }, { value: 'dozen', label: 'Dozen' },
+                    { value: 'bundle', label: 'Bundle' }, { value: 'spool', label: 'Spool' }, { value: 'tube', label: 'Tube' },
+                  ]}
+                  value={quickPriceUom}
+                  onChange={setQuickPriceUom}
+                  placeholder="Select UOM"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Unit Cost <span className="text-red-500">*</span></Label>
+                <Input type="number" min="0" step="0.01" value={quickPriceUnitCost} onChange={(e) => setQuickPriceUnitCost(e.target.value)} placeholder="0.00" className="h-9 rounded-lg" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Selling Price</Label>
+                <Input type="number" min="0" step="0.01" value={quickPriceSellingPrice} onChange={(e) => setQuickPriceSellingPrice(e.target.value)} placeholder="0.00" className="h-9 rounded-lg" />
+              </div>
+            </div>
+          </div>
+          <div className="px-6 py-4 border-t border-border flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => { setQuickPriceOpen(false); setQuickPriceProduct(null); }}>Cancel</Button>
+            <Button
+              onClick={handleQuickPriceSave}
+              disabled={!quickPriceVendorId || !quickPriceUnitCost || quickPriceSaving}
+              className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90"
+            >
+              {quickPriceSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Pricing
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ─── Edit Item Modal ─────────────────────────────── */}
       {editItem && (
@@ -839,8 +1343,12 @@ export default function PurchaseRequestDetailPage() {
             <form id="edit-item-form" onSubmit={handleEditItemSubmit} className="px-6 py-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
-                  <Input type="number" min="1" value={itemQty} onChange={(e) => setItemQty(parseInt(e.target.value) || 1)} className="h-9 rounded-lg" required />
+                  <Label className="text-[13px]">OP Qty <span className="text-red-500">*</span></Label>
+                  <div className="flex items-center gap-0">
+                    <button type="button" onClick={() => setItemQty(Math.max(1, itemQty - 1))} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-l-lg border border-r-0 border-border bg-muted hover:bg-accent transition-colors text-muted-foreground">−</button>
+                    <Input type="number" min="1" value={itemQty} onChange={(e) => setItemQty(Math.max(1, Number.parseInt(e.target.value) || 1))} className="h-9 rounded-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" required />
+                    <button type="button" onClick={() => setItemQty(itemQty + 1)} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-r-lg border border-l-0 border-border bg-muted hover:bg-accent transition-colors text-muted-foreground">+</button>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Unit Price</Label>
@@ -874,7 +1382,12 @@ export default function PurchaseRequestDetailPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Discount %</Label>
-                  <Input type="number" step="0.01" min="0" max="100" value={itemDiscount} onChange={(e) => setItemDiscount(parseFloat(e.target.value) || 0)} className="h-9 rounded-lg" />
+                  <Input type="number" step="1" min="0" max="100" value={itemDiscount} onChange={(e) => {
+                    const val = Number.parseFloat(e.target.value) || 0;
+                    if (val > 100) { toast({ title: 'Invalid discount', description: 'Discount cannot exceed 100%.', variant: 'destructive' }); setItemDiscount(100); }
+                    else if (val > 0 && val < 1) { toast({ title: 'Invalid discount', description: 'Discount must be at least 1%.', variant: 'destructive' }); setItemDiscount(0); }
+                    else setItemDiscount(Math.round(val));
+                  }} className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[13px] flex items-center gap-1">Taxable <span className="relative group"><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /><span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded bg-foreground text-background text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Subject to tax calculation</span></span></Label>
@@ -891,7 +1404,7 @@ export default function PurchaseRequestDetailPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Remarks</Label>
-                <Input value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} className="h-9 rounded-lg" placeholder="Optional remarks…" />
+                <Textarea value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} className="rounded-lg" rows={2} placeholder="Optional remarks…" />
               </div>
             </form>
             <div className="px-6 py-4 border-t border-border flex justify-between">
@@ -904,30 +1417,6 @@ export default function PurchaseRequestDetailPage() {
         </Dialog>
       )}
 
-
-      {/* ─── Reject Modal ──────────────────────────────── */}
-      <Dialog open={rejectOpen} onOpenChange={(open) => !open && setRejectOpen(false)}>
-        <DialogContent className="max-w-md p-0 gap-0">
-          <DialogHeader className="px-6 pt-5 pb-4 bg-red-50 dark:bg-red-900/10 border-b rounded-t-2xl">
-            <DialogTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
-              <XCircle className="h-5 w-5" /> Reject Purchase Request
-            </DialogTitle>
-            <p className="text-sm text-red-600/70 dark:text-red-400/70 mt-1">{pr.requestNumber} — {pr.title}</p>
-          </DialogHeader>
-          <div className="px-6 py-5 space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Reason for rejection</Label>
-              <Textarea value={rejectionNote} onChange={e => setRejectionNote(e.target.value)} placeholder="Explain why this request is being rejected..." rows={3} className="rounded-lg" />
-            </div>
-          </div>
-          <div className="px-6 py-4 border-t border-border flex justify-between">
-            <Button variant="ghost" onClick={() => setRejectOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => rejectMutation.mutate(rejectionNote)} disabled={rejectMutation.isPending}>
-              {rejectMutation.isPending ? 'Rejecting...' : 'Reject Request'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* ─── Edit PR Details Modal ────────────────────── */}
       <Dialog open={editPrOpen} onOpenChange={(open) => !open && setEditPrOpen(false)}>
@@ -967,8 +1456,22 @@ export default function PurchaseRequestDetailPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Description</Label>
-              <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="rounded-lg" rows={2} />
+              <Label className="text-[13px]">Purpose of Request</Label>
+              <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} className="rounded-lg" rows={2} placeholder="e.g., Quarterly restock, New project requirement..." />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Purchase Terms</Label>
+                <SearchableSelect options={purchaseTermOptions} value={editPurchaseTerms} onChange={setEditPurchaseTerms} placeholder="Select terms" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Delivery Terms</Label>
+                <SearchableSelect options={deliveryTermOptions} value={editDeliveryTerms} onChange={setEditDeliveryTerms} placeholder="Select delivery terms" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Type of Delivery</Label>
+              <SearchableSelect options={deliveryTypeOptions} value={editDeliveryType} onChange={setEditDeliveryType} placeholder="Select type of delivery" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Internal Notes</Label>
@@ -996,6 +1499,48 @@ export default function PurchaseRequestDetailPage() {
         isLoading={submitMutation.isPending}
       />
 
+      {/* ─── Approve Confirm ─────────────────────────────── */}
+      <ConfirmDialog
+        open={approveConfirmOpen}
+        onOpenChange={(open) => !open && setApproveConfirmOpen(false)}
+        title="Approve Request"
+        description={`Approve purchase request "${pr?.requestNumber}"?`}
+        confirmLabel="Approve"
+        onConfirm={() => { approveMutation.mutate(undefined, { onSuccess: () => setApproveConfirmOpen(false) }); }}
+        isLoading={approveMutation.isPending}
+      />
+
+      {/* ─── Reject Confirm ─────────────────────────────── */}
+      <Dialog open={rejectConfirmOpen} onOpenChange={(open) => { if (!open) { setRejectConfirmOpen(false); setRejectionNote(''); } }}>
+        <DialogContent className="max-w-xs p-5">
+          <DialogTitle className="text-sm font-semibold">Reject Request</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1.5">Reject purchase request &quot;{pr?.requestNumber}&quot;? This action cannot be undone.</p>
+          <div className="mt-3 space-y-1.5">
+            <Label className="text-sm">Reason <span className="text-red-500">*</span></Label>
+            <Textarea
+              value={rejectionNote}
+              onChange={(e) => setRejectionNote(e.target.value)}
+              placeholder="Enter reason for rejection..."
+              rows={3}
+            />
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setRejectConfirmOpen(false); setRejectionNote(''); }} disabled={rejectMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => rejectMutation.mutate(rejectionNote)}
+              disabled={!rejectionNote.trim() || rejectMutation.isPending}
+            >
+              {rejectMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Reject
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ─── Delete Line Item Confirm ─────────────────── */}
       <ConfirmDialog
         open={!!deleteItemTarget}
@@ -1006,6 +1551,17 @@ export default function PurchaseRequestDetailPage() {
         variant="destructive"
         onConfirm={() => { if (deleteItemTarget) deleteItemMutation.mutate(deleteItemTarget.id, { onSuccess: () => setDeleteItemTarget(null) }); }}
         isLoading={deleteItemMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteConfirmOpen}
+        onOpenChange={(open) => !open && setBulkDeleteConfirmOpen(false)}
+        title="Remove Selected Items"
+        description={`Remove ${selectedItemIds.size} selected item${selectedItemIds.size > 1 ? 's' : ''} from the request?`}
+        confirmLabel="Remove All"
+        variant="destructive"
+        onConfirm={handleBulkDelete}
+        isLoading={bulkDeleting}
       />
     </div>
   );

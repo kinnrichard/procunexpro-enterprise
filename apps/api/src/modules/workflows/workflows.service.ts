@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class WorkflowsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(
     tenantId: string,
@@ -60,12 +60,12 @@ export class WorkflowsService {
         entityType: data.entityType,
         minAmount: data.minAmount ?? null,
         maxAmount: data.maxAmount ?? null,
-        isActive: data.isActive !== undefined ? data.isActive : true,
+        isActive: data.isActive === undefined ? true : data.isActive,
         rules: {
           create: (data.rules || []).map((rule: any) => ({
             stepOrder: rule.stepOrder,
             role: rule.role,
-            isRequired: rule.isRequired !== undefined ? rule.isRequired : true,
+            isRequired: rule.isRequired === undefined ? true : rule.isRequired,
           })),
         },
       },
@@ -88,16 +88,16 @@ export class WorkflowsService {
       return tx.approvalWorkflow.update({
         where: { id },
         data: {
-          name: data.name !== undefined ? data.name : undefined,
-          entityType: data.entityType !== undefined ? data.entityType : undefined,
-          minAmount: data.minAmount !== undefined ? data.minAmount : undefined,
-          maxAmount: data.maxAmount !== undefined ? data.maxAmount : undefined,
-          isActive: data.isActive !== undefined ? data.isActive : undefined,
+          name: data.name === undefined ? undefined : data.name,
+          entityType: data.entityType === undefined ? undefined : data.entityType,
+          minAmount: data.minAmount === undefined ? undefined : data.minAmount,
+          maxAmount: data.maxAmount === undefined ? undefined : data.maxAmount,
+          isActive: data.isActive === undefined ? undefined : data.isActive,
           rules: {
             create: (data.rules || []).map((rule: any) => ({
               stepOrder: rule.stepOrder,
               role: rule.role,
-              isRequired: rule.isRequired !== undefined ? rule.isRequired : true,
+              isRequired: rule.isRequired === undefined ? true : rule.isRequired,
             })),
           },
         },
@@ -159,14 +159,14 @@ export class WorkflowsService {
       const maxOk = wf.maxAmount === null || amount <= wf.maxAmount;
       if (minOk && maxOk) {
         // A workflow with both min and max is more specific than a catch-all
-        if (!bestMatch) {
-          bestMatch = wf;
-        } else {
+        if (bestMatch) {
           const bestHasRange = bestMatch.minAmount !== null || bestMatch.maxAmount !== null;
           const currentHasRange = wf.minAmount !== null || wf.maxAmount !== null;
           if (currentHasRange && !bestHasRange) {
             bestMatch = wf;
           }
+        } else {
+          bestMatch = wf;
         }
       }
     }
@@ -181,7 +181,7 @@ export class WorkflowsService {
     amount: number,
   ) {
     const workflow = await this.getApplicableWorkflow(tenantId, entityType, amount);
-    if (!workflow || !workflow.rules.length) return [];
+    if (!workflow?.rules.length) return [];
 
     const steps = workflow.rules.map((rule) => {
       const stepData: any = {

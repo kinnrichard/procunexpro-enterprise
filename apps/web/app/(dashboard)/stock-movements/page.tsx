@@ -6,8 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
-import { formatDateTime } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatDateTime, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -43,7 +42,7 @@ const typeColors: Record<string, string> = {
   WRITE_OFF: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
 
-const inTypes = ['PURCHASE', 'TRANSFER_IN', 'RETURN'];
+const inTypes = new Set(['PURCHASE', 'TRANSFER_IN', 'RETURN']);
 
 export default function StockMovementsPage() {
   const { toast } = useToast();
@@ -98,15 +97,15 @@ export default function StockMovementsPage() {
     {
       key: 'type', label: 'Type', render: (v: string) => (
         <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', typeColors[v])}>
-          {inTypes.includes(v) ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
-          {v.replace(/_/g, ' ')}
+          {inTypes.has(v) ? <ArrowDownRight className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+          {v.replaceAll('_', ' ')}
         </span>
       ),
     },
     {
       key: 'quantity', label: 'Quantity', render: (v: number, row: any) => (
-        <span className={cn('font-medium', inTypes.includes(row.type) ? 'text-green-600' : 'text-red-600')}>
-          {inTypes.includes(row.type) ? '+' : '-'}{v}
+        <span className={cn('font-medium', inTypes.has(row.type) ? 'text-green-600' : 'text-red-600')}>
+          {inTypes.has(row.type) ? '+' : '-'}{v}
         </span>
       ),
     },
@@ -176,7 +175,7 @@ export default function StockMovementsPage() {
                     <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {['PURCHASE', 'SALE', 'ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'RETURN', 'WRITE_OFF'].map(t => (
-                        <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                        <SelectItem key={t} value={t}>{t.replaceAll('_', ' ')}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

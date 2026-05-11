@@ -27,7 +27,7 @@ function DatePicker({
   placeholder = "Pick a date",
   disabled = false,
   className,
-}: DatePickerProps) {
+}: Readonly<DatePickerProps>) {
   const [open, setOpen] = React.useState(false)
 
   return (

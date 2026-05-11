@@ -28,7 +28,7 @@ export const useCurrencyStore = create<CurrencyState>((set, get) => ({
       if (def) {
         const state = { code: def.code, symbol: def.symbol || def.code, loaded: true };
         set(state);
-        if (typeof window !== 'undefined') (window as any).__CURRENCY_STORE__ = state;
+        if (globalThis.window !== undefined) (globalThis as any).__CURRENCY_STORE__ = state;
       } else {
         set({ loaded: true });
       }

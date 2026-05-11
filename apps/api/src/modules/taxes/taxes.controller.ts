@@ -15,7 +15,7 @@ export class TaxesController {
   @Get()
   findAll(@Req() req: any, @Query('page') page?: string, @Query('limit') limit?: string, @Query('search') search?: string) {
     return this.taxesService.findAll(req.user.tenantId, {
-      page: page ? parseInt(page) : undefined, limit: limit ? parseInt(limit) : undefined, search,
+      page: page ? Number.parseInt(page) : undefined, limit: limit ? Number.parseInt(limit) : undefined, search,
     });
   }
 

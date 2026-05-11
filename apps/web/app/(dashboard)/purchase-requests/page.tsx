@@ -8,8 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
 import { downloadCsv } from '@/lib/export';
-import { formatCurrency, formatDate, getInitials } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatCurrency, formatDate, getInitials, cn } from '@/lib/utils';
+import { useTaxStore } from '@/lib/tax';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -24,23 +24,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  FileText, Plus, Pencil, Trash2, Send, CheckCircle, XCircle,
-  Clock, CheckCheck, FileX, Eye, Download,
+  FileText, Plus, Pencil, Send, XCircle,
+  Clock, CheckCheck, FileX, Download, Filter, X,
 } from 'lucide-react';
 
 // ─── Schema (details only, no items) ─────────────────────────
 const prSchema = z.object({
   title: z.string().min(2, 'Title is required'),
-  description: z.string().optional(),
+  description: z.string().min(1, 'Purpose of request is required'),
   companyId: z.string().min(1, 'Company is required'),
   departmentId: z.string().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
-  requiredDate: z.date().optional().nullable(),
+  requiredDate: z.date({ required_error: 'Required date is required' }),
+  purchaseTerms: z.string().min(1, 'Purchase terms is required'),
+  deliveryTerms: z.string().min(1, 'Delivery terms is required'),
+  deliveryType: z.string().min(1, 'Type of delivery is required'),
   notes: z.string().optional(),
 });
 
 type PRFormData = z.infer<typeof prSchema>;
+
+// ─── Helpers ───────────────────────────────────────────────
+function getVendorPricing(item: any) {
+  if (item.vendor?.id && item.product?.pricings) {
+    const pricing = item.product.pricings.find((p: any) => p.vendorId === item.vendor.id);
+    if (pricing) return { opQty: pricing.originalPackagingQty || 1, pcsPerPack: pricing.pcsPerPack || 1 };
+  }
+  return { opQty: 1, pcsPerPack: 1 };
+}
 
 // ─── Constants ─────────────────────────────────────────────
 const priorityColors: Record<string, string> = {
@@ -64,10 +77,46 @@ export default function PurchaseRequestsPage() {
   const [rejectTarget, setRejectTarget] = useState<any>(null);
   const [rejectionNote, setRejectionNote] = useState('');
 
+  // Filters
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterCompanyId, setFilterCompanyId] = useState('');
+  const [filterDepartmentId, setFilterDepartmentId] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
+  const [filterRequiredFrom, setFilterRequiredFrom] = useState<Date | undefined>();
+  const [filterRequiredTo, setFilterRequiredTo] = useState<Date | undefined>();
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const [filterAmountMin, setFilterAmountMin] = useState('');
+  const [filterAmountMax, setFilterAmountMax] = useState('');
+
+  const activeFilterCount = [filterCompanyId, filterDepartmentId, filterPriority, filterRequiredFrom, filterRequiredTo, filterCreatedFrom, filterCreatedTo, filterAmountMin, filterAmountMax].filter(Boolean).length;
+
+  const toDateStr = (d?: Date) => d ? d.toISOString().split('T')[0] : '';
+
+  function clearFilters() {
+    setFilterCompanyId(''); setFilterDepartmentId(''); setFilterPriority('');
+    setFilterRequiredFrom(undefined); setFilterRequiredTo(undefined);
+    setFilterCreatedFrom(undefined); setFilterCreatedTo(undefined);
+    setFilterAmountMin(''); setFilterAmountMax('');
+    setPage(1);
+  }
+
   // ─── Queries ────────────────────────────────────────────
   const { data: response, isLoading } = useQuery({
-    queryKey: ['purchase-requests', page, search, statusFilter],
-    queryFn: () => api.get('/purchase-requests', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }) } }),
+    queryKey: ['purchase-requests', page, search, statusFilter, filterCompanyId, filterDepartmentId, filterPriority, filterRequiredFrom, filterRequiredTo, filterCreatedFrom, filterCreatedTo, filterAmountMin, filterAmountMax],
+    queryFn: () => api.get('/purchase-requests', { params: {
+      page, limit: 10, search,
+      ...(statusFilter && { status: statusFilter }),
+      ...(filterCompanyId && { companyId: filterCompanyId }),
+      ...(filterDepartmentId && { departmentId: filterDepartmentId }),
+      ...(filterPriority && { priority: filterPriority }),
+      ...(filterRequiredFrom && { requiredDateFrom: toDateStr(filterRequiredFrom) }),
+      ...(filterRequiredTo && { requiredDateTo: toDateStr(filterRequiredTo) }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+      ...(filterAmountMin && { amountMin: filterAmountMin }),
+      ...(filterAmountMax && { amountMax: filterAmountMax }),
+    } }),
   });
 
   const { data: deptData } = useQuery({
@@ -75,11 +124,11 @@ export default function PurchaseRequestsPage() {
     queryFn: () => api.get('/departments', { params: { limit: 1000 } }),
   });
 
-  const { data: tenantsData } = useQuery({
-    queryKey: ['tenants-all'],
-    queryFn: () => api.get('/tenants', { params: { limit: 1000 } }),
+  const { data: companiesData } = useQuery({
+    queryKey: ['companies-active'],
+    queryFn: () => api.get('/companies/active'),
   });
-  const companies = (tenantsData?.data?.data || []).map((t: any) => ({ value: t.id, label: t.companyName }));
+  const companies = (companiesData?.data?.data || []).map((c: any) => ({ value: c.id, label: c.name }));
 
   const items = response?.data?.data || [];
   const total = response?.data?.total || 0;
@@ -93,11 +142,29 @@ export default function PurchaseRequestsPage() {
 
   const departments = (deptData?.data?.data || []).map((d: any) => ({ value: d.id, label: d.name }));
 
+  const { data: purchaseTermsData } = useQuery({
+    queryKey: ['purchase-terms-active'],
+    queryFn: () => api.get('/purchase-terms/active'),
+  });
+  const purchaseTermOptions = (purchaseTermsData?.data?.data || []).map((t: any) => ({ value: t.name, label: t.name }));
+
+  const { data: deliveryTermsData } = useQuery({
+    queryKey: ['delivery-terms-active'],
+    queryFn: () => api.get('/delivery-terms/active'),
+  });
+  const deliveryTermOptions = (deliveryTermsData?.data?.data || []).map((d: any) => ({ value: d.name, label: d.name }));
+
+  const { data: deliveryTypesData } = useQuery({
+    queryKey: ['delivery-types-active'],
+    queryFn: () => api.get('/delivery-types/active'),
+  });
+  const deliveryTypeOptions = (deliveryTypesData?.data?.data || []).map((d: any) => ({ value: d.name, label: d.name }));
+
   // ─── Form ───────────────────────────────────────────────
   const form = useForm<PRFormData>({
     resolver: zodResolver(prSchema),
     mode: 'onChange',
-    defaultValues: { title: '', description: '', companyId: '', departmentId: '', priority: 'MEDIUM', requiredDate: null, notes: '' },
+    defaultValues: { title: '', description: '', companyId: '', departmentId: '', priority: 'MEDIUM', requiredDate: null, purchaseTerms: '', deliveryTerms: '', deliveryType: '', notes: '' },
   });
 
   // ─── Mutations ──────────────────────────────────────────
@@ -130,12 +197,6 @@ export default function PurchaseRequestsPage() {
     onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to submit', variant: 'destructive' }),
   });
 
-  const approveMutation = useMutation({
-    mutationFn: (id: string) => api.put(`/purchase-requests/${id}/approve`),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['purchase-requests'] }); toast({ title: 'Purchase request approved' }); },
-    onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to approve', variant: 'destructive' }),
-  });
-
   const rejectMutation = useMutation({
     mutationFn: ({ id, rejectionNote }: { id: string; rejectionNote: string }) => api.put(`/purchase-requests/${id}/reject`, { rejectionNote }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['purchase-requests'] }); setRejectTarget(null); setRejectionNote(''); toast({ title: 'Purchase request rejected' }); },
@@ -145,7 +206,7 @@ export default function PurchaseRequestsPage() {
   // ─── Handlers ───────────────────────────────────────────
   const openCreate = () => {
     setEditing(null);
-    form.reset({ title: '', description: '', companyId: '', departmentId: '', priority: 'MEDIUM', requiredDate: null, notes: '' });
+    form.reset({ title: '', description: '', companyId: '', departmentId: '', priority: 'MEDIUM', requiredDate: null, purchaseTerms: '', deliveryTerms: '', notes: '' });
     setModalOpen(true);
   };
 
@@ -154,20 +215,21 @@ export default function PurchaseRequestsPage() {
     form.reset({
       title: pr.title,
       description: pr.description || '',
-      companyId: pr.tenantId || '',
+      companyId: pr.companyId || '',
       departmentId: pr.departmentId || '',
       priority: pr.priority,
       requiredDate: pr.requiredDate ? new Date(pr.requiredDate) : null,
+      purchaseTerms: pr.purchaseTerms || '',
+      deliveryTerms: pr.deliveryTerms || '',
+      deliveryType: pr.deliveryType || '',
       notes: pr.notes || '',
     });
     setModalOpen(true);
   };
 
   const onSubmit = (data: PRFormData) => {
-    const { companyId, ...rest } = data;
     const payload = {
-      ...rest,
-      tenantId: companyId,
+      ...data,
       requiredDate: data.requiredDate?.toISOString(),
     };
     if (editing) updateMutation.mutate({ id: editing.id, data: payload });
@@ -183,6 +245,23 @@ export default function PurchaseRequestsPage() {
     }
   };
 
+  const taxRate = useTaxStore((s) => s.getDefaultRate)();
+
+  function calcPrTotal(row: any) {
+    if (!row.items?.length) return 0;
+    return row.items.reduce((sum: number, item: any) => {
+      const vp = getVendorPricing(item);
+      const pkgQty = item.quantity || vp.opQty;
+      const invQty = pkgQty * vp.pcsPerPack;
+      const subtotal = invQty * (item.estimatedPrice || 0);
+      const discounted = subtotal - (subtotal * (item.discount || 0) / 100);
+      if (item.taxable && taxRate > 0 && !item.taxIncluded) {
+        return sum + discounted + (discounted * taxRate / 100);
+      }
+      return sum + discounted;
+    }, 0);
+  }
+
   // ─── Table Columns ──────────────────────────────────────
   const columns = [
     {
@@ -191,11 +270,19 @@ export default function PurchaseRequestsPage() {
     },
     { key: 'title', label: 'Title', sortable: true, className: 'max-w-[180px] truncate' },
     {
-      key: 'department', label: 'Department',
+      key: 'company', label: 'Company', sortable: true, sortKey: 'company.name',
+      render: (_: any, row: any) => row.company?.name || <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
+      key: 'department', label: 'Department', sortable: true, sortKey: 'department.name',
       render: (_: any, row: any) => row.department?.name || <span className="text-muted-foreground text-xs">—</span>,
     },
     {
-      key: 'requestedBy', label: 'Requested By',
+      key: 'priority', label: 'Priority', sortable: true,
+      render: (v: string) => <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', priorityColors[v])}>{v}</span>,
+    },
+    {
+      key: 'requestedBy', label: 'Requested By', sortable: true, sortKey: 'requestedBy.firstName',
       render: (_: any, row: any) => row.requestedBy ? (
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-700 to-[#1e3a5f] flex items-center justify-center text-white text-[9px] font-semibold shrink-0">
@@ -205,35 +292,25 @@ export default function PurchaseRequestsPage() {
         </div>
       ) : '—',
     },
+    { key: 'requiredDate', label: 'Required Date', sortable: true, render: (v: string) => v ? formatDate(v) : <span className="text-muted-foreground text-xs">—</span> },
+    { key: 'createdAt', label: 'Date Created', sortable: true, render: (v: string) => formatDate(v) },
     {
-      key: 'priority', label: 'Priority',
-      render: (v: string) => <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', priorityColors[v])}>{v}</span>,
+      key: 'totalAmount', label: 'Total Amount', sortable: true, className: 'text-right',
+      sortKey: (row: any) => calcPrTotal(row),
+      render: (_: any, row: any) => <span className="font-mono font-medium">{formatCurrency(calcPrTotal(row))}</span>,
     },
-    {
-      key: 'totalAmount', label: 'Amount', sortable: true,
-      render: (v: number) => <span className="font-medium">{formatCurrency(v)}</span>,
-    },
-    { key: 'status', label: 'Status', render: (v: string) => <StatusBadge status={v} /> },
-    { key: 'createdAt', label: 'Date', sortable: true, render: (v: string) => formatDate(v) },
+    { key: 'status', label: 'Status', sortable: true, render: (v: string) => <StatusBadge status={v} /> },
     {
       key: 'actions', label: '',
       render: (_: any, row: any) => (
-        <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-          <button onClick={() => router.push(`/purchase-requests/${row.id}`)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="View Details"><Eye className="h-3.5 w-3.5" /></button>
+        <button type="button" className="flex items-center gap-0.5" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           {row.status === 'DRAFT' && (
             <>
               <button onClick={() => submitMutation.mutate(row.id)} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Submit for Approval"><Send className="h-3.5 w-3.5" /></button>
               <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="Edit"><Pencil className="h-3.5 w-3.5" /></button>
-              <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
             </>
           )}
-          {row.status === 'PENDING_APPROVAL' && (
-            <>
-              <button onClick={() => approveMutation.mutate(row.id)} className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600" title="Approve"><CheckCircle className="h-3.5 w-3.5" /></button>
-              <button onClick={() => setRejectTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500" title="Reject"><XCircle className="h-3.5 w-3.5" /></button>
-            </>
-          )}
-        </div>
+        </button>
       ),
     },
   ];
@@ -275,19 +352,85 @@ export default function PurchaseRequestsPage() {
         emptyMessage="No purchase requests found"
         onRowClick={(row: any) => router.push(`/purchase-requests/${row.id}`)}
         toolbar={
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {statusFilters.map(s => (
-              <button
-                key={s}
-                onClick={() => { setStatusFilter(s); setPage(1); }}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                  statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
-                )}
-              >
-                {statusLabels[s]}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="relative">
+                  <Filter className="h-3.5 w-3.5 mr-1.5" /> Filters
+                  {activeFilterCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">{activeFilterCount}</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[340px] p-0" align="start">
+                <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/50">
+                  <p className="text-sm font-semibold">Filters</p>
+                  {activeFilterCount > 0 && (
+                    <button onClick={clearFilters} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+                      <X className="h-3 w-3" /> Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="p-4 space-y-4 max-h-[420px] overflow-y-auto">
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Company</Label>
+                    <SearchableSelect options={companies} value={filterCompanyId} onChange={(v) => { setFilterCompanyId(v); setPage(1); }} placeholder="All companies" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Department</Label>
+                    <SearchableSelect options={departments} value={filterDepartmentId} onChange={(v) => { setFilterDepartmentId(v); setPage(1); }} placeholder="All departments" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Priority</Label>
+                    <Select value={filterPriority} onValueChange={(v) => { setFilterPriority(v === 'ALL' ? '' : v); setPage(1); }}>
+                      <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All priorities" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All priorities</SelectItem>
+                        <SelectItem value="LOW">Low</SelectItem>
+                        <SelectItem value="MEDIUM">Medium</SelectItem>
+                        <SelectItem value="HIGH">High</SelectItem>
+                        <SelectItem value="URGENT">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Required Date</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <DatePicker value={filterRequiredFrom} onChange={(d) => { setFilterRequiredFrom(d); setPage(1); }} placeholder="From" className="h-9 rounded-lg text-xs" />
+                      <DatePicker value={filterRequiredTo} onChange={(d) => { setFilterRequiredTo(d); setPage(1); }} placeholder="To" className="h-9 rounded-lg text-xs" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Date Created</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="h-9 rounded-lg text-xs" />
+                      <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="h-9 rounded-lg text-xs" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Total Amount</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input type="number" value={filterAmountMin} onChange={(e) => { setFilterAmountMin(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="Min" />
+                      <Input type="number" value={filterAmountMax} onChange={(e) => { setFilterAmountMax(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="Max" />
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {statusFilters.map(s => (
+                <button
+                  key={s}
+                  onClick={() => { setStatusFilter(s); setPage(1); }}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
+                  )}
+                >
+                  {statusLabels[s]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
@@ -333,15 +476,35 @@ export default function PurchaseRequestsPage() {
                 )} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Required Date</Label>
+                <Label className="text-[13px]">Required Date <span className="text-red-500">*</span></Label>
                 <Controller control={form.control} name="requiredDate" render={({ field }) => (
                   <DatePicker value={field.value || undefined} onChange={(d) => field.onChange(d)} />
                 )} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Description</Label>
-              <Textarea {...form.register('description')} className="rounded-lg" rows={2} placeholder="Describe the purpose of this request..." />
+              <Label className="text-[13px]">Purpose of Request <span className="text-red-500">*</span></Label>
+              <Textarea {...form.register('description')} className="rounded-lg" rows={2} placeholder="e.g., Quarterly restock, New project requirement..." />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Purchase Terms <span className="text-red-500">*</span></Label>
+                <Controller control={form.control} name="purchaseTerms" render={({ field }) => (
+                  <SearchableSelect options={purchaseTermOptions} value={field.value || ''} onChange={field.onChange} placeholder="Select terms" />
+                )} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Delivery Terms <span className="text-red-500">*</span></Label>
+                <Controller control={form.control} name="deliveryTerms" render={({ field }) => (
+                  <SearchableSelect options={deliveryTermOptions} value={field.value || ''} onChange={field.onChange} placeholder="Select delivery terms" />
+                )} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Type of Delivery <span className="text-red-500">*</span></Label>
+              <Controller control={form.control} name="deliveryType" render={({ field }) => (
+                <SearchableSelect options={deliveryTypeOptions} value={field.value || ''} onChange={field.onChange} placeholder="Select type of delivery" />
+              )} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Internal Notes</Label>
@@ -351,7 +514,10 @@ export default function PurchaseRequestsPage() {
           <div className="px-6 py-4 border-t border-border flex justify-between">
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button type="submit" form="pr-form" className="bg-gradient-primary text-white" disabled={!form.formState.isValid || createMutation.isPending || updateMutation.isPending}>
-              {(createMutation.isPending || updateMutation.isPending) ? 'Saving...' : editing ? 'Update Request' : 'Create Request'}
+              {(() => {
+                if (createMutation.isPending || updateMutation.isPending) return 'Saving...';
+                return editing ? 'Update Request' : 'Create Request';
+              })()}
             </Button>
           </div>
         </DialogContent>

@@ -26,7 +26,7 @@ function SearchableSelect({
   placeholder = "Select...",
   disabled = false,
   className,
-}: SearchableSelectProps) {
+}: Readonly<SearchableSelectProps>) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const containerRef = React.useRef<HTMLDivElement>(null)

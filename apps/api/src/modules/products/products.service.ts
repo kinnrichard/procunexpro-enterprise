@@ -1,18 +1,18 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replaceAll(/[^a-z0-9\s-]/g, '')
+    .replaceAll(/\s+/g, '-')
+    .replaceAll(/-+/g, '-')
+    .replaceAll(/^-|-$/g, '');
 }
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly includeRelations = {
     manufacturer: { select: { id: true, name: true } },
@@ -49,7 +49,10 @@ export class ProductsService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: this.includeRelations,
+        include: {
+          ...this.includeRelations,
+          _count: { select: { pricings: true } },
+        },
       }),
       this.prisma.product.count({ where }),
     ]);
@@ -219,6 +222,9 @@ export class ProductsService {
         productId,
         vendorId: data.vendorId,
         type: data.type || 'local',
+        originalPackagingQty: data.originalPackagingQty ?? 1,
+        pcsPerPack: data.pcsPerPack ?? 1,
+        originalPackagingUom: data.originalPackagingUom || 'pcs',
         unitCost: data.unitCost ?? 0,
         sellingPrice: data.sellingPrice ?? 0,
         currency: data.currency || 'USD',
@@ -245,7 +251,7 @@ export class ProductsService {
     }
 
     const updateData: any = {};
-    const fields = ['vendorId', 'type', 'unitCost', 'sellingPrice', 'currency', 'minOrderQty', 'leadTimeDays', 'notes', 'isActive'];
+    const fields = ['vendorId', 'type', 'originalPackagingQty', 'pcsPerPack', 'originalPackagingUom', 'unitCost', 'sellingPrice', 'currency', 'minOrderQty', 'leadTimeDays', 'notes', 'isActive'];
     for (const f of fields) {
       if (data[f] !== undefined) updateData[f] = data[f];
     }
@@ -329,15 +335,6 @@ export class ProductsService {
         maxStock: data.maxStock ?? 1,
         reorderQuantity: data.reorderQuantity ?? 1,
 
-        // Original Packaging UOM
-        originalPackagingQty: data.originalPackagingQty,
-        pcsPerPack: data.pcsPerPack,
-        originalPackagingUom: data.originalPackagingUom,
-
-        // Selling Packaging UOM
-        sellingPackagingQty: data.sellingPackagingQty,
-        sellingPackagingUom: data.sellingPackagingUom,
-
         // Legacy defaults
         unit: data.unit || 'pcs',
         costPrice: data.costPrice || 0,
@@ -346,7 +343,7 @@ export class ProductsService {
         reorderPoint: data.reorderPoint || 0,
         warehouseId: data.warehouseId || null,
         locationId: data.locationId || null,
-        isActive: data.isActive !== undefined ? data.isActive : true,
+        isActive: data.isActive === undefined ? true : data.isActive,
       },
       include: this.includeRelations,
     });
@@ -376,8 +373,6 @@ export class ProductsService {
       'description', 'categoryId', 'subCategoryId', 'vendorId', 'originId',
       'length', 'depth', 'height', 'weight',
       'minStock', 'maxStock', 'reorderQuantity',
-      'originalPackagingQty', 'pcsPerPack', 'originalPackagingUom',
-      'sellingPackagingQty', 'sellingPackagingUom',
       'unit', 'costPrice', 'sellingPrice', 'currentStock', 'reorderPoint',
       'warehouseId', 'locationId', 'isActive',
     ];

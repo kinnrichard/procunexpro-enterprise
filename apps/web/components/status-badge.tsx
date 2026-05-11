@@ -45,12 +45,12 @@ const variantStyles: Record<string, string> = {
 
 function formatStatus(status: string): string {
   return status
-    .replace(/_/g, ' ')
+    .replaceAll('_', ' ')
     .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replaceAll(/\b\w/g, (c) => c.toUpperCase())
 }
 
-export function StatusBadge({ status, variant }: StatusBadgeProps) {
+export function StatusBadge({ status, variant }: Readonly<StatusBadgeProps>) {
   const resolvedVariant = variant || statusVariantMap[status] || 'default'
 
   return (

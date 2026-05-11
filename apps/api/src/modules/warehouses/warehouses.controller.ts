@@ -17,8 +17,8 @@ export class WarehousesController {
     @Query('search') search?: string,
   ) {
     return this.warehousesService.findAll(req.user.tenantId, {
-      page: page ? parseInt(page) : undefined,
-      limit: limit ? parseInt(limit) : undefined,
+      page: page ? Number.parseInt(page) : undefined,
+      limit: limit ? Number.parseInt(limit) : undefined,
       search,
     });
   }

@@ -47,7 +47,7 @@ export class ReportsController {
     @Query('fiscalYear') fiscalYear?: string,
   ) {
     return this.reportsService.getBudgetUtilization(req.user.tenantId, {
-      fiscalYear: fiscalYear ? parseInt(fiscalYear, 10) : undefined,
+      fiscalYear: fiscalYear ? Number.parseInt(fiscalYear, 10) : undefined,
     });
   }
 
@@ -80,10 +80,12 @@ export class ReportsController {
     ]);
 
     // Add summary row
-    rows.push([]);
-    rows.push(['Total Spend', data.totalSpend, '']);
-    rows.push(['Previous Period Spend', data.previousPeriodSpend, '']);
-    rows.push(['Change %', data.changePercent, '']);
+    rows.push(
+      [],
+      ['Total Spend', data.totalSpend, ''],
+      ['Previous Period Spend', data.previousPeriodSpend, ''],
+      ['Change %', data.changePercent, ''],
+    );
 
     const csv = this.reportsService.generateCsv(headers, rows);
 
@@ -157,11 +159,13 @@ export class ReportsController {
     ]);
 
     // Add summary rows
-    rows.push([]);
-    rows.push(['Total Value', '', '', '', '', '', data.totalValue, '']);
-    rows.push(['Total Products', '', '', '', '', '', data.totalProducts, '']);
-    rows.push(['Low Stock Count', '', '', '', '', '', data.lowStockCount, '']);
-    rows.push(['Out of Stock Count', '', '', '', '', '', data.outOfStockCount, '']);
+    rows.push(
+      [],
+      ['Total Value', '', '', '', '', '', data.totalValue, ''],
+      ['Total Products', '', '', '', '', '', data.totalProducts, ''],
+      ['Low Stock Count', '', '', '', '', '', data.lowStockCount, ''],
+      ['Out of Stock Count', '', '', '', '', '', data.outOfStockCount, ''],
+    );
 
     const csv = this.reportsService.generateCsv(headers, rows);
 
@@ -178,7 +182,7 @@ export class ReportsController {
   ) {
     const data = await this.reportsService.getBudgetUtilization(
       req.user.tenantId,
-      { fiscalYear: fiscalYear ? parseInt(fiscalYear, 10) : undefined },
+      { fiscalYear: fiscalYear ? Number.parseInt(fiscalYear, 10) : undefined },
     );
 
     const headers = [
@@ -201,8 +205,10 @@ export class ReportsController {
     ]);
 
     // Add summary rows
-    rows.push([]);
-    rows.push(['Summary', '', data.summary.totalBudgeted, data.summary.totalSpent, data.summary.avgUtilization, '', '']);
+    rows.push(
+      [],
+      ['Summary', '', data.summary.totalBudgeted, data.summary.totalSpent, data.summary.avgUtilization, '', ''],
+    );
 
     const csv = this.reportsService.generateCsv(headers, rows);
 

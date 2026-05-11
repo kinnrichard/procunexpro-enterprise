@@ -10,6 +10,7 @@ export interface Column<T> {
   key: string
   label: string
   sortable?: boolean
+  sortKey?: string | ((row: T) => any)
   className?: string
   render?: (value: any, row: T) => React.ReactNode
 }
@@ -50,7 +51,7 @@ export function DataTable<T extends Record<string, any>>({
   toolbar,
   emptyMessage = 'No results found.',
   emptyIcon,
-}: DataTableProps<T>) {
+}: Readonly<DataTableProps<T>>) {
   const [searchValue, setSearchValue] = React.useState('')
   const [sortKey, setSortKey] = React.useState<string | null>(null)
   const [sortDir, setSortDir] = React.useState<SortDirection>(null)
@@ -85,12 +86,21 @@ export function DataTable<T extends Record<string, any>>({
 
   const sortedData = React.useMemo(() => {
     if (!sortKey || !sortDir) return data
+    const col = columns.find((c) => c.key === sortKey)
+    const getSortVal = (row: any) => {
+      if (col?.sortKey) {
+        return typeof col.sortKey === 'function' ? col.sortKey(row) : getNestedValue(row, col.sortKey)
+      }
+      return getNestedValue(row, sortKey)
+    }
     return [...data].sort((a, b) => {
-      const aVal = getNestedValue(a, sortKey)
-      const bVal = getNestedValue(b, sortKey)
-      if (aVal == null && bVal == null) return 0
-      if (aVal == null) return 1
-      if (bVal == null) return -1
+      const aVal = getSortVal(a)
+      const bVal = getSortVal(b)
+      if (aVal === null || aVal === undefined) {
+        if (bVal === null || bVal === undefined) return 0;
+        return 1;
+      }
+      if (bVal === null || bVal === undefined) return -1
       if (typeof aVal === 'string' && typeof bVal === 'string') {
         return sortDir === 'asc'
           ? aVal.localeCompare(bVal)
@@ -108,6 +118,57 @@ export function DataTable<T extends Record<string, any>>({
   const totalPages = Math.ceil(total / limit)
   const startItem = total === 0 ? 0 : (page - 1) * limit + 1
   const endItem = Math.min(page * limit, total)
+
+  function renderSortIcon(colKey: string) {
+    const isActiveSortCol = sortKey === colKey
+    if (isActiveSortCol && sortDir === 'asc') return <ArrowUp className="h-3.5 w-3.5" />
+    if (isActiveSortCol && sortDir === 'desc') return <ArrowDown className="h-3.5 w-3.5" />
+    return <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+  }
+
+  function renderTableBody() {
+    if (isLoading) {
+      return ['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5', 'sk-6'].map((key) => (
+        <tr key={key} className="border-b border-border/50">
+          {columns.map((col) => (
+            <td key={col.key} className="px-4 py-3">
+              <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
+            </td>
+          ))}
+        </tr>
+      ))
+    }
+    if (sortedData.length === 0) {
+      return (
+        <tr>
+          <td colSpan={columns.length} className="py-16">
+            <div className="flex flex-col items-center justify-center text-center">
+              {emptyIcon || <Inbox className="h-12 w-12 text-muted-foreground/40 mb-3" />}
+              <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+            </div>
+          </td>
+        </tr>
+      )
+    }
+    return sortedData.map((row, rowIndex) => (
+      <tr
+        key={row.id ?? rowIndex}
+        className={cn(
+          'border-b border-border/50 transition-colors',
+          onRowClick && 'cursor-pointer hover:bg-accent/50'
+        )}
+        onClick={() => onRowClick?.(row)}
+      >
+        {columns.map((col) => (
+          <td key={col.key} className={cn('text-sm py-3 px-4', col.className)}>
+            {col.render
+              ? col.render(getNestedValue(row, col.key), row)
+              : getNestedValue(row, col.key) ?? '-'}
+          </td>
+        ))}
+      </tr>
+    ))
+  }
 
   const getPageNumbers = () => {
     const pages: number[] = []
@@ -166,13 +227,7 @@ export function DataTable<T extends Record<string, any>>({
                       <span>{col.label}</span>
                       {col.sortable && (
                         <span className="inline-flex">
-                          {sortKey === col.key && sortDir === 'asc' ? (
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          ) : sortKey === col.key && sortDir === 'desc' ? (
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
-                          )}
+                          {renderSortIcon(col.key)}
                         </span>
                       )}
                     </div>
@@ -181,45 +236,7 @@ export function DataTable<T extends Record<string, any>>({
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border/50">
-                    {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-3">
-                        <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : sortedData.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className="py-16">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      {emptyIcon || <Inbox className="h-12 w-12 text-muted-foreground/40 mb-3" />}
-                      <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                sortedData.map((row, rowIndex) => (
-                  <tr
-                    key={(row as any).id ?? rowIndex}
-                    className={cn(
-                      'border-b border-border/50 transition-colors',
-                      onRowClick && 'cursor-pointer hover:bg-accent/50'
-                    )}
-                    onClick={() => onRowClick?.(row)}
-                  >
-                    {columns.map((col) => (
-                      <td key={col.key} className={cn('text-sm py-3 px-4', col.className)}>
-                        {col.render
-                          ? col.render(getNestedValue(row, col.key), row)
-                          : getNestedValue(row, col.key) ?? '-'}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
+              {renderTableBody()}
             </tbody>
           </table>
         </div>

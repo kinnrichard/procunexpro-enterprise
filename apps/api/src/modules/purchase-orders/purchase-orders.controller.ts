@@ -19,8 +19,8 @@ export class PurchaseOrdersController {
     @Query('priority') priority?: string,
   ) {
     return this.purchaseOrdersService.findAll(req.user.tenantId, {
-      page: page ? parseInt(page) : undefined,
-      limit: limit ? parseInt(limit) : undefined,
+      page: page ? Number.parseInt(page) : undefined,
+      limit: limit ? Number.parseInt(limit) : undefined,
       search,
       status,
       priority,

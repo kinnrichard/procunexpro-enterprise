@@ -7,7 +7,7 @@ export interface EmptyStateProps {
   action?: React.ReactNode
 }
 
-export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, action }: Readonly<EmptyStateProps>) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="text-muted-foreground/40 mb-4">

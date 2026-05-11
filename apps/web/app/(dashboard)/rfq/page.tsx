@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -20,13 +19,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import {
   FileSearch, Plus, Pencil, Trash2, Send, Lock, Trophy, Eye,
-  X, Clock, CheckCircle, Building2, BarChart3,
+  X, Clock, Building2, BarChart3,
 } from 'lucide-react';
 
 const rfqSchema = z.object({
@@ -73,7 +71,7 @@ export default function RFQPage() {
     queryFn: () => api.get('/rfq', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }) } }),
   });
 
-  const { data: detailData, refetch: refetchDetail } = useQuery({
+  const { data: detailData } = useQuery({
     queryKey: ['rfq-detail', detailRfq?.id],
     queryFn: () => api.get(`/rfq/${detailRfq.id}`),
     enabled: !!detailRfq,
@@ -203,7 +201,7 @@ export default function RFQPage() {
     { key: 'createdAt', label: 'Created', sortable: true, render: (v: string) => formatDate(v) },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           <button onClick={() => { setDetailRfq(row); setCompareView(false); }} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="View"><Eye className="h-3.5 w-3.5" /></button>
           {row.status === 'DRAFT' && (
             <>
@@ -215,7 +213,7 @@ export default function RFQPage() {
           {row.status === 'PUBLISHED' && (
             <button onClick={() => actionMut.mutate({ id: row.id, action: 'close' })} className="p-1.5 rounded-md hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600" title="Close"><Lock className="h-3.5 w-3.5" /></button>
           )}
-        </div>
+        </button>
       ),
     },
   ];
@@ -338,7 +336,58 @@ export default function RFQPage() {
             </div>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-            {!compareView ? (
+            {compareView ? (
+              /* Compare View */
+              <div>
+                <h4 className="text-sm font-semibold mb-2">Quote Comparison</h4>
+                {comparison ? (
+                  <div className="border rounded-lg overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50 text-muted-foreground text-[10.5px] uppercase tracking-wider">
+                          <th className="text-left px-4 py-2 sticky left-0 bg-muted/50">Item</th>
+                          <th className="text-right px-4 py-2">Qty</th>
+                          {comparison.vendors?.map((v: any) => (
+                            <th key={v.vendorId} className="text-right px-4 py-2 min-w-[120px]">{v.vendorName}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparison.items?.map((item: any) => {
+                          const prices = comparison.vendors?.map((v: any) => {
+                            const qi = item.quotes?.find((q: any) => q.vendorId === v.vendorId);
+                            return qi?.unitPrice ?? null;
+                          }) || [];
+                          const validPrices = prices.filter((p: any) => p !== null);
+                          const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : null;
+
+                          return (
+                            <tr key={item.rfqItemId} className="border-t border-border/50">
+                              <td className="px-4 py-2.5 sticky left-0 bg-background font-medium">{item.description}</td>
+                              <td className="px-4 py-2.5 text-right">{item.quantity}</td>
+                              {prices.map((price: any, i: number) => (
+                                <td key={comparison.vendors[i]?.vendorId ?? `price-col-${i}`} className={cn('px-4 py-2.5 text-right font-medium', price === minPrice && price !== null && 'text-green-600 font-bold')}>
+                                  {price === null ? '—' : formatCurrency(price)}
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                        <tr className="border-t-2 border-border font-bold bg-muted/30">
+                          <td className="px-4 py-2.5 sticky left-0 bg-muted/30">Total</td>
+                          <td className="px-4 py-2.5"></td>
+                          {comparison.vendors?.map((v: any) => (
+                            <td key={v.vendorId} className="px-4 py-2.5 text-right">{formatCurrency(v.totalAmount || 0)}</td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">Loading comparison...</div>
+                )}
+              </div>
+            ) : (
               <>
                 {/* Items */}
                 <div>
@@ -407,57 +456,6 @@ export default function RFQPage() {
                   )}
                 </div>
               </>
-            ) : (
-              /* Compare View */
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Quote Comparison</h4>
-                {comparison ? (
-                  <div className="border rounded-lg overflow-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-muted/50 text-muted-foreground text-[10.5px] uppercase tracking-wider">
-                          <th className="text-left px-4 py-2 sticky left-0 bg-muted/50">Item</th>
-                          <th className="text-right px-4 py-2">Qty</th>
-                          {comparison.vendors?.map((v: any) => (
-                            <th key={v.vendorId} className="text-right px-4 py-2 min-w-[120px]">{v.vendorName}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {comparison.items?.map((item: any) => {
-                          const prices = comparison.vendors?.map((v: any) => {
-                            const qi = item.quotes?.find((q: any) => q.vendorId === v.vendorId);
-                            return qi?.unitPrice ?? null;
-                          }) || [];
-                          const validPrices = prices.filter((p: any) => p !== null);
-                          const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : null;
-
-                          return (
-                            <tr key={item.rfqItemId} className="border-t border-border/50">
-                              <td className="px-4 py-2.5 sticky left-0 bg-background font-medium">{item.description}</td>
-                              <td className="px-4 py-2.5 text-right">{item.quantity}</td>
-                              {prices.map((price: any, i: number) => (
-                                <td key={i} className={cn('px-4 py-2.5 text-right font-medium', price === minPrice && price !== null && 'text-green-600 font-bold')}>
-                                  {price !== null ? formatCurrency(price) : '—'}
-                                </td>
-                              ))}
-                            </tr>
-                          );
-                        })}
-                        <tr className="border-t-2 border-border font-bold bg-muted/30">
-                          <td className="px-4 py-2.5 sticky left-0 bg-muted/30">Total</td>
-                          <td className="px-4 py-2.5"></td>
-                          {comparison.vendors?.map((v: any) => (
-                            <td key={v.vendorId} className="px-4 py-2.5 text-right">{formatCurrency(v.totalAmount || 0)}</td>
-                          ))}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">Loading comparison...</div>
-                )}
-              </div>
             )}
           </div>
         </DialogContent>

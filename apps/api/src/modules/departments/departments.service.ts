@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class DepartmentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(
     tenantId: string,
@@ -66,7 +66,7 @@ export class DepartmentsService {
         description: data.description || null,
         parentId: data.parentId || null,
         managerId: data.managerId || null,
-        isActive: data.isActive !== undefined ? data.isActive : true,
+        isActive: data.isActive === undefined ? true : data.isActive,
       },
       include: {
         parent: { select: { id: true, name: true } },

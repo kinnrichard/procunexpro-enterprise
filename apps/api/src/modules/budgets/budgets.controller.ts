@@ -19,11 +19,11 @@ export class BudgetsController {
     @Query('fiscalYear') fiscalYear?: string,
   ) {
     return this.budgetsService.findAll(req.user.tenantId, {
-      page: page ? parseInt(page) : undefined,
-      limit: limit ? parseInt(limit) : undefined,
+      page: page ? Number.parseInt(page) : undefined,
+      limit: limit ? Number.parseInt(limit) : undefined,
       search,
       status,
-      fiscalYear: fiscalYear ? parseInt(fiscalYear) : undefined,
+      fiscalYear: fiscalYear ? Number.parseInt(fiscalYear) : undefined,
     });
   }
 

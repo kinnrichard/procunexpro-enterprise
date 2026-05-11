@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class PurchaseRequestsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private async generateRequestNumber(tenantId: string): Promise<string> {
     const today = new Date();
@@ -17,9 +17,9 @@ export class PurchaseRequestsService {
     return `${prefix}-${String(count + 1).padStart(4, '0')}`;
   }
 
-  private itemIncludes = {
+  private readonly itemIncludes = {
     vendor: { select: { id: true, name: true } },
-    product: { select: { id: true, name: true, sku: true, unit: true, costPrice: true, appliedPricingId: true, originalPackagingQty: true, pcsPerPack: true, originalPackagingUom: true } },
+    product: { select: { id: true, name: true, sku: true, unit: true, costPrice: true, appliedPricingId: true, pricings: { select: { vendorId: true, originalPackagingQty: true, pcsPerPack: true, originalPackagingUom: true } } } },
   };
 
   private async getProductPricing(productId: string, vendorId?: string | null) {
@@ -41,18 +41,37 @@ export class PurchaseRequestsService {
     return null;
   }
 
-  async findAll(
-    tenantId: string,
-    params: { page?: number; limit?: number; search?: string; status?: string; priority?: string },
-  ) {
-    const page = params.page || 1;
-    const limit = params.limit || 10;
-    const skip = (page - 1) * limit;
+  private buildDateRange(from?: string, to?: string) {
+    if (!from && !to) return undefined;
+    const range: any = {};
+    if (from) range.gte = new Date(from);
+    if (to) range.lte = new Date(to + 'T23:59:59.999Z');
+    return range;
+  }
 
+  private buildNumericRange(min?: number, max?: number) {
+    if (min === undefined && max === undefined) return undefined;
+    const range: any = {};
+    if (min !== undefined) range.gte = min;
+    if (max !== undefined) range.lte = max;
+    return range;
+  }
+
+  private buildWhere(tenantId: string, params: any) {
     const where: any = { tenantId };
-
     if (params.status) where.status = params.status;
     if (params.priority) where.priority = params.priority;
+    if (params.companyId) where.companyId = params.companyId;
+    if (params.departmentId) where.departmentId = params.departmentId;
+
+    const requiredDate = this.buildDateRange(params.requiredDateFrom, params.requiredDateTo);
+    if (requiredDate) where.requiredDate = requiredDate;
+
+    const createdAt = this.buildDateRange(params.createdDateFrom, params.createdDateTo);
+    if (createdAt) where.createdAt = createdAt;
+
+    const totalAmount = this.buildNumericRange(params.amountMin, params.amountMax);
+    if (totalAmount) where.totalAmount = totalAmount;
 
     if (params.search) {
       where.OR = [
@@ -61,6 +80,23 @@ export class PurchaseRequestsService {
         { items: { some: { description: { contains: params.search, mode: 'insensitive' } } } },
       ];
     }
+    return where;
+  }
+
+  async findAll(
+    tenantId: string,
+    params: {
+      page?: number; limit?: number; search?: string; status?: string; priority?: string;
+      companyId?: string; departmentId?: string;
+      requiredDateFrom?: string; requiredDateTo?: string;
+      createdDateFrom?: string; createdDateTo?: string;
+      amountMin?: number; amountMax?: number;
+    },
+  ) {
+    const page = params.page || 1;
+    const limit = params.limit || 10;
+    const skip = (page - 1) * limit;
+    const where = this.buildWhere(tenantId, params);
 
     const [data, total] = await Promise.all([
       this.prisma.purchaseRequest.findMany({
@@ -69,7 +105,7 @@ export class PurchaseRequestsService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          tenant: { select: { id: true, companyName: true } },
+          company: { select: { id: true, name: true } },
           requestedBy: {
             select: { id: true, firstName: true, lastName: true, username: true },
           },
@@ -107,12 +143,12 @@ export class PurchaseRequestsService {
   }
 
   async create(tenantId: string, userId: string, data: any) {
-    const effectiveTenantId = data.tenantId || tenantId;
-    const requestNumber = await this.generateRequestNumber(effectiveTenantId);
+    const requestNumber = await this.generateRequestNumber(tenantId);
 
     return this.prisma.purchaseRequest.create({
       data: {
-        tenantId: effectiveTenantId,
+        tenantId,
+        companyId: data.companyId || null,
         requestNumber,
         title: data.title,
         description: data.description || null,
@@ -122,6 +158,9 @@ export class PurchaseRequestsService {
         status: 'DRAFT',
         requiredDate: data.requiredDate ? new Date(data.requiredDate) : null,
         totalAmount: 0,
+        purchaseTerms: data.purchaseTerms || null,
+        deliveryTerms: data.deliveryTerms || null,
+        deliveryType: data.deliveryType || null,
         notes: data.notes || null,
       },
       include: {
@@ -144,12 +183,15 @@ export class PurchaseRequestsService {
     }
 
     const updateData: any = {};
-    if (data.tenantId !== undefined) updateData.tenantId = data.tenantId;
+    if (data.companyId !== undefined) updateData.companyId = data.companyId || null;
     if (data.title !== undefined) updateData.title = data.title;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.departmentId !== undefined) updateData.departmentId = data.departmentId || null;
     if (data.priority !== undefined) updateData.priority = data.priority;
     if (data.requiredDate !== undefined) updateData.requiredDate = data.requiredDate ? new Date(data.requiredDate) : null;
+    if (data.purchaseTerms !== undefined) updateData.purchaseTerms = data.purchaseTerms;
+    if (data.deliveryTerms !== undefined) updateData.deliveryTerms = data.deliveryTerms;
+    if (data.deliveryType !== undefined) updateData.deliveryType = data.deliveryType;
     if (data.notes !== undefined) updateData.notes = data.notes;
 
     return this.prisma.purchaseRequest.update({
@@ -202,16 +244,34 @@ export class PurchaseRequestsService {
 
     resolvedPrice = resolvedPrice ?? 0;
 
-    // Calculate invQty = originalPackagingQty * pcsPerPack
-    const invQty = product ? (product.originalPackagingQty || 0) * (product.pcsPerPack || 0) : (data.quantity || 1);
+    // Calculate invQty = originalPackagingQty * pcsPerPack (from vendor pricing)
+    let pcsPerPack = 1;
+    let opQty = 1;
+    if (product && resolvedVendorId) {
+      const pricing = await this.prisma.productPricing.findUnique({
+        where: { productId_vendorId: { productId: product.id, vendorId: resolvedVendorId } },
+      });
+      if (pricing) {
+        pcsPerPack = pricing.pcsPerPack || 1;
+        opQty = pricing.originalPackagingQty || 1;
+      }
+    }
+    const invQty = product ? opQty * pcsPerPack : (data.quantity || 1);
 
     const item = await this.prisma.purchaseRequestItem.create({
       data: {
         purchaseRequestId: prId,
         itemNumber: maxItemNumber + 1,
         description: product?.name || data.description || '',
-        uom: product?.originalPackagingUom?.toUpperCase() || product?.unit?.toUpperCase() || data.uom || 'PCS',
-        quantity: invQty,
+        uom: (() => {
+          if (product && resolvedVendorId) {
+            // UOM from vendor pricing
+            const p = (product as any).pricings?.find((pr: any) => pr.vendorId === resolvedVendorId);
+            if (p?.originalPackagingUom) return p.originalPackagingUom.toUpperCase();
+          }
+          return product?.unit?.toUpperCase() || data.uom || 'PCS';
+        })(),
+        quantity: opQty,
         estimatedPrice: resolvedPrice,
         totalPrice: invQty * resolvedPrice,
         vendorId: resolvedVendorId,
@@ -225,6 +285,26 @@ export class PurchaseRequestsService {
     return item;
   }
 
+  private async getPcsPerPack(productId: string | null, vendorId: string | null): Promise<number> {
+    if (!productId || !vendorId) return 1;
+    const pricing = await this.prisma.productPricing.findUnique({
+      where: { productId_vendorId: { productId, vendorId } },
+    });
+    return pricing?.pcsPerPack || 1;
+  }
+
+  private buildItemUpdate(data: any, existing: any) {
+    const updateData: any = {};
+    const simpleFields = ['quantity', 'discount', 'taxable', 'taxIncluded'];
+    for (const f of simpleFields) {
+      if (data[f] !== undefined) updateData[f] = data[f];
+    }
+    if (data.vendorId !== undefined) updateData.vendorId = data.vendorId || null;
+    if (data.notes !== undefined) updateData.notes = data.notes || null;
+    if (data.estimatedPrice !== undefined) updateData.estimatedPrice = data.estimatedPrice;
+    return updateData;
+  }
+
   async updateItem(tenantId: string, prId: string, itemId: string, data: any) {
     const pr = await this.findOne(tenantId, prId);
     if (pr.status !== 'DRAFT') throw new BadRequestException('Can only edit items in draft requests');
@@ -232,7 +312,8 @@ export class PurchaseRequestsService {
     const existing = pr.items.find(i => i.id === itemId);
     if (!existing) throw new NotFoundException('Item not found');
 
-    const updateData: any = {};
+    const updateData = this.buildItemUpdate(data, existing);
+
     if (data.productId !== undefined) {
       updateData.productId = data.productId;
       const product = await this.prisma.product.findUnique({ where: { id: data.productId } });
@@ -241,33 +322,22 @@ export class PurchaseRequestsService {
         updateData.uom = product.unit?.toUpperCase() || 'PCS';
       }
     }
-    if (data.quantity !== undefined) updateData.quantity = data.quantity;
-    if (data.vendorId !== undefined) updateData.vendorId = data.vendorId || null;
-    if (data.discount !== undefined) updateData.discount = data.discount;
-    if (data.taxable !== undefined) updateData.taxable = data.taxable;
-    if (data.taxIncluded !== undefined) updateData.taxIncluded = data.taxIncluded;
-    if (data.notes !== undefined) updateData.notes = data.notes || null;
 
     // Auto-update price when vendor changes (and user didn't manually set price)
     if (data.vendorId !== undefined && data.estimatedPrice === undefined) {
       const productId = data.productId || existing.productId;
       if (productId) {
         const pricing = await this.getProductPricing(productId, data.vendorId || null);
-        if (pricing) {
-          updateData.estimatedPrice = pricing.unitCost;
-        }
+        if (pricing) updateData.estimatedPrice = pricing.unitCost;
       }
     }
-    if (data.estimatedPrice !== undefined) updateData.estimatedPrice = data.estimatedPrice;
 
-    // Recalc total: invQty (from product packaging) * unitPrice
+    // Recalc total
     const productId = data.productId || existing.productId;
-    let invQty = existing.quantity;
-    if (productId) {
-      const prod = await this.prisma.product.findUnique({ where: { id: productId } });
-      if (prod) invQty = (prod.originalPackagingQty || 0) * (prod.pcsPerPack || 0);
-    }
-    if (data.quantity !== undefined) invQty = data.quantity;
+    const vendorId = updateData.vendorId ?? data.vendorId ?? existing.vendorId;
+    const opQty = data.quantity ?? existing.quantity;
+    const pcsPerPack = await this.getPcsPerPack(productId, vendorId);
+    const invQty = opQty * pcsPerPack;
     const price = updateData.estimatedPrice ?? data.estimatedPrice ?? existing.estimatedPrice;
     updateData.totalPrice = invQty * price;
 
@@ -309,7 +379,8 @@ export class PurchaseRequestsService {
 
       if (!pricing) continue; // Skip — vendor doesn't supply this product
 
-      const totalPrice = item.quantity * pricing.unitCost;
+      const invQty = item.quantity * (pricing.pcsPerPack || 1);
+      const totalPrice = invQty * pricing.unitCost;
       await this.prisma.purchaseRequestItem.update({
         where: { id: item.id },
         data: {

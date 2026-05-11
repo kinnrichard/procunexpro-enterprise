@@ -220,6 +220,67 @@ async function main() {
     create: { tenantId: tenant.id, name: 'Exempt', rate: 0 },
   });
 
+  // Purchase Terms
+  await prisma.purchaseTerm.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Net 30' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Net 30', description: 'Payment due within 30 days', isDefault: true },
+  });
+  await prisma.purchaseTerm.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Net 60' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Net 60', description: 'Payment due within 60 days' },
+  });
+  await prisma.purchaseTerm.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'COD' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'COD', description: 'Cash on delivery' },
+  });
+  await prisma.purchaseTerm.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Prepaid' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Prepaid', description: 'Full payment before shipment' },
+  });
+
+  // Delivery Terms
+  await prisma.deliveryTerm.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Standard Delivery' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Standard Delivery', description: 'Deliver to main warehouse within 7-14 days', isDefault: true },
+  });
+  await prisma.deliveryTerm.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Express Delivery' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Express Delivery', description: 'Rush delivery within 1-3 days' },
+  });
+  await prisma.deliveryTerm.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Pickup' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Pickup', description: 'Pickup from vendor location' },
+  });
+
+  // Delivery Types
+  await prisma.deliveryType.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Air Freight' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Air Freight' },
+  });
+  await prisma.deliveryType.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Sea Freight' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Sea Freight' },
+  });
+  await prisma.deliveryType.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Land Transport' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Land Transport' },
+  });
+  await prisma.deliveryType.upsert({
+    where: { tenantId_name: { tenantId: tenant.id, name: 'Courier' } },
+    update: {},
+    create: { tenantId: tenant.id, name: 'Courier' },
+  });
+
   // Currencies
   await prisma.currency.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: 'USD' } },
@@ -438,16 +499,16 @@ async function main() {
 
   // Products
   const products = [
-    { name: 'A4 Paper (500 sheets)', sku: 'OFF-001', manufacturerId: mfgDoubleA.id, modelNumber: 'DA-A4-500', categoryId: catOffice.id, subCategoryId: subPaper.id, vendorId: vendorOffice.id, originId: originThailand.id, unit: 'ream', costPrice: 5.99, sellingPrice: 8.99, currentStock: 150, minStock: 20, maxStock: 500, reorderPoint: 30, reorderQuantity: 100, originalPackagingQty: 5, pcsPerPack: 5, originalPackagingUom: 'ream', sellingPackagingQty: 1, sellingPackagingUom: 'ream', warehouseId: whMain.id },
-    { name: 'Ballpoint Pens (Box of 12)', sku: 'OFF-002', manufacturerId: mfgPilot.id, modelNumber: 'PIL-BP12', categoryId: catOffice.id, subCategoryId: subWriting.id, vendorId: vendorABC.id, originId: originJapan.id, unit: 'box', costPrice: 3.49, sellingPrice: 5.99, currentStock: 80, minStock: 10, maxStock: 200, reorderPoint: 20, reorderQuantity: 50, originalPackagingQty: 12, pcsPerPack: 12, originalPackagingUom: 'pcs', sellingPackagingQty: 1, sellingPackagingUom: 'box', warehouseId: whMain.id },
-    { name: 'Laptop - Dell XPS 15', sku: 'ELEC-001', manufacturerId: mfgDell.id, modelNumber: 'XPS-15-9530', categoryId: catElectronics.id, subCategoryId: subLaptops.id, vendorId: vendorTech.id, originId: originChina.id, unit: 'unit', costPrice: 1299.99, sellingPrice: 1599.99, currentStock: 12, minStock: 3, maxStock: 30, reorderPoint: 5, reorderQuantity: 10, originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'unit', sellingPackagingQty: 1, sellingPackagingUom: 'unit', warehouseId: whMain.id },
-    { name: 'Wireless Mouse', sku: 'ELEC-002', manufacturerId: mfgLogitech.id, modelNumber: 'MX-MASTER-3S', categoryId: catElectronics.id, subCategoryId: subPeripherals.id, vendorId: vendorTech.id, originId: originChina.id, unit: 'unit', costPrice: 24.99, sellingPrice: 39.99, currentStock: 45, minStock: 10, maxStock: 100, reorderPoint: 15, reorderQuantity: 30, originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'unit', sellingPackagingQty: 1, sellingPackagingUom: 'unit', warehouseId: whMain.id },
-    { name: '27" Monitor', sku: 'ELEC-003', manufacturerId: mfgSamsung.id, modelNumber: 'LS27A800', categoryId: catElectronics.id, subCategoryId: subMonitors.id, vendorId: vendorTech.id, originId: originSouthKorea.id, unit: 'unit', costPrice: 349.99, sellingPrice: 449.99, currentStock: 8, minStock: 2, maxStock: 20, reorderPoint: 4, reorderQuantity: 10, originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'unit', sellingPackagingQty: 1, sellingPackagingUom: 'unit', warehouseId: whMain.id },
-    { name: 'Steel Sheets (4x8)', sku: 'RAW-001', manufacturerId: mfgArcelorMittal.id, modelNumber: 'AM-SS-4X8', categoryId: catRaw.id, subCategoryId: subMetals.id, vendorId: vendorGlobal.id, originId: originUSA.id, unit: 'sheet', costPrice: 89.99, sellingPrice: 0, currentStock: 3, minStock: 5, maxStock: 50, reorderPoint: 10, reorderQuantity: 20, originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'sheet', sellingPackagingQty: 1, sellingPackagingUom: 'sheet', warehouseId: whSecondary.id },
-    { name: 'Copper Wire (100m)', sku: 'RAW-002', manufacturerId: mfgSouthwire.id, modelNumber: 'SW-CW-100M', categoryId: catRaw.id, subCategoryId: subWiring.id, vendorId: vendorGlobal.id, originId: originUSA.id, unit: 'roll', costPrice: 45.50, sellingPrice: 0, currentStock: 7, minStock: 3, maxStock: 30, reorderPoint: 5, reorderQuantity: 15, originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'roll', sellingPackagingQty: 1, sellingPackagingUom: 'roll', warehouseId: whSecondary.id },
-    { name: 'Office Desk - Standing', sku: 'FURN-001', manufacturerId: mfgFlexiSpot.id, modelNumber: 'E7-PRO', categoryId: catFurniture.id, subCategoryId: subDesks.id, vendorId: vendorOffice.id, originId: originChina.id, unit: 'unit', costPrice: 599.99, sellingPrice: 849.99, currentStock: 4, minStock: 2, maxStock: 15, reorderPoint: 3, reorderQuantity: 5, originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'unit', sellingPackagingQty: 1, sellingPackagingUom: 'unit', warehouseId: whMain.id },
-    { name: 'Ergonomic Chair', sku: 'FURN-002', manufacturerId: mfgHermanMiller.id, modelNumber: 'HM-AERON-B', categoryId: catFurniture.id, subCategoryId: subChairs.id, vendorId: vendorOffice.id, originId: originUSA.id, unit: 'unit', costPrice: 449.99, sellingPrice: 649.99, currentStock: 6, minStock: 2, maxStock: 15, reorderPoint: 3, reorderQuantity: 5, originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'unit', sellingPackagingQty: 1, sellingPackagingUom: 'unit', warehouseId: whMain.id },
-    { name: 'Safety Goggles', sku: 'SAFE-001', manufacturerId: mfg3M.id, modelNumber: '3M-GG501', categoryId: catSafety.id, subCategoryId: subEyeProtection.id, vendorId: vendorABC.id, originId: originUSA.id, unit: 'pair', costPrice: 12.99, sellingPrice: 19.99, currentStock: 25, minStock: 10, maxStock: 200, reorderPoint: 15, reorderQuantity: 50, originalPackagingQty: 10, pcsPerPack: 10, originalPackagingUom: 'pcs', sellingPackagingQty: 1, sellingPackagingUom: 'pair', warehouseId: whSecondary.id },
+    { name: 'A4 Paper (500 sheets)', sku: 'OFF-001', manufacturerId: mfgDoubleA.id, modelNumber: 'DA-A4-500', categoryId: catOffice.id, subCategoryId: subPaper.id, vendorId: vendorOffice.id, originId: originThailand.id, unit: 'ream', costPrice: 5.99, sellingPrice: 8.99, currentStock: 150, minStock: 20, maxStock: 500, reorderPoint: 30, reorderQuantity: 100, warehouseId: whMain.id },
+    { name: 'Ballpoint Pens (Box of 12)', sku: 'OFF-002', manufacturerId: mfgPilot.id, modelNumber: 'PIL-BP12', categoryId: catOffice.id, subCategoryId: subWriting.id, vendorId: vendorABC.id, originId: originJapan.id, unit: 'box', costPrice: 3.49, sellingPrice: 5.99, currentStock: 80, minStock: 10, maxStock: 200, reorderPoint: 20, reorderQuantity: 50, warehouseId: whMain.id },
+    { name: 'Laptop - Dell XPS 15', sku: 'ELEC-001', manufacturerId: mfgDell.id, modelNumber: 'XPS-15-9530', categoryId: catElectronics.id, subCategoryId: subLaptops.id, vendorId: vendorTech.id, originId: originChina.id, unit: 'unit', costPrice: 1299.99, sellingPrice: 1599.99, currentStock: 12, minStock: 3, maxStock: 30, reorderPoint: 5, reorderQuantity: 10, warehouseId: whMain.id },
+    { name: 'Wireless Mouse', sku: 'ELEC-002', manufacturerId: mfgLogitech.id, modelNumber: 'MX-MASTER-3S', categoryId: catElectronics.id, subCategoryId: subPeripherals.id, vendorId: vendorTech.id, originId: originChina.id, unit: 'unit', costPrice: 24.99, sellingPrice: 39.99, currentStock: 45, minStock: 10, maxStock: 100, reorderPoint: 15, reorderQuantity: 30, warehouseId: whMain.id },
+    { name: '27" Monitor', sku: 'ELEC-003', manufacturerId: mfgSamsung.id, modelNumber: 'LS27A800', categoryId: catElectronics.id, subCategoryId: subMonitors.id, vendorId: vendorTech.id, originId: originSouthKorea.id, unit: 'unit', costPrice: 349.99, sellingPrice: 449.99, currentStock: 8, minStock: 2, maxStock: 20, reorderPoint: 4, reorderQuantity: 10, warehouseId: whMain.id },
+    { name: 'Steel Sheets (4x8)', sku: 'RAW-001', manufacturerId: mfgArcelorMittal.id, modelNumber: 'AM-SS-4X8', categoryId: catRaw.id, subCategoryId: subMetals.id, vendorId: vendorGlobal.id, originId: originUSA.id, unit: 'sheet', costPrice: 89.99, sellingPrice: 0, currentStock: 3, minStock: 5, maxStock: 50, reorderPoint: 10, reorderQuantity: 20, warehouseId: whSecondary.id },
+    { name: 'Copper Wire (100m)', sku: 'RAW-002', manufacturerId: mfgSouthwire.id, modelNumber: 'SW-CW-100M', categoryId: catRaw.id, subCategoryId: subWiring.id, vendorId: vendorGlobal.id, originId: originUSA.id, unit: 'roll', costPrice: 45.50, sellingPrice: 0, currentStock: 7, minStock: 3, maxStock: 30, reorderPoint: 5, reorderQuantity: 15, warehouseId: whSecondary.id },
+    { name: 'Office Desk - Standing', sku: 'FURN-001', manufacturerId: mfgFlexiSpot.id, modelNumber: 'E7-PRO', categoryId: catFurniture.id, subCategoryId: subDesks.id, vendorId: vendorOffice.id, originId: originChina.id, unit: 'unit', costPrice: 599.99, sellingPrice: 849.99, currentStock: 4, minStock: 2, maxStock: 15, reorderPoint: 3, reorderQuantity: 5, warehouseId: whMain.id },
+    { name: 'Ergonomic Chair', sku: 'FURN-002', manufacturerId: mfgHermanMiller.id, modelNumber: 'HM-AERON-B', categoryId: catFurniture.id, subCategoryId: subChairs.id, vendorId: vendorOffice.id, originId: originUSA.id, unit: 'unit', costPrice: 449.99, sellingPrice: 649.99, currentStock: 6, minStock: 2, maxStock: 15, reorderPoint: 3, reorderQuantity: 5, warehouseId: whMain.id },
+    { name: 'Safety Goggles', sku: 'SAFE-001', manufacturerId: mfg3M.id, modelNumber: '3M-GG501', categoryId: catSafety.id, subCategoryId: subEyeProtection.id, vendorId: vendorABC.id, originId: originUSA.id, unit: 'pair', costPrice: 12.99, sellingPrice: 19.99, currentStock: 25, minStock: 10, maxStock: 200, reorderPoint: 15, reorderQuantity: 50, warehouseId: whSecondary.id },
   ];
 
   for (const p of products) {

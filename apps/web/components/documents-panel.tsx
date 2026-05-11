@@ -6,8 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
-import { formatDateTime } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatDateTime, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,7 +44,7 @@ interface DocumentsPanelProps {
   entityId: string;
 }
 
-export function DocumentsPanel({ entityType, entityId }: DocumentsPanelProps) {
+export function DocumentsPanel({ entityType, entityId }: Readonly<DocumentsPanelProps>) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
@@ -85,6 +84,48 @@ export function DocumentsPanel({ entityType, entityId }: DocumentsPanelProps) {
     onError: () => toast({ title: 'Failed to remove', variant: 'destructive' }),
   });
 
+  function renderDocumentsList() {
+    if (isLoading) {
+      return (
+        <div className="animate-pulse space-y-2">
+          {[1, 2].map(i => <div key={i} className="h-10 bg-muted rounded" />)}
+        </div>
+      );
+    }
+    if (documents.length === 0) {
+      return <p className="text-center py-4 text-sm text-muted-foreground">No documents attached</p>;
+    }
+    return (
+      <div className="space-y-1.5">
+        {documents.map((doc: any) => {
+          const Icon = getFileIcon(doc.mimeType);
+          return (
+            <div key={doc.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 group">
+              <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:text-primary flex items-center gap-1 truncate">
+                  {doc.fileName}
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                </a>
+                <p className="text-[10px] text-muted-foreground">
+                  {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(0)} KB` : ''} {doc.fileSize && '·'} {formatDateTime(doc.createdAt)}
+                </p>
+              </div>
+              <button
+                onClick={() => setDeleteTarget(doc)}
+                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 hover:text-red-600 transition-opacity"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -94,41 +135,7 @@ export function DocumentsPanel({ entityType, entityId }: DocumentsPanelProps) {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="animate-pulse space-y-2">
-          {[1, 2].map(i => <div key={i} className="h-10 bg-muted rounded" />)}
-        </div>
-      ) : documents.length === 0 ? (
-        <p className="text-center py-4 text-sm text-muted-foreground">No documents attached</p>
-      ) : (
-        <div className="space-y-1.5">
-          {documents.map((doc: any) => {
-            const Icon = getFileIcon(doc.mimeType);
-            return (
-              <div key={doc.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 group">
-                <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
-                  <Icon className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:text-primary flex items-center gap-1 truncate">
-                    {doc.fileName}
-                    <ExternalLink className="h-3 w-3 shrink-0" />
-                  </a>
-                  <p className="text-[10px] text-muted-foreground">
-                    {doc.fileSize ? `${(doc.fileSize / 1024).toFixed(0)} KB` : ''} {doc.fileSize && '·'} {formatDateTime(doc.createdAt)}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setDeleteTarget(doc)}
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-400 hover:text-red-600 transition-opacity"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {renderDocumentsList()}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-sm p-0 gap-0">

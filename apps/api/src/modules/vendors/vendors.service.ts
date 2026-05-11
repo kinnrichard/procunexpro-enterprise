@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class VendorsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(
     tenantId: string,
@@ -78,7 +78,7 @@ export class VendorsService {
         bankRouting: data.bankRouting || null,
         rating: data.rating || null,
         notes: data.notes || null,
-        isActive: data.isActive !== undefined ? data.isActive : true,
+        isActive: data.isActive === undefined ? true : data.isActive,
       },
     });
   }

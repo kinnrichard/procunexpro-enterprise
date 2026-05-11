@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class WarehousesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(
     tenantId: string,
@@ -64,7 +64,7 @@ export class WarehousesService {
         address: data.address || null,
         city: data.city || null,
         managerId: data.managerId || null,
-        isActive: data.isActive !== undefined ? data.isActive : true,
+        isActive: data.isActive === undefined ? true : data.isActive,
       },
       include: {
         _count: { select: { locations: true, products: true } },
@@ -133,7 +133,7 @@ export class WarehousesService {
         name: data.name,
         code: data.code,
         description: data.description || null,
-        isActive: data.isActive !== undefined ? data.isActive : true,
+        isActive: data.isActive === undefined ? true : data.isActive,
       },
     });
   }

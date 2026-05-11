@@ -48,14 +48,6 @@ const productSchema = z.object({
   // Description
   description: z.string().optional().or(z.literal('')),
 
-  // Original Packaging UOM
-  originalPackagingQty: z.coerce.number().int().min(1, 'Required'),
-  pcsPerPack: z.coerce.number().int().min(1, 'Required'),
-  originalPackagingUom: z.string().min(1, 'Required'),
-
-  // Selling Packaging UOM
-  sellingPackagingQty: z.coerce.number().int().min(1, 'Required'),
-  sellingPackagingUom: z.string().min(1, 'Required'),
 })
 
 type ProductFormData = z.infer<typeof productSchema>
@@ -77,11 +69,6 @@ type Product = {
   minStock: number
   maxStock: number
   reorderQuantity: number
-  originalPackagingQty: number
-  pcsPerPack: number
-  originalPackagingUom: string
-  sellingPackagingQty: number
-  sellingPackagingUom: string
   currentStock: number
   reorderPoint: number
   costPrice: number
@@ -150,8 +137,6 @@ export default function ProductsPage() {
     length: '', depth: '', height: '', weight: '',
     minStock: 1, maxStock: 1, reorderQuantity: 1,
     description: '',
-    originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'pcs',
-    sellingPackagingQty: 1, sellingPackagingUom: 'pcs',
   }
 
   const {
@@ -289,11 +274,6 @@ export default function ProductsPage() {
       maxStock: product.maxStock,
       reorderQuantity: product.reorderQuantity,
       description: product.description || '',
-      originalPackagingQty: product.originalPackagingQty,
-      pcsPerPack: product.pcsPerPack,
-      originalPackagingUom: product.originalPackagingUom,
-      sellingPackagingQty: product.sellingPackagingQty,
-      sellingPackagingUom: product.sellingPackagingUom,
     })
     setEditing(product)
     setModalOpen(true)
@@ -315,9 +295,9 @@ export default function ProductsPage() {
       description: data.description || undefined,
     }
     if (editing) {
-      updateMutation.mutate({ id: editing.id, data: cleaned as any })
+      updateMutation.mutate({ id: editing.id, data: cleaned })
     } else {
-      createMutation.mutate(cleaned as any)
+      createMutation.mutate(cleaned)
     }
   }
 
@@ -412,7 +392,7 @@ export default function ProductsPage() {
       label: '',
       className: 'w-[80px]',
       render: (_value: any, row: Product) => (
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           <button
             onClick={() => openEdit(row)}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -425,7 +405,7 @@ export default function ProductsPage() {
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
-        </div>
+        </button>
       ),
     },
   ]
@@ -679,87 +659,6 @@ export default function ProductsPage() {
                   placeholder="Additional notes about this product..."
                   className="min-h-[80px]"
                 />
-              </div>
-
-              {/* Original Packaging UOM Section */}
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground mb-1">Original Packaging UOM</p>
-                <p className="text-xs text-muted-foreground mb-3">
-                  If the item arrives in a set of 5 pieces, encode original packaging qty as 5 and UOM as pcs.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Original Packaging Qty <span className="text-red-500">*</span></Label>
-                  <Input
-                    type="number"
-                    {...register('originalPackagingQty')}
-                    placeholder="e.g., 5"
-                    className={cn(errors.originalPackagingQty && 'border-red-300 focus-visible:ring-red-200')}
-                  />
-                  {errors.originalPackagingQty && <p className="text-xs text-red-500">{errors.originalPackagingQty.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Pcs/Pack <span className="text-red-500">*</span></Label>
-                  <Input
-                    type="number"
-                    {...register('pcsPerPack')}
-                    placeholder="e.g., 5"
-                    className={cn(errors.pcsPerPack && 'border-red-300 focus-visible:ring-red-200')}
-                  />
-                  {errors.pcsPerPack && <p className="text-xs text-red-500">{errors.pcsPerPack.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Original Packaging UOM <span className="text-red-500">*</span></Label>
-                  <Controller
-                    control={control}
-                    name="originalPackagingUom"
-                    render={({ field }) => (
-                      <SearchableSelect
-                        options={UOM_OPTIONS}
-                        value={field.value || ''}
-                        onChange={(val) => field.onChange(val)}
-                        placeholder="Select UOM"
-                      />
-                    )}
-                  />
-                  {errors.originalPackagingUom && <p className="text-xs text-red-500">{errors.originalPackagingUom.message}</p>}
-                </div>
-              </div>
-
-              {/* Selling Packaging UOM Section */}
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground mb-3">Selling Packaging UOM</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Selling Packaging Qty <span className="text-red-500">*</span></Label>
-                  <Input
-                    type="number"
-                    {...register('sellingPackagingQty')}
-                    placeholder="e.g., 1"
-                    className={cn(errors.sellingPackagingQty && 'border-red-300 focus-visible:ring-red-200')}
-                  />
-                  {errors.sellingPackagingQty && <p className="text-xs text-red-500">{errors.sellingPackagingQty.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-sm">Selling Packaging UOM <span className="text-red-500">*</span></Label>
-                  <Controller
-                    control={control}
-                    name="sellingPackagingUom"
-                    render={({ field }) => (
-                      <SearchableSelect
-                        options={UOM_OPTIONS}
-                        value={field.value || ''}
-                        onChange={(val) => field.onChange(val)}
-                        placeholder="Select UOM"
-                      />
-                    )}
-                  />
-                  {errors.sellingPackagingUom && <p className="text-xs text-red-500">{errors.sellingPackagingUom.message}</p>}
-                </div>
               </div>
 
             </form>

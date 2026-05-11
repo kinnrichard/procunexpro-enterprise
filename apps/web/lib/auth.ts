@@ -50,7 +50,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   hydrate: () => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     const userStr = localStorage.getItem('user');
     const token = localStorage.getItem('accessToken');
     if (userStr && token) {

@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class SpendAnalyticsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async byVendor(tenantId: string) {
     const results = await this.prisma.purchaseOrder.groupBy({

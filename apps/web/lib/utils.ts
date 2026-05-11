@@ -7,10 +7,10 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatCurrency(amount: number, currency?: string): string {
   let code = currency || 'USD';
-  if (!currency && typeof window !== 'undefined') {
+  if (!currency && globalThis.window !== undefined) {
     try {
       // Read from zustand store without subscribing (for non-hook contexts)
-      const store = (window as any).__CURRENCY_STORE__;
+      const store = (globalThis as any).__CURRENCY_STORE__;
       if (store) code = store.code || 'USD';
     } catch {}
   }

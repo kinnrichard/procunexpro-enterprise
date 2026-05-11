@@ -6,8 +6,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -16,14 +15,13 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/use-toast';
-import { Wallet, Plus, Pencil, Trash2, Play, Square, X, DollarSign, PieChart, AlertTriangle } from 'lucide-react';
+import { Wallet, Plus, Pencil, Trash2, Play, Square, X, DollarSign, PieChart } from 'lucide-react';
 
 const budgetSchema = z.object({
   name: z.string().min(2, 'Name required'),
@@ -136,11 +134,14 @@ export default function BudgetsPage() {
     {
       key: 'spentAmount', label: 'Spent', render: (v: number, row: any) => {
         const pct = row.totalAmount > 0 ? (v / row.totalAmount) * 100 : 0;
+        let pctClass = 'text-muted-foreground';
+        if (pct > 90) pctClass = 'text-red-600';
+        else if (pct > 75) pctClass = 'text-amber-600';
         return (
           <div className="space-y-1 min-w-[120px]">
             <div className="flex justify-between text-xs">
               <span>{formatCurrency(v)}</span>
-              <span className={cn(pct > 90 ? 'text-red-600' : pct > 75 ? 'text-amber-600' : 'text-muted-foreground')}>{pct.toFixed(0)}%</span>
+              <span className={cn(pctClass)}>{pct.toFixed(0)}%</span>
             </div>
             <Progress value={pct} className="h-1.5" />
           </div>
@@ -151,7 +152,7 @@ export default function BudgetsPage() {
     { key: 'status', label: 'Status', render: (v: string) => <StatusBadge status={v} /> },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           {row.status === 'DRAFT' && (
             <>
               <button onClick={() => actionMut.mutate({ id: row.id, action: 'activate' })} className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600" title="Activate"><Play className="h-3.5 w-3.5" /></button>
@@ -162,7 +163,7 @@ export default function BudgetsPage() {
           {row.status === 'ACTIVE' && (
             <button onClick={() => actionMut.mutate({ id: row.id, action: 'close' })} className="p-1.5 rounded-md hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600" title="Close"><Square className="h-3.5 w-3.5" /></button>
           )}
-        </div>
+        </button>
       ),
     },
   ];
@@ -342,13 +343,16 @@ export default function BudgetsPage() {
                         <tbody>
                           {detail.allocations.map((a: any) => {
                             const pct = a.amount > 0 ? (a.spentAmount / a.amount) * 100 : 0;
+                            let pctColor = '';
+                            if (pct > 90) pctColor = 'text-red-600';
+                            else if (pct > 75) pctColor = 'text-amber-600';
                             return (
                               <tr key={a.id} className="border-t border-border/50">
                                 <td className="px-4 py-2.5">{a.department?.name || 'All'}</td>
                                 <td className="px-4 py-2.5">{a.category?.name || 'All'}</td>
                                 <td className="px-4 py-2.5 text-right">{formatCurrency(a.amount)}</td>
                                 <td className="px-4 py-2.5 text-right">{formatCurrency(a.spentAmount)}</td>
-                                <td className={cn('px-4 py-2.5 text-right font-medium', pct > 90 ? 'text-red-600' : pct > 75 ? 'text-amber-600' : '')}>{pct.toFixed(0)}%</td>
+                                <td className={cn('px-4 py-2.5 text-right font-medium', pctColor)}>{pct.toFixed(0)}%</td>
                               </tr>
                             );
                           })}

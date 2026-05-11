@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class CurrenciesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string }) {
     const page = params.page || 1;

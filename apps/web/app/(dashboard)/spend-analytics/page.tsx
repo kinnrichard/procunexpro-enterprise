@@ -3,19 +3,44 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
+
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts';
-import { TrendingUp, DollarSign, Building2, Package, Calendar } from 'lucide-react';
+import { TrendingUp, DollarSign, Building2, Calendar } from 'lucide-react';
 
 const COLORS = ['#1e3a5f', '#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#6366f1', '#0891b2'];
+
+function SkeletonCard() {
+  return (
+    <div className="animate-pulse space-y-3">
+      <div className="h-4 bg-muted rounded w-24" />
+      <div className="h-8 bg-muted rounded w-32" />
+    </div>
+  );
+}
+
+function SpendBar({ label, amount, max, count }: Readonly<{ label: string; amount: number; max: number; count: number }>) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium truncate mr-2">{label}</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="text-xs text-muted-foreground">{count} orders</span>
+          <span className="font-semibold">{formatCurrency(amount)}</span>
+        </div>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(amount / max) * 100}%` }} />
+      </div>
+    </div>
+  );
+}
 
 export default function SpendAnalyticsPage() {
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
@@ -52,28 +77,6 @@ export default function SpendAnalyticsPage() {
   const maxVendorSpend = byVendor.length > 0 ? Math.max(...byVendor.map((v: any) => v.totalSpend || 0)) : 1;
   const maxCatSpend = byCategory.length > 0 ? Math.max(...byCategory.map((c: any) => c.totalSpend || 0)) : 1;
   const maxDeptSpend = byDept.length > 0 ? Math.max(...byDept.map((d: any) => d.totalSpend || 0)) : 1;
-
-  const SkeletonCard = () => (
-    <div className="animate-pulse space-y-3">
-      <div className="h-4 bg-muted rounded w-24" />
-      <div className="h-8 bg-muted rounded w-32" />
-    </div>
-  );
-
-  const SpendBar = ({ label, amount, max, count }: { label: string; amount: number; max: number; count: number }) => (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium truncate mr-2">{label}</span>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs text-muted-foreground">{count} orders</span>
-          <span className="font-semibold">{formatCurrency(amount)}</span>
-        </div>
-      </div>
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(amount / max) * 100}%` }} />
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -144,7 +147,7 @@ export default function SpendAnalyticsPage() {
                   <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie data={byVendor.slice(0, 8)} dataKey="totalSpend" nameKey="vendorName" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} labelLine={false}>
-                        {byVendor.slice(0, 8).map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        {byVendor.slice(0, 8).map((v: any, i: number) => <Cell key={v.vendorId ?? `cell-${i}`} fill={COLORS[i % COLORS.length]} />)}
                       </Pie>
                       <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
                     </PieChart>

@@ -105,8 +105,8 @@ export default function UsersPage() {
   const onSubmit = (data: any) => {
     const payload = { ...data, departmentId: data.departmentId || null };
     if (editing) {
-      if (!payload.password) delete payload.password;
-      updateMut.mutate({ id: editing.id, data: payload });
+      const updatePayload = payload.password ? payload : (({ password: _pw, ...rest }) => rest)(payload);
+      updateMut.mutate({ id: editing.id, data: updatePayload });
     } else {
       createMut.mutate(payload);
     }
@@ -130,7 +130,7 @@ export default function UsersPage() {
     {
       key: 'role', label: 'Role', render: (v: string) => (
         <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', roleColors[v])}>
-          {v.replace(/_/g, ' ')}
+          {v.replaceAll('_', ' ')}
         </span>
       ),
     },
@@ -139,7 +139,7 @@ export default function UsersPage() {
     { key: 'isActive', label: 'Status', render: (v: boolean) => <StatusBadge status={v ? 'ACTIVE' : 'INACTIVE'} /> },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
           <button
             onClick={() => toggleMut.mutate({ id: row.id, action: row.isActive ? 'deactivate' : 'activate' })}
@@ -149,7 +149,7 @@ export default function UsersPage() {
             {row.isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
           </button>
           <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-        </div>
+        </button>
       ),
     },
   ];
@@ -187,7 +187,7 @@ export default function UsersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Roles</SelectItem>
-              {roles.map(r => <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>)}
+              {roles.map(r => <SelectItem key={r} value={r}>{r.replaceAll('_', ' ')}</SelectItem>)}
             </SelectContent>
           </Select>
         }
@@ -230,7 +230,7 @@ export default function UsersPage() {
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {roles.map(r => <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>)}
+                      {roles.map(r => <SelectItem key={r} value={r}>{r.replaceAll('_', ' ')}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )} />

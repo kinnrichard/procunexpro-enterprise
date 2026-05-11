@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class SupplierScoringService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(
     tenantId: string,
@@ -115,10 +115,10 @@ export class SupplierScoringService {
     const score = await this.prisma.supplierScore.findFirst({ where: { id, tenantId } });
     if (!score) throw new NotFoundException('Score not found');
 
-    const quality = data.quality !== undefined ? data.quality : score.quality;
-    const delivery = data.delivery !== undefined ? data.delivery : score.delivery;
-    const pricing = data.pricing !== undefined ? data.pricing : score.pricing;
-    const service = data.service !== undefined ? data.service : score.service;
+    const quality = data.quality === undefined ? score.quality : data.quality;
+    const delivery = data.delivery === undefined ? score.delivery : data.delivery;
+    const pricing = data.pricing === undefined ? score.pricing : data.pricing;
+    const service = data.service === undefined ? score.service : data.service;
     const overall = Math.round(((quality + delivery + pricing + service) / 4) * 100) / 100;
 
     const updateData: any = { quality, delivery, pricing, service, overall };

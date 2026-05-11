@@ -78,23 +78,11 @@ export default function LoginPage() {
         <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] items-center justify-center p-10">
           <div className="max-w-xl text-center">
             {/* Logo */}
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-                <span className="text-2xl font-bold text-white">PE</span>
-              </div>
+            <div className="flex items-center justify-center mb-10">
+              <img src="/logo-white.png" alt="Procunex" className="h-75" />
             </div>
-            <h1 className="text-5xl font-bold text-white tracking-tight mb-2">
-              ProcunexPro
-            </h1>
-            <span className="inline-block px-3 py-1 text-xs font-semibold uppercase tracking-widest text-blue-200 bg-blue-500/20 rounded-full border border-blue-400/30 mb-8">
-              Enterprise
-            </span>
             <p className="text-xl text-white/90 leading-relaxed max-w-lg mx-auto mb-10">
-              Enterprise Procurement & Inventory Management
-              <br />
-              <span className="text-white/70">
-                Streamline purchasing, vendors, and stock control
-              </span>
+              Streamline purchasing, vendors, and stock control
             </p>
 
             {/* Stats */}
@@ -126,11 +114,8 @@ export default function LoginPage() {
           >
             {/* Logo inside card */}
             <div className="text-center mb-10">
-              <div className="inline-flex items-center gap-3 mb-3">
-                <div className="w-11 h-11 bg-gradient-to-br from-slate-700 to-[#1e3a5f] rounded-xl flex items-center justify-center">
-                  <span className="text-sm font-bold text-white">PE</span>
-                </div>
-                <span className="text-2xl font-bold text-slate-800 tracking-tight">ProcunexPro</span>
+              <div className="inline-flex items-center mb-3">
+                <img src="/logo-primary.png" alt="Procunex" className="h-22" />
               </div>
               <p className="text-sm text-gray-500">Sign in to your account</p>
             </div>
@@ -273,7 +258,7 @@ export default function LoginPage() {
             {/* Footer */}
             <div className="text-center mt-8 text-xs text-gray-500">
               <div className="text-gray-400 mb-1">
-                &copy; {new Date().getFullYear()} ProcunexPro Enterprise. All rights reserved.
+                &copy; {new Date().getFullYear()} Procunex. All rights reserved.
               </div>
               <div className="text-gray-400">
                 Developed by{' '}

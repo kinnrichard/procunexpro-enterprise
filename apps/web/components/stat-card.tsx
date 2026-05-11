@@ -10,7 +10,7 @@ export interface StatCardProps {
   className?: string
 }
 
-export function StatCard({ title, value, icon, trend, className }: StatCardProps) {
+export function StatCard({ title, value, icon, trend, className }: Readonly<StatCardProps>) {
   return (
     <Card className={cn('p-5 relative overflow-hidden', className)}>
       <div className="flex items-start justify-between">

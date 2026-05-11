@@ -13,14 +13,15 @@ interface BreadcrumbsProps {
   items: BreadcrumbItem[];
 }
 
-export function Breadcrumbs({ items }: BreadcrumbsProps) {
+export function Breadcrumbs({ items }: Readonly<BreadcrumbsProps>) {
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
       {items.map((item, index) => {
         const isLast = index === items.length - 1;
+        const itemKey = item.href ?? item.label;
 
         return (
-          <div key={index} className="flex items-center gap-1">
+          <div key={itemKey} className="flex items-center gap-1">
             {index > 0 && (
               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
             )}

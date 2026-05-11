@@ -19,7 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { useToast } from '@/components/ui/use-toast';
 import { GitBranch, Plus, Pencil, Trash2, Eye, X, ArrowDown, CheckCircle, XCircle } from 'lucide-react';
 
@@ -129,7 +129,7 @@ export default function WorkflowsPage() {
     { key: 'name', label: 'Name', sortable: true, render: (v: string) => <span className="font-medium">{v}</span> },
     {
       key: 'entityType', label: 'Applies To', render: (v: string) => (
-        <Badge variant="outline" className="font-mono text-xs">{v.replace(/_/g, ' ')}</Badge>
+        <Badge variant="outline" className="font-mono text-xs">{v.replaceAll('_', ' ')}</Badge>
       ),
     },
     {
@@ -144,7 +144,7 @@ export default function WorkflowsPage() {
     { key: 'isActive', label: 'Status', render: (v: boolean) => <StatusBadge status={v ? 'ACTIVE' : 'INACTIVE'} /> },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           <button onClick={() => setDetailWorkflow(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="View"><Eye className="h-3.5 w-3.5" /></button>
           <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
           <button
@@ -155,7 +155,7 @@ export default function WorkflowsPage() {
             {row.isActive ? <XCircle className="h-3.5 w-3.5" /> : <CheckCircle className="h-3.5 w-3.5" />}
           </button>
           <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-        </div>
+        </button>
       ),
     },
   ];
@@ -195,7 +195,7 @@ export default function WorkflowsPage() {
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {entityTypes.map(t => <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>)}
+                      {entityTypes.map(t => <SelectItem key={t} value={t}>{t.replaceAll('_', ' ')}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )} />
@@ -232,7 +232,7 @@ export default function WorkflowsPage() {
                           <Select value={f.value} onValueChange={f.onChange}>
                             <SelectTrigger className="h-9 rounded-lg text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {roles.map(r => <SelectItem key={r} value={r}>{r.replace(/_/g, ' ')}</SelectItem>)}
+                              {roles.map(r => <SelectItem key={r} value={r}>{r.replaceAll('_', ' ')}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         )} />
@@ -270,7 +270,7 @@ export default function WorkflowsPage() {
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-muted-foreground">Type:</span> {detail?.entityType?.replace(/_/g, ' ')}</div>
+              <div><span className="text-muted-foreground">Type:</span> {detail?.entityType?.replaceAll('_', ' ')}</div>
               <div><span className="text-muted-foreground">Status:</span> <StatusBadge status={detail?.isActive ? 'ACTIVE' : 'INACTIVE'} /></div>
               <div><span className="text-muted-foreground">Min:</span> {detail?.minAmount ? `$${detail.minAmount.toLocaleString()}` : 'Any'}</div>
               <div><span className="text-muted-foreground">Max:</span> {detail?.maxAmount ? `$${detail.maxAmount.toLocaleString()}` : 'Any'}</div>
@@ -284,7 +284,7 @@ export default function WorkflowsPage() {
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">{rule.stepOrder}</div>
                       <div className="flex-1">
                         <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', roleColors[rule.role] || 'bg-gray-100 text-gray-600')}>
-                          {rule.role.replace(/_/g, ' ')}
+                          {rule.role.replaceAll('_', ' ')}
                         </span>
                         {rule.isRequired && <span className="ml-2 text-xs text-muted-foreground">(Required)</span>}
                         {!rule.isRequired && <span className="ml-2 text-xs text-muted-foreground">(Optional)</span>}

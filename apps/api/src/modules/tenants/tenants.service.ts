@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(params: { page?: number; limit?: number; search?: string }) {
     const page = params.page || 1;
@@ -52,7 +52,7 @@ export class TenantsService {
     });
     if (existing) throw new ConflictException('Company name already exists');
 
-    const schemaName = data.schemaName || data.companyName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const schemaName = data.schemaName || data.companyName.toLowerCase().replaceAll(/[^a-z0-9]/g, '_');
 
     return this.prisma.tenant.create({
       data: {

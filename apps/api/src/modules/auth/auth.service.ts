@@ -6,8 +6,8 @@ import { PrismaService } from '../../database/prisma.service';
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
-    private jwtService: JwtService,
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async login(companyName: string, username: string, password: string) {
@@ -20,7 +20,7 @@ export class AuthService {
       where: { tenantId_username: { tenantId: tenant.id, username } },
       include: { department: true },
     });
-    if (!user || !user.isActive) throw new UnauthorizedException('Invalid credentials');
+    if (!user?.isActive) throw new UnauthorizedException('Invalid credentials');
 
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       throw new UnauthorizedException('Account is locked. Try again later.');
@@ -92,7 +92,7 @@ export class AuthService {
       where: { id: stored.userId },
       include: { tenant: true },
     });
-    if (!user || !user.isActive) throw new UnauthorizedException('User inactive');
+    if (!user?.isActive) throw new UnauthorizedException('User inactive');
 
     const payload = {
       sub: user.id,

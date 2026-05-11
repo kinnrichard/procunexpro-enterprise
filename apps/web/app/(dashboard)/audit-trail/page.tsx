@@ -3,14 +3,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { formatDateTime } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatDateTime, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollText, Plus, Pencil, Trash2, LogIn, LogOut, RefreshCw, Activity } from 'lucide-react';
 
 const actionColors: Record<string, string> = {
@@ -87,7 +84,7 @@ export default function AuditTrailPage() {
       key: 'newValues', label: 'Changes', render: (v: any, row: any) => {
         if (!v && !row.oldValues) return <span className="text-xs text-muted-foreground">—</span>;
         const changes = v ? Object.keys(v).length : 0;
-        return <span className="text-xs text-muted-foreground">{changes} field{changes !== 1 ? 's' : ''}</span>;
+        return <span className="text-xs text-muted-foreground">{changes} field{changes === 1 ? '' : 's'}</span>;
       },
     },
     { key: 'ipAddress', label: 'IP', render: (v: string) => v ? <span className="font-mono text-xs">{v}</span> : '—' },
@@ -125,7 +122,7 @@ export default function AuditTrailPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All Entities</SelectItem>
-                {entityTypes.filter(Boolean).map(t => <SelectItem key={t} value={t}>{t.replace(/-/g, ' ')}</SelectItem>)}
+                {entityTypes.filter(Boolean).map(t => <SelectItem key={t} value={t}>{t.replaceAll('-', ' ')}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v === 'ALL' ? '' : v); setPage(1); }}>

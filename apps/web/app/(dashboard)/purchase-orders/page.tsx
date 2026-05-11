@@ -6,8 +6,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
-import { formatCurrency, formatDate } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -24,7 +23,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import {
   ShoppingCart, Plus, Pencil, Trash2, Send, CheckCircle, Truck, PackageCheck,
-  Clock, X, FileText,
+  Clock, X,
 } from 'lucide-react';
 
 const poSchema = z.object({
@@ -168,7 +167,7 @@ export default function PurchaseOrdersPage() {
     { key: 'orderDate', label: 'Date', sortable: true, render: (v: string) => formatDate(v) },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+        <button type="button" className="flex items-center gap-1" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.click(); }}>
           {row.status === 'DRAFT' && (
             <>
               <button onClick={() => actionMut.mutate({ id: row.id, action: 'submit' })} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Submit"><Send className="h-3.5 w-3.5" /></button>
@@ -185,13 +184,19 @@ export default function PurchaseOrdersPage() {
           {(row.status === 'SENT' || row.status === 'PARTIALLY_RECEIVED') && (
             <button onClick={() => actionMut.mutate({ id: row.id, action: 'receive' })} className="p-1.5 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-emerald-600" title="Receive"><PackageCheck className="h-3.5 w-3.5" /></button>
           )}
-        </div>
+        </button>
       ),
     },
   ];
 
   const statusFilters = ['', 'DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_RECEIVED', 'RECEIVED'];
   const statusLabels: Record<string, string> = { '': 'All', DRAFT: 'Draft', PENDING_APPROVAL: 'Pending', APPROVED: 'Approved', SENT: 'Sent', PARTIALLY_RECEIVED: 'Partial', RECEIVED: 'Received' };
+
+  const isSavingPO = createMut.isPending || updateMut.isPending;
+  let poSubmitLabel: string;
+  if (isSavingPO) poSubmitLabel = 'Saving...';
+  else if (editing) poSubmitLabel = 'Update Order';
+  else poSubmitLabel = 'Create Order';
 
   return (
     <div className="space-y-6">
@@ -331,8 +336,8 @@ export default function PurchaseOrdersPage() {
           </form>
           <div className="px-6 py-4 border-t border-border flex justify-between">
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button type="submit" form="po-form" className="bg-gradient-primary text-white" disabled={!form.formState.isValid || createMut.isPending || updateMut.isPending}>
-              {(createMut.isPending || updateMut.isPending) ? 'Saving...' : editing ? 'Update Order' : 'Create Order'}
+            <Button type="submit" form="po-form" className="bg-gradient-primary text-white" disabled={!form.formState.isValid || isSavingPO}>
+              {poSubmitLabel}
             </Button>
           </div>
         </DialogContent>

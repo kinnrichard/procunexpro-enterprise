@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { Command } from 'cmdk';
@@ -19,12 +19,11 @@ import {
   Network,
   Users,
   Plus,
-  Settings,
   Moon,
   Sun,
   type LucideIcon,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+
 
 interface CommandPaletteProps {
   open: boolean;
@@ -38,7 +37,7 @@ interface CommandItem {
   keywords?: string[];
 }
 
-export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
+export function CommandPalette({ open, onOpenChange }: Readonly<CommandPaletteProps>) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
 

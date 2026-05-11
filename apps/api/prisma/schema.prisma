@@ -170,10 +170,15 @@ model Tenant {
   auditLogs          AuditLog[]
   documents          Document[]
   supplierScores     SupplierScore[]
+  companies          Company[]
+  comments           Comment[]
   manufacturers      Manufacturer[]
   origins            Origin[]
   currencies         Currency[]
   taxes              Tax[]
+  purchaseTerms      PurchaseTerm[]
+  deliveryTerms      DeliveryTerm[]
+  deliveryTypes      DeliveryType[]
 }
 
 model User {
@@ -204,6 +209,7 @@ model User {
   approvalSteps       ApprovalStep[]
   notifications       Notification[]
   auditLogs           AuditLog[]
+  comments            Comment[]
 
   @@unique([tenantId, username])
   @@unique([tenantId, email])
@@ -218,6 +224,20 @@ model RefreshToken {
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  purchaseRequests PurchaseRequest[]
+
+  @@unique([tenantId, name])
 }
 
 // ============================================================
@@ -373,6 +393,49 @@ model Tax {
   @@unique([tenantId, name])
 }
 
+model PurchaseTerm {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+}
+
+model DeliveryTerm {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+}
+
+model DeliveryType {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+}
+
 // ============================================================
 // PRODUCTS & INVENTORY
 // ============================================================
@@ -403,15 +466,6 @@ model Product {
   minStock        Int     @default(1)
   maxStock        Int     @default(1)
   reorderQuantity Int     @default(1)
-
-  // Original Packaging UOM
-  originalPackagingQty  Int
-  pcsPerPack            Int
-  originalPackagingUom  String
-
-  // Selling Packaging UOM
-  sellingPackagingQty   Int
-  sellingPackagingUom   String
 
   // Applied pricing
   appliedPricingId String?
@@ -465,6 +519,12 @@ model ProductPricing {
   productId     String
   vendorId      String
   type          String   @default("local") // "local" or "imported"
+
+  // Packaging
+  originalPackagingQty  Int      @default(1)
+  pcsPerPack            Int      @default(1)
+  originalPackagingUom  String   @default("pcs")
+
   unitCost      Float    @default(0)
   sellingPrice  Float    @default(0)
   currency      String   @default("USD")
@@ -527,6 +587,7 @@ model WarehouseLocation {
 model PurchaseRequest {
   id            String                @id @default(cuid())
   tenantId      String
+  companyId     String?
   requestNumber String
   title         String
   description   String?
@@ -535,15 +596,19 @@ model PurchaseRequest {
   priority      Priority              @default(MEDIUM)
   status        PurchaseRequestStatus @default(DRAFT)
   requiredDate  DateTime?
-  totalAmount   Float                 @default(0)
-  notes         String?
-  rejectionNote String?
+  totalAmount       Float                 @default(0)
+  purchaseTerms     String?
+  deliveryTerms     String?
+  deliveryType      String?
+  notes             String?
+  rejectionNote     String?
   approvedAt    DateTime?
   approvedBy    String?
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 
   tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  company       Company?    @relation(fields: [companyId], references: [id])
   requestedBy   User        @relation(fields: [requestedById], references: [id])
   department    Department? @relation(fields: [departmentId], references: [id])
   items         PurchaseRequestItem[]
@@ -917,6 +982,29 @@ model Document {
   updatedAt  DateTime           @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ============================================================
+// COMMENTS
+// ============================================================
+
+model Comment {
+  id         String  @id @default(cuid())
+  tenantId   String
+  entityType String
+  entityId   String
+  userId     String
+  content    String
+  parentId   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  user   User    @relation(fields: [userId], references: [id])
+  parent Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([entityType, entityId])
 }
 
 // ============================================================

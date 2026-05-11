@@ -18,8 +18,8 @@ export class RfqController {
     @Query('status') status?: string,
   ) {
     return this.rfqService.findAll(req.user.tenantId, {
-      page: page ? parseInt(page) : undefined,
-      limit: limit ? parseInt(limit) : undefined,
+      page: page ? Number.parseInt(page) : undefined,
+      limit: limit ? Number.parseInt(limit) : undefined,
       search,
       status,
     });

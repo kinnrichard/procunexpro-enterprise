@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // ============================================================
   // Report 1: Spend Summary
@@ -39,9 +39,9 @@ export class ReportsService {
     // Previous period spend for comparison
     let previousPeriodSpend = 0;
     if (start && end) {
-      const duration = end.getTime() - start.getTime();
-      const prevStart = new Date(start.getTime() - duration);
-      const prevEnd = new Date(start.getTime());
+      const duration = +end - +start;
+      const prevStart = new Date(+start - duration);
+      const prevEnd = new Date(+start);
 
       const prevPOs = await this.prisma.purchaseOrder.findMany({
         where: {
@@ -54,7 +54,6 @@ export class ReportsService {
       previousPeriodSpend = prevPOs.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
     } else {
       // Default: compare current month vs previous month
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
 
@@ -69,12 +68,11 @@ export class ReportsService {
       previousPeriodSpend = prevPOs.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
     }
 
+    const changePercentNoPrev = totalSpend > 0 ? 100 : 0;
     const changePercent =
       previousPeriodSpend > 0
         ? Math.round(((totalSpend - previousPeriodSpend) / previousPeriodSpend) * 10000) / 100
-        : totalSpend > 0
-          ? 100
-          : 0;
+        : changePercentNoPrev;
 
     // Monthly breakdown (last 12 months or within date range)
     const monthlyStart =
@@ -159,7 +157,7 @@ export class ReportsService {
             ? Math.round(
                 posWithDates.reduce((sum, po) => {
                   const diff =
-                    (new Date(po.expectedDate!).getTime() - new Date(po.orderDate).getTime()) /
+                    (+new Date(po.expectedDate || 0) - +new Date(po.orderDate)) /
                     (1000 * 60 * 60 * 24);
                   return sum + diff;
                 }, 0) / posWithDates.length,
@@ -171,7 +169,7 @@ export class ReportsService {
           (po) => po.status === 'RECEIVED' && po.receivedAt && po.expectedDate,
         );
         const onTimePOs = receivedPOs.filter(
-          (po) => new Date(po.receivedAt!).getTime() <= new Date(po.expectedDate!).getTime(),
+          (po) => +new Date(po.receivedAt || 0) <= +new Date(po.expectedDate || 0),
         );
         const onTimePercent =
           receivedPOs.length > 0
@@ -372,7 +370,7 @@ export class ReportsService {
         ? Math.round(
             (approvedPRs.reduce((sum, pr) => {
               const diff =
-                (new Date(pr.approvedAt!).getTime() - new Date(pr.createdAt).getTime()) /
+                (+new Date(pr.approvedAt || 0) - +new Date(pr.createdAt)) /
                 (1000 * 60 * 60 * 24);
               return sum + diff;
             }, 0) /
@@ -392,7 +390,7 @@ export class ReportsService {
         ? Math.round(
             (approvedPOs.reduce((sum, po) => {
               const diff =
-                (new Date(po.approvedAt!).getTime() - new Date(po.createdAt).getTime()) /
+                (+new Date(po.approvedAt || 0) - +new Date(po.createdAt)) /
                 (1000 * 60 * 60 * 24);
               return sum + diff;
             }, 0) /
@@ -419,7 +417,7 @@ export class ReportsService {
       if (field === null || field === undefined) return '';
       const str = String(field);
       if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-        return '"' + str.replace(/"/g, '""') + '"';
+        return '"' + str.replaceAll('"', '""') + '"';
       }
       return str;
     };

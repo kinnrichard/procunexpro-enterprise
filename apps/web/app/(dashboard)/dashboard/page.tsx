@@ -1,5 +1,6 @@
 'use client';
 
+import { type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Building2,
@@ -120,18 +121,20 @@ function ChartSkeleton() {
   );
 }
 
-function TableSkeleton({ rows = 5 }: { rows?: number }) {
+const TABLE_SKELETON_KEYS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+
+function TableSkeleton({ rows = 5 }: Readonly<{ rows?: number }>) {
   return (
     <div className="space-y-3">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-10 w-full animate-pulse rounded bg-muted/50" />
+      {TABLE_SKELETON_KEYS.slice(0, rows).map((key) => (
+        <div key={key} className="h-10 w-full animate-pulse rounded bg-muted/50" />
       ))}
     </div>
   );
 }
 
 // ── Custom Tooltip ─────────────────────────────────────────────────
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label }: Readonly<any>) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border bg-background p-3 shadow-md">
@@ -148,8 +151,101 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
+// ── Stock alert helpers ────────────────────────────────────────────
+function stockAlertRowClass(isCritical: boolean, isWarning: boolean): string {
+  if (isCritical) return 'border-b last:border-0 transition-colors bg-red-50 dark:bg-red-950/20';
+  if (isWarning) return 'border-b last:border-0 transition-colors bg-amber-50 dark:bg-amber-950/20';
+  return 'border-b last:border-0 transition-colors';
+}
+
+function stockAlertStockClass(isCritical: boolean, isWarning: boolean): string {
+  if (isCritical) return 'py-2.5 pr-4 text-right font-semibold text-red-600 dark:text-red-400';
+  if (isWarning) return 'py-2.5 pr-4 text-right font-semibold text-amber-600 dark:text-amber-400';
+  return 'py-2.5 pr-4 text-right font-semibold';
+}
+
+function StockAlertRow({ item }: Readonly<{ item: StockAlert }>) {
+  const isCritical = item.currentStock < item.minStock;
+  const isWarning = !isCritical && item.currentStock < item.reorderPoint;
+  return (
+    <tr className={stockAlertRowClass(isCritical, isWarning)}>
+      <td className="py-2.5 pr-4">
+        <div className="flex items-center gap-2">
+          {isCritical && <span className="flex h-2 w-2 rounded-full bg-red-500" />}
+          {isWarning && <span className="flex h-2 w-2 rounded-full bg-amber-500" />}
+          <span className="font-medium">{item.name}</span>
+        </div>
+      </td>
+      <td className="py-2.5 pr-4 text-muted-foreground font-mono text-xs">{item.sku}</td>
+      <td className={stockAlertStockClass(isCritical, isWarning)}>{item.currentStock}</td>
+      <td className="py-2.5 text-right text-muted-foreground">{item.reorderPoint}</td>
+    </tr>
+  );
+}
+
+// ── Quantity cell with directional arrow ───────────────────────────
+function QuantityCell({ type, quantity }: Readonly<{ type: string; quantity: number }>) {
+  let arrow: React.ReactNode = null;
+  if (type === 'IN') arrow = <ArrowUpRight className="h-3.5 w-3.5 text-green-600" />;
+  else if (type === 'OUT') arrow = <ArrowDownRight className="h-3.5 w-3.5 text-red-600" />;
+  return (
+    <span className="flex items-center justify-end gap-1">
+      {arrow}
+      {quantity}
+    </span>
+  );
+}
+
+// ── Generic activity table ─────────────────────────────────────────
+interface ActivityColumn {
+  header: string;
+  className?: string;
+  render: (row: any) => ReactNode;
+}
+
+function ActivityTable({ rows, columns, emptyMessage }: Readonly<{
+  rows: any[] | undefined;
+  columns: ActivityColumn[];
+  emptyMessage: string;
+}>) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-left text-muted-foreground">
+            {columns.map((col) => (
+              <th key={col.header} className={`pb-2 pr-4 font-medium ${col.className ?? ''}`}>
+                {col.header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows?.length ? (
+            rows.map((row, idx) => (
+              <tr key={row.id ?? idx} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                {columns.map((col) => (
+                  <td key={col.header} className={`py-2.5 pr-4 ${col.className ?? ''}`}>
+                    {col.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={columns.length} className="py-8 text-center text-muted-foreground">
+                {emptyMessage}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Movement type badge ────────────────────────────────────────────
-function MovementTypeBadge({ type }: { type: string }) {
+function MovementTypeBadge({ type }: Readonly<{ type: string }>) {
   const styles: Record<string, string> = {
     IN: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     OUT: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -189,47 +285,16 @@ export default function DashboardPage() {
   });
 
   // ── Stat card config ───────────────────────────────────────────
+  const makeTrend = (val: number | null | undefined) =>
+    val !== null && val !== undefined ? { value: val, label: 'vs last month' } : undefined;
+
   const statCards = [
-    {
-      title: 'Total Vendors',
-      value: stats?.totalVendors ?? 0,
-      icon: <Building2 className="h-5 w-5" />,
-      trend: stats?.vendorsTrend != null ? { value: stats.vendorsTrend, label: 'vs last month' } : undefined,
-      className: 'border-l-4 border-l-blue-500',
-    },
-    {
-      title: 'Total Products',
-      value: stats?.totalProducts ?? 0,
-      icon: <Package className="h-5 w-5" />,
-      trend: stats?.productsTrend != null ? { value: stats.productsTrend, label: 'vs last month' } : undefined,
-      className: 'border-l-4 border-l-indigo-500',
-    },
-    {
-      title: 'Purchase Requests',
-      value: stats?.purchaseRequests ?? 0,
-      icon: <FileText className="h-5 w-5" />,
-      trend: stats?.prTrend != null ? { value: stats.prTrend, label: 'vs last month' } : undefined,
-      className: 'border-l-4 border-l-violet-500',
-    },
-    {
-      title: 'Purchase Orders',
-      value: stats?.purchaseOrders ?? 0,
-      icon: <ShoppingCart className="h-5 w-5" />,
-      trend: stats?.poTrend != null ? { value: stats.poTrend, label: 'vs last month' } : undefined,
-      className: 'border-l-4 border-l-emerald-500',
-    },
-    {
-      title: 'Low Stock Items',
-      value: stats?.lowStockItems ?? 0,
-      icon: <AlertTriangle className="h-5 w-5" />,
-      className: 'border-l-4 border-l-amber-500',
-    },
-    {
-      title: 'Pending Approvals',
-      value: stats?.pendingApprovals ?? 0,
-      icon: <Clock className="h-5 w-5" />,
-      className: 'border-l-4 border-l-rose-500',
-    },
+    { title: 'Total Vendors', value: stats?.totalVendors ?? 0, icon: <Building2 className="h-5 w-5" />, trend: makeTrend(stats?.vendorsTrend), className: 'border-l-4 border-l-blue-500' },
+    { title: 'Total Products', value: stats?.totalProducts ?? 0, icon: <Package className="h-5 w-5" />, trend: makeTrend(stats?.productsTrend), className: 'border-l-4 border-l-indigo-500' },
+    { title: 'Purchase Requests', value: stats?.purchaseRequests ?? 0, icon: <FileText className="h-5 w-5" />, trend: makeTrend(stats?.prTrend), className: 'border-l-4 border-l-violet-500' },
+    { title: 'Purchase Orders', value: stats?.purchaseOrders ?? 0, icon: <ShoppingCart className="h-5 w-5" />, trend: makeTrend(stats?.poTrend), className: 'border-l-4 border-l-emerald-500' },
+    { title: 'Low Stock Items', value: stats?.lowStockItems ?? 0, icon: <AlertTriangle className="h-5 w-5" />, className: 'border-l-4 border-l-amber-500' },
+    { title: 'Pending Approvals', value: stats?.pendingApprovals ?? 0, icon: <Clock className="h-5 w-5" />, className: 'border-l-4 border-l-rose-500' },
   ];
 
   return (
@@ -243,7 +308,7 @@ export default function DashboardPage() {
       {/* Stat Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {statsLoading
-          ? Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
+          ? ['s1', 's2', 's3', 's4', 's5', 's6'].map((key) => <StatCardSkeleton key={key} />)
           : statCards.map((card) => (
               <StatCard
                 key={card.title}
@@ -334,45 +399,7 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {stockAlerts.map((item) => {
-                        const isCritical = item.currentStock < item.minStock;
-                        const isWarning = item.currentStock < item.reorderPoint && !isCritical;
-                        return (
-                          <tr
-                            key={item.id}
-                            className={`border-b last:border-0 transition-colors ${
-                              isCritical
-                                ? 'bg-red-50 dark:bg-red-950/20'
-                                : isWarning
-                                ? 'bg-amber-50 dark:bg-amber-950/20'
-                                : ''
-                            }`}
-                          >
-                            <td className="py-2.5 pr-4">
-                              <div className="flex items-center gap-2">
-                                {isCritical && (
-                                  <span className="flex h-2 w-2 rounded-full bg-red-500" />
-                                )}
-                                {isWarning && !isCritical && (
-                                  <span className="flex h-2 w-2 rounded-full bg-amber-500" />
-                                )}
-                                <span className="font-medium">{item.name}</span>
-                              </div>
-                            </td>
-                            <td className="py-2.5 pr-4 text-muted-foreground font-mono text-xs">
-                              {item.sku}
-                            </td>
-                            <td className={`py-2.5 pr-4 text-right font-semibold ${
-                              isCritical ? 'text-red-600 dark:text-red-400' : isWarning ? 'text-amber-600 dark:text-amber-400' : ''
-                            }`}>
-                              {item.currentStock}
-                            </td>
-                            <td className="py-2.5 text-right text-muted-foreground">
-                              {item.reorderPoint}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {stockAlerts.map((item) => <StockAlertRow key={item.id} item={item} />)}
                     </tbody>
                   </table>
                 ) : (
@@ -404,135 +431,47 @@ export default function DashboardPage() {
 
               {/* Stock Movements Tab */}
               <TabsContent value="stock-movements">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 pr-4 font-medium">Reference</th>
-                        <th className="pb-2 pr-4 font-medium">Product</th>
-                        <th className="pb-2 pr-4 font-medium">Type</th>
-                        <th className="pb-2 pr-4 font-medium text-right">Quantity</th>
-                        <th className="pb-2 font-medium text-right">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activity?.stockMovements?.length ? (
-                        activity.stockMovements.map((sm) => (
-                          <tr key={sm.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                            <td className="py-2.5 pr-4 font-mono text-xs">{sm.reference}</td>
-                            <td className="py-2.5 pr-4 font-medium">{sm.productName}</td>
-                            <td className="py-2.5 pr-4">
-                              <MovementTypeBadge type={sm.type} />
-                            </td>
-                            <td className="py-2.5 pr-4 text-right font-semibold">
-                              <span className="flex items-center justify-end gap-1">
-                                {sm.type === 'IN' ? (
-                                  <ArrowUpRight className="h-3.5 w-3.5 text-green-600" />
-                                ) : sm.type === 'OUT' ? (
-                                  <ArrowDownRight className="h-3.5 w-3.5 text-red-600" />
-                                ) : null}
-                                {sm.quantity}
-                              </span>
-                            </td>
-                            <td className="py-2.5 text-right text-muted-foreground">
-                              {formatDate(sm.createdAt)}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                            No recent stock movements
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <ActivityTable
+                  rows={activity?.stockMovements}
+                  emptyMessage="No recent stock movements"
+                  columns={[
+                    { header: 'Reference', render: (sm) => <span className="font-mono text-xs">{sm.reference}</span> },
+                    { header: 'Product', render: (sm) => <span className="font-medium">{sm.productName}</span> },
+                    { header: 'Type', render: (sm) => <MovementTypeBadge type={sm.type} /> },
+                    { header: 'Quantity', className: 'text-right', render: (sm) => <span className="font-semibold"><QuantityCell type={sm.type} quantity={sm.quantity} /></span> },
+                    { header: 'Date', className: 'text-right', render: (sm) => <span className="text-muted-foreground">{formatDate(sm.createdAt)}</span> },
+                  ]}
+                />
               </TabsContent>
 
               {/* Purchase Requests Tab */}
               <TabsContent value="purchase-requests">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 pr-4 font-medium">PR Number</th>
-                        <th className="pb-2 pr-4 font-medium">Title</th>
-                        <th className="pb-2 pr-4 font-medium">Status</th>
-                        <th className="pb-2 pr-4 font-medium text-right">Amount</th>
-                        <th className="pb-2 font-medium text-right">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activity?.purchaseRequests?.length ? (
-                        activity.purchaseRequests.map((pr) => (
-                          <tr key={pr.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                            <td className="py-2.5 pr-4 font-mono text-xs font-semibold">{pr.prNumber}</td>
-                            <td className="py-2.5 pr-4 font-medium">{pr.title}</td>
-                            <td className="py-2.5 pr-4">
-                              <StatusBadge status={pr.status} />
-                            </td>
-                            <td className="py-2.5 pr-4 text-right font-semibold">
-                              {formatCurrency(pr.totalAmount)}
-                            </td>
-                            <td className="py-2.5 text-right text-muted-foreground">
-                              {formatDate(pr.createdAt)}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                            No recent purchase requests
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <ActivityTable
+                  rows={activity?.purchaseRequests}
+                  emptyMessage="No recent purchase requests"
+                  columns={[
+                    { header: 'PR Number', render: (pr) => <span className="font-mono text-xs font-semibold">{pr.prNumber}</span> },
+                    { header: 'Title', render: (pr) => <span className="font-medium">{pr.title}</span> },
+                    { header: 'Status', render: (pr) => <StatusBadge status={pr.status} /> },
+                    { header: 'Amount', className: 'text-right', render: (pr) => <span className="font-semibold">{formatCurrency(pr.totalAmount)}</span> },
+                    { header: 'Date', className: 'text-right', render: (pr) => <span className="text-muted-foreground">{formatDate(pr.createdAt)}</span> },
+                  ]}
+                />
               </TabsContent>
 
               {/* Purchase Orders Tab */}
               <TabsContent value="purchase-orders">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 pr-4 font-medium">PO Number</th>
-                        <th className="pb-2 pr-4 font-medium">Vendor</th>
-                        <th className="pb-2 pr-4 font-medium">Status</th>
-                        <th className="pb-2 pr-4 font-medium text-right">Amount</th>
-                        <th className="pb-2 font-medium text-right">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activity?.purchaseOrders?.length ? (
-                        activity.purchaseOrders.map((po) => (
-                          <tr key={po.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                            <td className="py-2.5 pr-4 font-mono text-xs font-semibold">{po.poNumber}</td>
-                            <td className="py-2.5 pr-4 font-medium">{po.vendorName}</td>
-                            <td className="py-2.5 pr-4">
-                              <StatusBadge status={po.status} />
-                            </td>
-                            <td className="py-2.5 pr-4 text-right font-semibold">
-                              {formatCurrency(po.totalAmount)}
-                            </td>
-                            <td className="py-2.5 text-right text-muted-foreground">
-                              {formatDate(po.createdAt)}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                            No recent purchase orders
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                <ActivityTable
+                  rows={activity?.purchaseOrders}
+                  emptyMessage="No recent purchase orders"
+                  columns={[
+                    { header: 'PO Number', render: (po) => <span className="font-mono text-xs font-semibold">{po.poNumber}</span> },
+                    { header: 'Vendor', render: (po) => <span className="font-medium">{po.vendorName}</span> },
+                    { header: 'Status', render: (po) => <StatusBadge status={po.status} /> },
+                    { header: 'Amount', className: 'text-right', render: (po) => <span className="font-semibold">{formatCurrency(po.totalAmount)}</span> },
+                    { header: 'Date', className: 'text-right', render: (po) => <span className="text-muted-foreground">{formatDate(po.createdAt)}</span> },
+                  ]}
+                />
               </TabsContent>
             </Tabs>
           )}

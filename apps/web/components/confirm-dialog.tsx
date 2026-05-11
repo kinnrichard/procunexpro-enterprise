@@ -27,7 +27,7 @@ export function ConfirmDialog({
   variant = 'default',
   onConfirm,
   isLoading = false,
-}: ConfirmDialogProps) {
+}: Readonly<ConfirmDialogProps>) {
   const isDestructive = variant === 'destructive'
 
   return (

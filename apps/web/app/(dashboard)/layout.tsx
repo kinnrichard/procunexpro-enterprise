@@ -9,7 +9,7 @@ import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 import { CommandPalette } from '@/components/command-palette';
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { isAuthenticated, isLoading, hydrate } = useAuthStore();
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -56,6 +56,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {children}
           </div>
         </main>
+        <footer className="shrink-0 h-8 flex items-center justify-center border-t border-border/40 bg-background">
+          <p className="text-[10px] text-muted-foreground/50">&copy; {new Date().getFullYear()} Procunex. Developed by Kinnitech Softwares</p>
+        </footer>
       </div>
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
     </div>

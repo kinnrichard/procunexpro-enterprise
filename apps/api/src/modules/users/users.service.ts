@@ -4,7 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(
     tenantId: string,
@@ -100,7 +100,7 @@ export class UsersService {
         role: data.role || 'VIEWER',
         departmentId: data.departmentId || null,
         phone: data.phone || null,
-        isActive: data.isActive !== undefined ? data.isActive : true,
+        isActive: data.isActive === undefined ? true : data.isActive,
         mustChangePassword: true,
       },
       select: {

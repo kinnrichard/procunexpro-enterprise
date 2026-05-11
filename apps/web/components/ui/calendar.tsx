@@ -20,7 +20,7 @@ function Calendar({
   classNames,
   showOutsideDays = true,
   ...props
-}: CalendarProps) {
+}: Readonly<CalendarProps>) {
   const currentYear = new Date().getFullYear()
   const years = Array.from({ length: 100 }, (_, i) => currentYear - 50 + i)
   const months = [
@@ -46,13 +46,13 @@ function Calendar({
 
   const handleMonthChange = (month: string) => {
     const newDate = new Date(displayMonth)
-    newDate.setMonth(parseInt(month))
+    newDate.setMonth(Number.parseInt(month))
     setDisplayMonth(newDate)
   }
 
   const handleYearChange = (year: string) => {
     const newDate = new Date(displayMonth)
-    newDate.setFullYear(parseInt(year))
+    newDate.setFullYear(Number.parseInt(year))
     setDisplayMonth(newDate)
   }
 
