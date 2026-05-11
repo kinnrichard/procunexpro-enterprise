@@ -232,6 +232,16 @@ function calcLineAmount(item: any, taxRate: number) {
   return discounted;
 }
 
+function getFilteredProducts(products: any[], items: any[], search: string) {
+  const existingIds = new Set((items || []).map((i: any) => i.productId).filter(Boolean));
+  const available = products.filter((p: any) => !existingIds.has(p.id));
+  if (!search) return available.slice(0, 10);
+  const q = search.toLowerCase();
+  return available
+    .filter((p: any) => p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.manufacturer?.name?.toLowerCase().includes(q))
+    .slice(0, 50);
+}
+
 function getVendorPricing(item: any) {
   if (item.vendor?.id && item.product?.pricings) {
     const pricing = item.product.pricings.find((p: any) => p.vendorId === item.vendor.id);
@@ -653,15 +663,7 @@ export default function PurchaseRequestDetailPage() {
   }
 
   // Filtered products for the picker
-  const existingProductIds = new Set((pr?.items || []).map((i: any) => i.productId).filter(Boolean));
-  const filteredProducts = products
-    .filter((p: any) => !existingProductIds.has(p.id))
-    .filter((p: any) => {
-      if (!addItemSearch) return true;
-      const q = addItemSearch.toLowerCase();
-      return p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.manufacturer?.name?.toLowerCase().includes(q);
-    })
-    .slice(0, addItemSearch ? 50 : 10);
+  const filteredProducts = getFilteredProducts(products, pr?.items, addItemSearch);
 
   const totalAmount = pr?.items?.reduce((sum: number, item: any) => sum + calcLineAmount(item, taxRate), 0) || 0;
 
