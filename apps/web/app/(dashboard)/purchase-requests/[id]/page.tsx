@@ -668,6 +668,34 @@ export default function PurchaseRequestDetailPage() {
   if (isLoading) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Loading…</div>;
   if (!pr) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Purchase request not found</div>;
 
+  function renderHeaderActions() {
+    return (
+      <div className="flex items-center gap-2">
+        {(isDraft || pr.status === 'PENDING_APPROVAL') && (
+          <Button variant="outline" size="sm" onClick={openEditPr}>
+            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+          </Button>
+        )}
+        {isDraft && (
+          <Button onClick={() => setSubmitConfirmOpen(true)} disabled={submitMutation.isPending || (pr.items?.length || 0) === 0} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+            {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+            Submit for Approval
+          </Button>
+        )}
+        {pr.status === 'PENDING_APPROVAL' && (
+          <>
+            <Button onClick={() => setApproveConfirmOpen(true)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+              <CheckCircle className="h-4 w-4 mr-2" /> Approve
+            </Button>
+            <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}>
+              <XCircle className="h-4 w-4 mr-2" /> Reject
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
+
   // Header checkbox state
   const headerAllSelected = selectedItemIds.size > 0 && selectedItemIds.size === pr.items?.length;
   const headerSomeSelected = selectedItemIds.size > 0 && !headerAllSelected;
@@ -694,29 +722,7 @@ export default function PurchaseRequestDetailPage() {
             <p className="text-sm text-muted-foreground mt-0.5">{pr.title}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {(isDraft || pr.status === 'PENDING_APPROVAL') && (
-            <Button variant="outline" size="sm" onClick={openEditPr}>
-              <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
-            </Button>
-          )}
-          {isDraft && (
-            <Button onClick={() => setSubmitConfirmOpen(true)} disabled={submitMutation.isPending || (pr.items?.length || 0) === 0} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
-              {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-              Submit for Approval
-            </Button>
-          )}
-          {pr.status === 'PENDING_APPROVAL' && (
-            <>
-              <Button onClick={() => setApproveConfirmOpen(true)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
-                <CheckCircle className="h-4 w-4 mr-2" /> Approve
-              </Button>
-              <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}>
-                <XCircle className="h-4 w-4 mr-2" /> Reject
-              </Button>
-            </>
-          )}
-        </div>
+        {renderHeaderActions()}
       </div>
 
       {/* Tabs */}
