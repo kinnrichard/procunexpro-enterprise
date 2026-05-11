@@ -1167,6 +1167,254 @@ function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{
 }
 
 // ============================================================
+// Chart of Accounts Config
+// ============================================================
+
+const COA_TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'] as const
+type CoaType = (typeof COA_TYPES)[number]
+
+type GlAccount = {
+  id: string
+  code: string
+  name: string
+  type: string
+  classification: string
+  category: string
+  subCategory: string | null
+  isActive: boolean
+}
+
+function ChartOfAccountsConfig() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<GlAccount | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<GlAccount | null>(null)
+  const [formData, setFormData] = useState({
+    type: '' as CoaType | '',
+    classification: '',
+    category: '',
+    subCategory: '',
+    name: '',
+    code: '',
+  })
+
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['gl-accounts-config', search],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '100' })
+      if (search) params.set('search', search)
+      return (await api.get<{ data: GlAccount[] }>(`/gl-accounts?${params}`)).data
+    },
+  })
+
+  const allAccounts = response?.data ?? []
+  const filtered = typeFilter ? allAccounts.filter((a) => a.type === typeFilter) : allAccounts
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/gl-accounts', data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['gl-accounts-config'] }); closeModal(); toast({ title: 'Account created' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to create account.', variant: 'destructive' }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/gl-accounts/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['gl-accounts-config'] }); closeModal(); toast({ title: 'Account updated' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to update account.', variant: 'destructive' }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/gl-accounts/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['gl-accounts-config'] }); setDeleteTarget(null); toast({ title: 'Account deleted' }) },
+    onError: () => toast({ title: 'Error', description: 'Failed to delete account.', variant: 'destructive' }),
+  })
+
+  function openAdd() {
+    setFormData({ type: '', classification: '', category: '', subCategory: '', name: '', code: '' })
+    setEditing(null)
+    setModalOpen(true)
+  }
+
+  function openEdit(account: GlAccount) {
+    setFormData({
+      type: account.type as CoaType,
+      classification: account.classification,
+      category: account.category,
+      subCategory: account.subCategory || '',
+      name: account.name,
+      code: account.code,
+    })
+    setEditing(account)
+    setModalOpen(true)
+  }
+
+  function closeModal() { setModalOpen(false); setEditing(null) }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const payload = {
+      type: formData.type,
+      classification: formData.classification,
+      category: formData.category,
+      subCategory: formData.subCategory || null,
+      name: formData.name,
+      code: formData.code,
+    }
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+  const canSubmit = !!formData.type && !!formData.classification && !!formData.category && !!formData.name && !!formData.code
+
+  function renderCoaContent() {
+    if (isLoading) {
+      return <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+    }
+    if (filtered.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No accounts found.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Code</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Title</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Type</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Classification</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Category</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Sub Category</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {filtered.map((account) => (
+            <tr key={account.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-mono text-muted-foreground">{account.code}</td>
+              <td className="px-4 py-2.5 font-medium">{account.name}</td>
+              <td className="px-4 py-2.5">
+                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">{account.type}</span>
+              </td>
+              <td className="px-4 py-2.5 text-muted-foreground text-xs">{account.classification}</td>
+              <td className="px-4 py-2.5 text-muted-foreground text-xs">{account.category}</td>
+              <td className="px-4 py-2.5 text-muted-foreground text-xs">{account.subCategory || '—'}</td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={account.isActive ? 'default' : 'secondary'} className="text-[10px]">
+                  {account.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button onClick={() => openEdit(account)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => setDeleteTarget(account)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Input
+          placeholder="Search accounts..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs h-9"
+        />
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          <option value="">All Types</option>
+          {COA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <Button size="sm" onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+          <Plus className="h-4 w-4 mr-1" /> Add Account
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          {renderCoaContent()}
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Modal */}
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>{editing ? 'Edit Account' : 'Add Account'}</DialogTitle>
+          <DialogDescription>{editing ? 'Update GL account details.' : 'Create a new GL account.'}</DialogDescription>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Account Type <span className="text-red-500">*</span></Label>
+              <select
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as CoaType })}
+                required
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">Select type...</option>
+                {COA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Classification <span className="text-red-500">*</span></Label>
+              <Input value={formData.classification} onChange={(e) => setFormData({ ...formData, classification: e.target.value })} required placeholder="e.g., Current Assets" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Category <span className="text-red-500">*</span></Label>
+              <Input value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} required placeholder="e.g., Cash and Cash Equivalents" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Sub Category</Label>
+              <Input value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} placeholder="Optional sub-category" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Account Title <span className="text-red-500">*</span></Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Cash on Hand" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Account Code <span className="text-red-500">*</span></Label>
+              <Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required placeholder="e.g., 1001" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
+              <Button type="submit" disabled={!canSubmit || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editing ? 'Save' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete Account"
+        description={`Delete "${deleteTarget?.name} (${deleteTarget?.code})"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+        isLoading={deleteMutation.isPending}
+      />
+    </div>
+  )
+}
+
+// ============================================================
 // Settings Page
 // ============================================================
 
@@ -1394,7 +1642,7 @@ export default function SettingsPage() {
 
         {/* GL Accounts Tab */}
         <TabsContent value="gl-accounts">
-          <SimpleConfigTable endpoint="gl-accounts" label="Account" hasCode />
+          <ChartOfAccountsConfig />
         </TabsContent>
       </Tabs>
     </div>

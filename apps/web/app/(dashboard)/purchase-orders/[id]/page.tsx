@@ -370,7 +370,7 @@ export default function PurchaseOrderDetailPage() {
               </div>
             ) : (
               <div className="border border-border rounded-xl overflow-x-auto">
-                <table className="w-full text-sm min-w-[1100px]">
+                <table className="w-full text-sm min-w-[1360px]">
                   <thead>
                     <tr className="bg-muted/50 text-muted-foreground text-[10.5px] uppercase tracking-wider">
                       <th className="text-left px-3 py-2.5 w-[40px]">#</th>
@@ -389,6 +389,9 @@ export default function PurchaseOrderDetailPage() {
                       <th className="text-center px-3 py-2.5 w-[55px]">Taxable</th>
                       <th className="text-center px-3 py-2.5 w-[55px]">Tax Incl</th>
                       <th className="text-left px-3 py-2.5 w-[140px]">Account</th>
+                      <th className="text-right px-3 py-2.5 w-[80px]">Debit</th>
+                      <th className="text-right px-3 py-2.5 w-[80px]">Credit</th>
+                      <th className="text-left px-3 py-2.5 w-[100px]">Acct Remarks</th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Amount</th>
                     </tr>
                   </thead>
@@ -448,6 +451,15 @@ export default function PurchaseOrderDetailPage() {
                             ) : (
                               <span className="text-xs text-muted-foreground">{item.glAccount?.code || '—'}</span>
                             )}
+                          </td>
+                          <td className="px-3 py-2 w-[80px]" onClick={(e) => e.stopPropagation()}>
+                            <InlineEditCell value={item.debitAmount || 0} onSave={(v) => inlineSave(item.id, 'debitAmount', v)} align="right" disabled={!isDraft} />
+                          </td>
+                          <td className="px-3 py-2 w-[80px]" onClick={(e) => e.stopPropagation()}>
+                            <InlineEditCell value={item.creditAmount || 0} onSave={(v) => inlineSave(item.id, 'creditAmount', v)} align="right" disabled={!isDraft} />
+                          </td>
+                          <td className="px-3 py-3 w-[100px]">
+                            <span className="text-xs text-muted-foreground">{item.accountRemarks || '—'}</span>
                           </td>
                           <td className="px-3 py-3 text-right font-mono font-medium">{formatCurrency(calcItemAmount(item, vendorId, taxRate))}</td>
                         </tr>

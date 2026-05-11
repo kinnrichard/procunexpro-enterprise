@@ -5,15 +5,17 @@ import { PrismaService } from '../../database/prisma.service';
 export class GlAccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string }) {
+  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string; accountType?: string }) {
     const page = params.page || 1;
-    const limit = params.limit || 10;
+    const limit = params.limit || 50;
     const skip = (page - 1) * limit;
     const where: any = { tenantId };
+    if (params.accountType) where.accountType = params.accountType;
     if (params.search) {
       where.OR = [
         { code: { contains: params.search, mode: 'insensitive' } },
-        { name: { contains: params.search, mode: 'insensitive' } },
+        { title: { contains: params.search, mode: 'insensitive' } },
+        { category: { contains: params.search, mode: 'insensitive' } },
       ];
     }
     const [data, total] = await Promise.all([
@@ -30,24 +32,40 @@ export class GlAccountsService {
 
   async create(tenantId: string, data: any) {
     const existing = await this.prisma.glAccount.findFirst({ where: { tenantId, code: data.code } });
-    if (existing) throw new ConflictException('GL Account code already exists');
-    return this.prisma.glAccount.create({ data: { tenantId, code: data.code, name: data.name, description: data.description || null, isActive: data.isActive ?? true } });
+    if (existing) throw new ConflictException('Account code already exists');
+    return this.prisma.glAccount.create({
+      data: {
+        tenantId,
+        accountType: data.accountType,
+        classification: data.classification,
+        category: data.category,
+        subCategory: data.subCategory || null,
+        title: data.title,
+        code: data.code,
+        isActive: data.isActive ?? true,
+      },
+    });
   }
 
   async update(tenantId: string, id: string, data: any) {
     const item = await this.prisma.glAccount.findFirst({ where: { id, tenantId } });
-    if (!item) throw new NotFoundException('GL Account not found');
+    if (!item) throw new NotFoundException('Account not found');
     if (data.code && data.code !== item.code) {
       const dup = await this.prisma.glAccount.findFirst({ where: { tenantId, code: data.code, id: { not: id } } });
-      if (dup) throw new ConflictException('GL Account code already exists');
+      if (dup) throw new ConflictException('Account code already exists');
     }
-    return this.prisma.glAccount.update({ where: { id }, data: { ...(data.code !== undefined && { code: data.code }), ...(data.name !== undefined && { name: data.name }), ...(data.description !== undefined && { description: data.description || null }), ...(data.isActive !== undefined && { isActive: data.isActive }) } });
+    const fields = ['accountType', 'classification', 'category', 'subCategory', 'title', 'code', 'isActive'];
+    const updateData: any = {};
+    for (const f of fields) {
+      if (data[f] !== undefined) updateData[f] = data[f];
+    }
+    return this.prisma.glAccount.update({ where: { id }, data: updateData });
   }
 
   async delete(tenantId: string, id: string) {
     const item = await this.prisma.glAccount.findFirst({ where: { id, tenantId } });
-    if (!item) throw new NotFoundException('GL Account not found');
+    if (!item) throw new NotFoundException('Account not found');
     await this.prisma.glAccount.delete({ where: { id } });
-    return { message: 'GL Account deleted' };
+    return { message: 'Account deleted' };
   }
 }

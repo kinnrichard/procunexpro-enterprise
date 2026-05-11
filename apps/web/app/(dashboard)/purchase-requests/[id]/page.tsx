@@ -938,7 +938,7 @@ export default function PurchaseRequestDetailPage() {
               return (
               <>
               <div className="border border-border rounded-xl overflow-x-auto">
-                <table className="w-full text-sm min-w-[1250px]">
+                <table className="w-full text-sm min-w-[1510px]">
                   <thead>
                     <tr className="bg-muted/50 text-muted-foreground text-[10.5px] uppercase tracking-wider">
                       {isDraft && (
@@ -976,6 +976,9 @@ export default function PurchaseRequestDetailPage() {
                       <th className="text-center px-3 py-2.5 w-[55px]"><div className="flex items-center justify-center gap-1">Taxable <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Subject to tax calculation</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-center px-3 py-2.5 w-[55px]"><div className="flex items-center justify-center gap-1">Tax Incl <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Price already includes tax</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-left px-3 py-2.5 w-[140px]">Account</th>
+                      <th className="text-right px-3 py-2.5 w-[80px]">Debit</th>
+                      <th className="text-right px-3 py-2.5 w-[80px]">Credit</th>
+                      <th className="text-left px-3 py-2.5 w-[100px]">Acct Remarks</th>
                       <th className="text-right px-3 py-2.5 w-[80px]"><div className="flex items-center justify-end gap-1">Tax <TooltipProvider delayDuration={0}><Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 text-muted-foreground/50 cursor-help" /></TooltipTrigger><TooltipContent><p className="text-xs">Default tax rate: {taxRate}%</p></TooltipContent></Tooltip></TooltipProvider></div></th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Amount</th>
                       <th className="px-3 py-2.5 w-[60px]"></th>
@@ -1066,6 +1069,15 @@ export default function PurchaseRequestDetailPage() {
                           ) : (
                             <span className="text-xs text-muted-foreground">{item.glAccount?.code || '—'}</span>
                           )}
+                        </td>
+                        <td className="px-3 py-2 w-[80px]" onClick={e => e.stopPropagation()}>
+                          <InlineEditCell value={item.debitAmount || 0} onSave={(v) => inlineSave(item.id, 'debitAmount', v)} align="right" disabled={!isDraft} />
+                        </td>
+                        <td className="px-3 py-2 w-[80px]" onClick={e => e.stopPropagation()}>
+                          <InlineEditCell value={item.creditAmount || 0} onSave={(v) => inlineSave(item.id, 'creditAmount', v)} align="right" disabled={!isDraft} />
+                        </td>
+                        <td className="px-3 py-3 w-[100px]">
+                          <span className="text-xs text-muted-foreground">{item.accountRemarks || '—'}</span>
                         </td>
                         <td className="px-3 py-3 text-right font-mono text-xs text-muted-foreground">
                           {item.taxable ? `${taxRate}%` : '—'}

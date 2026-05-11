@@ -11,8 +11,8 @@ export class GlAccountsController {
   findAllActive(@Req() req: any) { return this.service.findAllActive(req.user.tenantId); }
 
   @Get()
-  findAll(@Req() req: any, @Query('page') page?: string, @Query('limit') limit?: string, @Query('search') search?: string) {
-    return this.service.findAll(req.user.tenantId, { page: page ? Number.parseInt(page) : undefined, limit: limit ? Number.parseInt(limit) : undefined, search });
+  findAll(@Req() req: any, @Query('page') page?: string, @Query('limit') limit?: string, @Query('search') search?: string, @Query('accountType') accountType?: string) {
+    return this.service.findAll(req.user.tenantId, { page: page ? Number.parseInt(page) : undefined, limit: limit ? Number.parseInt(limit) : undefined, search, accountType });
   }
 
   @Post()

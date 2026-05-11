@@ -438,14 +438,17 @@ model DeliveryType {
 }
 
 model GlAccount {
-  id          String   @id @default(cuid())
-  tenantId    String
-  code        String
-  name        String
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  tenantId        String
+  accountType     String
+  classification  String
+  category        String
+  subCategory     String?
+  title           String
+  code            String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -649,6 +652,9 @@ model PurchaseRequestItem {
   productId         String?
   vendorId          String?
   glAccountId       String?
+  debitAmount       Float   @default(0)
+  creditAmount      Float   @default(0)
+  accountRemarks    String?
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -714,6 +720,9 @@ model PurchaseOrderItem {
   totalPrice      Float   @default(0)
   receivedQty     Int     @default(0)
   glAccountId     String?
+  debitAmount     Float   @default(0)
+  creditAmount    Float   @default(0)
+  accountRemarks  String?
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
