@@ -1173,10 +1173,70 @@ function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{
 const COA_TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'] as const
 type CoaType = (typeof COA_TYPES)[number]
 
+const COA_HIERARCHY: Record<string, Record<string, Record<string, string[]>>> = {
+  Asset: {
+    'Current Asset': {
+      'Cash & Cash Equivalents': ['Cash'],
+      'Receivables': ['Trade', 'Non-Trade'],
+      'Inventories': ['Merchandise', 'Raw Materials', 'WIP', 'Finished Goods', 'Supplies'],
+      'Prepayments': [],
+      'Tax Credits': [],
+    },
+    'Non-Current Asset': {
+      'Property Plant & Equipment': ['Land', 'Building', 'Machinery', 'Office', 'Furniture', 'Transportation'],
+      'Other Non-Current': ['Leasehold'],
+    },
+  },
+  Liability: {
+    'Current Liability': {
+      'Trade Payables': [],
+      'Accrued Liabilities': [],
+      'Government Payables': ['SSS', 'PhilHealth', 'Pag-IBIG', 'BIR'],
+      'Short-Term Borrowings': [],
+    },
+    'Non-Current Liability': {
+      'Long-Term Borrowings': [],
+    },
+  },
+  Equity: {
+    'Owners Equity': {
+      'Share Capital': [],
+      'Retained Earnings': [],
+      'Other': [],
+    },
+  },
+  Revenue: {
+    'Operating Revenue': {
+      'Sales': [],
+      'Service': [],
+    },
+    'Non-Operating Revenue': {
+      'Other Income': [],
+    },
+  },
+  Expense: {
+    'Cost of Sales': {
+      'Direct Costs': [],
+      'Manufacturing Overhead': [],
+    },
+    'Operating Expense': {
+      'Personnel': ['Compensation', 'Benefits'],
+      'General & Admin': ['Office', 'Communication', 'Facilities', 'Travel', 'Professional', 'Training', 'Financial', 'Government', 'Other'],
+      'Selling': ['Marketing'],
+      'Non-Cash': ['Depreciation', 'Amortization', 'Provision'],
+    },
+    'Non-Operating Expense': {
+      'Losses': [],
+    },
+  },
+}
+
 type GlAccount = {
   id: string
   code: string
+  title: string
   name: string
+  accountType: string
   type: string
   classification: string
   category: string
@@ -1211,7 +1271,7 @@ function ChartOfAccountsConfig() {
   })
 
   const allAccounts = response?.data ?? []
-  const filtered = typeFilter ? allAccounts.filter((a) => a.type === typeFilter) : allAccounts
+  const filtered = typeFilter ? allAccounts.filter((a) => (a.accountType || a.type) === typeFilter) : allAccounts
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/gl-accounts', data),
@@ -1239,11 +1299,11 @@ function ChartOfAccountsConfig() {
 
   function openEdit(account: GlAccount) {
     setFormData({
-      type: account.type as CoaType,
+      type: (account.type || account.accountType) as CoaType,
       classification: account.classification,
       category: account.category,
       subCategory: account.subCategory || '',
-      name: account.name,
+      name: account.title || account.name,
       code: account.code,
     })
     setEditing(account)
@@ -1255,11 +1315,11 @@ function ChartOfAccountsConfig() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const payload = {
-      type: formData.type,
+      accountType: formData.type,
       classification: formData.classification,
       category: formData.category,
       subCategory: formData.subCategory || null,
-      name: formData.name,
+      title: formData.name,
       code: formData.code,
     }
     if (editing) updateMutation.mutate({ id: editing.id, data: payload })
@@ -1294,9 +1354,9 @@ function ChartOfAccountsConfig() {
           {filtered.map((account) => (
             <tr key={account.id} className="hover:bg-accent/30 transition-colors">
               <td className="px-4 py-2.5 font-mono text-muted-foreground">{account.code}</td>
-              <td className="px-4 py-2.5 font-medium">{account.name}</td>
+              <td className="px-4 py-2.5 font-medium">{account.title || account.name}</td>
               <td className="px-4 py-2.5">
-                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">{account.type}</span>
+                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">{account.accountType || account.type}</span>
               </td>
               <td className="px-4 py-2.5 text-muted-foreground text-xs">{account.classification}</td>
               <td className="px-4 py-2.5 text-muted-foreground text-xs">{account.category}</td>
@@ -1357,38 +1417,62 @@ function ChartOfAccountsConfig() {
           <DialogTitle>{editing ? 'Edit Account' : 'Add Account'}</DialogTitle>
           <DialogDescription>{editing ? 'Update GL account details.' : 'Create a new GL account.'}</DialogDescription>
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-            <div className="space-y-1.5">
-              <Label className="text-sm">Account Type <span className="text-red-500">*</span></Label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as CoaType })}
-                required
-                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="">Select type...</option>
-                {COA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Classification <span className="text-red-500">*</span></Label>
-              <Input value={formData.classification} onChange={(e) => setFormData({ ...formData, classification: e.target.value })} required placeholder="e.g., Current Assets" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Category <span className="text-red-500">*</span></Label>
-              <Input value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} required placeholder="e.g., Cash and Cash Equivalents" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Sub Category</Label>
-              <Input value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} placeholder="Optional sub-category" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Account Title <span className="text-red-500">*</span></Label>
-              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Cash on Hand" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm">Account Code <span className="text-red-500">*</span></Label>
-              <Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required placeholder="e.g., 1001" />
-            </div>
+            {(() => {
+              const classifications = formData.type ? Object.keys(COA_HIERARCHY[formData.type] || {}) : [];
+              const categories = formData.type && formData.classification ? Object.keys(COA_HIERARCHY[formData.type]?.[formData.classification] || {}) : [];
+              const subCategories = formData.type && formData.classification && formData.category ? (COA_HIERARCHY[formData.type]?.[formData.classification]?.[formData.category] || []) : [];
+              const selectClass = "w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
+              return (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Account Type <span className="text-red-500">*</span></Label>
+                    <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as CoaType, classification: '', category: '', subCategory: '' })} required className={selectClass}>
+                      <option value="">Select type...</option>
+                      {COA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  {formData.type && (
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">Classification <span className="text-red-500">*</span></Label>
+                      <select value={formData.classification} onChange={(e) => setFormData({ ...formData, classification: e.target.value, category: '', subCategory: '' })} required className={selectClass}>
+                        <option value="">Select classification...</option>
+                        {classifications.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {formData.classification && (
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">Category <span className="text-red-500">*</span></Label>
+                      <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: '' })} required className={selectClass}>
+                        <option value="">Select category...</option>
+                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {formData.category && subCategories.length > 0 && (
+                    <div className="space-y-1.5">
+                      <Label className="text-sm">Sub Category</Label>
+                      <select value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} className={selectClass}>
+                        <option value="">None</option>
+                        {subCategories.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {formData.category && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">Account Title <span className="text-red-500">*</span></Label>
+                        <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Cash on Hand" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-sm">Account Code <span className="text-red-500">*</span></Label>
+                        <Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required placeholder="e.g., 1010" />
+                      </div>
+                    </>
+                  )}
+                </>
+              );
+            })()}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
               <Button type="submit" disabled={!canSubmit || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
@@ -1425,24 +1509,24 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage application preferences and configuration" />
 
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="bg-muted flex-wrap h-auto gap-1 p-1">
-          <TabsTrigger value="general" className="gap-1.5"><Building2 className="h-4 w-4" /> General</TabsTrigger>
-          <TabsTrigger value="company" className="gap-1.5"><Building2 className="h-4 w-4" /> Company</TabsTrigger>
-          <TabsTrigger value="departments" className="gap-1.5"><Network className="h-4 w-4" /> Departments</TabsTrigger>
-          <TabsTrigger value="categories" className="gap-1.5"><FolderTree className="h-4 w-4" /> Categories</TabsTrigger>
-          <TabsTrigger value="manufacturers" className="gap-1.5"><Factory className="h-4 w-4" /> Manufacturers</TabsTrigger>
-          <TabsTrigger value="origins" className="gap-1.5"><Globe className="h-4 w-4" /> Origins</TabsTrigger>
-          <TabsTrigger value="currencies" className="gap-1.5"><Coins className="h-4 w-4" /> Currencies</TabsTrigger>
-          <TabsTrigger value="taxes" className="gap-1.5"><Percent className="h-4 w-4" /> Taxes</TabsTrigger>
-          <TabsTrigger value="purchase-terms" className="gap-1.5"><FileText className="h-4 w-4" /> Purchase Terms</TabsTrigger>
-          <TabsTrigger value="delivery-terms" className="gap-1.5"><Truck className="h-4 w-4" /> Delivery Terms</TabsTrigger>
-          <TabsTrigger value="delivery-types" className="gap-1.5"><Truck className="h-4 w-4" /> Type of Delivery</TabsTrigger>
-          <TabsTrigger value="gl-accounts" className="gap-1.5"><FileText className="h-4 w-4" /> Chart of Accounts</TabsTrigger>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0 flex-wrap">
+          <TabsTrigger value="general" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">General</TabsTrigger>
+          <TabsTrigger value="company" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Company</TabsTrigger>
+          <TabsTrigger value="departments" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Departments</TabsTrigger>
+          <TabsTrigger value="categories" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Categories</TabsTrigger>
+          <TabsTrigger value="manufacturers" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Manufacturers</TabsTrigger>
+          <TabsTrigger value="origins" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Origins</TabsTrigger>
+          <TabsTrigger value="currencies" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Currencies</TabsTrigger>
+          <TabsTrigger value="taxes" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Taxes</TabsTrigger>
+          <TabsTrigger value="purchase-terms" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Purchase Terms</TabsTrigger>
+          <TabsTrigger value="delivery-terms" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Delivery Terms</TabsTrigger>
+          <TabsTrigger value="delivery-types" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Type of Delivery</TabsTrigger>
+          <TabsTrigger value="gl-accounts" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Chart of Accounts</TabsTrigger>
         </TabsList>
 
         {/* General Tab */}
-        <TabsContent value="general">
+        <TabsContent value="general" className="mt-5">
           <div className="grid gap-6">
             <Card>
               <CardHeader>
@@ -1591,57 +1675,57 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Company Tab */}
-        <TabsContent value="company">
+        <TabsContent value="company" className="mt-5">
           <CompanyConfig />
         </TabsContent>
 
         {/* Departments Tab */}
-        <TabsContent value="departments">
+        <TabsContent value="departments" className="mt-5">
           <DepartmentsConfig />
         </TabsContent>
 
         {/* Categories Tab */}
-        <TabsContent value="categories">
+        <TabsContent value="categories" className="mt-5">
           <CategoriesConfig />
         </TabsContent>
 
         {/* Manufacturers Tab */}
-        <TabsContent value="manufacturers">
+        <TabsContent value="manufacturers" className="mt-5">
           <SimpleConfigTable endpoint="manufacturers" label="Manufacturer" />
         </TabsContent>
 
         {/* Origins Tab */}
-        <TabsContent value="origins">
+        <TabsContent value="origins" className="mt-5">
           <SimpleConfigTable endpoint="origins" label="Origin" hasCode />
         </TabsContent>
 
         {/* Currencies Tab */}
-        <TabsContent value="currencies">
+        <TabsContent value="currencies" className="mt-5">
           <CurrenciesConfig />
         </TabsContent>
 
         {/* Taxes Tab */}
-        <TabsContent value="taxes">
+        <TabsContent value="taxes" className="mt-5">
           <TaxesConfig />
         </TabsContent>
 
         {/* Purchase Terms Tab */}
-        <TabsContent value="purchase-terms">
+        <TabsContent value="purchase-terms" className="mt-5">
           <ConfigTableWithDesc endpoint="purchase-terms" label="Purchase Term" showDefault={false} />
         </TabsContent>
 
         {/* Delivery Terms Tab */}
-        <TabsContent value="delivery-terms">
+        <TabsContent value="delivery-terms" className="mt-5">
           <ConfigTableWithDesc endpoint="delivery-terms" label="Delivery Term" showDefault={false} />
         </TabsContent>
 
         {/* Type of Delivery Tab */}
-        <TabsContent value="delivery-types">
+        <TabsContent value="delivery-types" className="mt-5">
           <SimpleConfigTable endpoint="delivery-types" label="Delivery Type" />
         </TabsContent>
 
         {/* GL Accounts Tab */}
-        <TabsContent value="gl-accounts">
+        <TabsContent value="gl-accounts" className="mt-5">
           <ChartOfAccountsConfig />
         </TabsContent>
       </Tabs>
