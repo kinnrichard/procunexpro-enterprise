@@ -9,6 +9,7 @@ import { z } from 'zod';
 import api from '@/lib/api';
 import { downloadCsv } from '@/lib/export';
 import { formatCurrency, formatDate, getInitials, cn } from '@/lib/utils';
+import { useCurrencyStore } from '@/lib/currency';
 import { useTaxStore } from '@/lib/tax';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
@@ -25,8 +26,9 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  FileText, Plus, Pencil, Send, XCircle,
+  FileText, Plus, Pencil, Send, XCircle, Package,
   Clock, CheckCheck, FileX, Download, Filter, X,
 } from 'lucide-react';
 
@@ -53,6 +55,94 @@ function getVendorPricing(item: any) {
     if (pricing) return { opQty: pricing.originalPackagingQty || 1, pcsPerPack: pricing.pcsPerPack || 1 };
   }
   return { opQty: 1, pcsPerPack: 1 };
+}
+
+// ─── All Line Items Tab ─────────────────────────────────────
+function AllLineItems() {
+  const router = useRouter();
+  const formatCurrency = useCurrencyStore((s) => s.format);
+  const [liPage, setLiPage] = useState(1);
+  const [liSearch, setLiSearch] = useState('');
+
+  const { data: liResponse, isLoading: liLoading } = useQuery({
+    queryKey: ['pr-all-items', liPage, liSearch],
+    queryFn: () => api.get('/purchase-requests/items/all', { params: { page: liPage, limit: 20, search: liSearch || undefined } }),
+  });
+
+  const liItems = liResponse?.data?.data || [];
+  const liTotal = liResponse?.data?.total || 0;
+
+  const liColumns = [
+    {
+      key: 'requestNumber', label: 'Request #', sortable: true,
+      render: (_: any, row: any) => (
+        <button className="font-medium text-primary hover:underline" onClick={(e) => { e.stopPropagation(); router.push(`/purchase-requests/${row.purchaseRequest?.id}`); }}>
+          {row.purchaseRequest?.requestNumber || '—'}
+        </button>
+      ),
+    },
+    {
+      key: 'prTitle', label: 'PR Title', sortable: true,
+      render: (_: any, row: any) => <span className="text-sm truncate max-w-[150px] block">{row.purchaseRequest?.title || '—'}</span>,
+    },
+    {
+      key: 'company', label: 'Company',
+      render: (_: any, row: any) => row.purchaseRequest?.company?.name || <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
+      key: 'product', label: 'Product', sortable: true,
+      render: (_: any, row: any) => (
+        <div>
+          <p className="font-medium text-sm">{row.product?.name || row.description || '—'}</p>
+          {row.product?.sku && <p className="font-mono text-xs text-muted-foreground">{row.product.sku}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'vendor', label: 'Vendor',
+      render: (_: any, row: any) => row.vendor?.name || <span className="text-muted-foreground text-xs">—</span>,
+    },
+    { key: 'quantity', label: 'OP Qty', sortable: true, className: 'text-center',
+      render: (v: number) => <span className="font-mono text-sm">{v}</span>,
+    },
+    {
+      key: 'invQty', label: 'Inv Qty', className: 'text-center',
+      render: (_: any, row: any) => {
+        const vp = getVendorPricing(row);
+        const invQty = (row.quantity || vp.opQty) * vp.pcsPerPack;
+        return <span className="font-mono text-sm font-semibold">{invQty.toLocaleString()}</span>;
+      },
+    },
+    { key: 'estimatedPrice', label: 'Unit Price', sortable: true, className: 'text-right',
+      render: (v: number) => <span className="font-mono text-sm">{formatCurrency(v || 0)}</span>,
+    },
+    { key: 'discount', label: 'Discount', className: 'text-right',
+      render: (v: number) => v ? <span className="font-mono text-sm">{v}%</span> : <span className="text-muted-foreground text-xs">—</span>,
+    },
+    { key: 'totalPrice', label: 'Amount', sortable: true, className: 'text-right',
+      render: (v: number) => <span className="font-mono font-medium">{formatCurrency(v || 0)}</span>,
+    },
+    {
+      key: 'status', label: 'PR Status',
+      render: (_: any, row: any) => <StatusBadge status={row.purchaseRequest?.status || ''} />,
+    },
+  ];
+
+  return (
+    <DataTable
+      columns={liColumns}
+      data={liItems}
+      total={liTotal}
+      page={liPage}
+      limit={20}
+      onPageChange={setLiPage}
+      onSearch={setLiSearch}
+      searchPlaceholder="Search by product, SKU, or request #..."
+      isLoading={liLoading}
+      emptyMessage="No line items found"
+      onRowClick={(row: any) => router.push(`/purchase-requests/${row.purchaseRequest?.id}`)}
+    />
+  );
 }
 
 // ─── Constants ─────────────────────────────────────────────
@@ -332,6 +422,18 @@ export default function PurchaseRequestsPage() {
         </div>
       </PageHeader>
 
+      <Tabs defaultValue="requests" className="w-full">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0">
+          <TabsTrigger value="requests" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
+            Requests
+          </TabsTrigger>
+          <TabsTrigger value="line-items" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
+            Line Items
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="requests" className="mt-5 space-y-6">
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Requests" value={stats.total} icon={<FileText className="h-5 w-5" />} />
         <StatCard title="Pending Approval" value={stats.pending} icon={<Clock className="h-5 w-5" />} />
@@ -434,6 +536,13 @@ export default function PurchaseRequestsPage() {
           </div>
         }
       />
+
+        </TabsContent>
+
+        <TabsContent value="line-items" className="mt-5">
+          <AllLineItems />
+        </TabsContent>
+      </Tabs>
 
       {/* ─── Create/Edit Modal (Details only, no items) ──── */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

@@ -123,6 +123,37 @@ export class PurchaseRequestsService {
     return { data, total, page, limit };
   }
 
+  async findAllItems(tenantId: string, params: { page?: number; limit?: number; search?: string; prStatus?: string }) {
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = { purchaseRequest: { tenantId } };
+    if (params.prStatus) where.purchaseRequest.status = params.prStatus;
+    if (params.search) {
+      where.OR = [
+        { description: { contains: params.search, mode: 'insensitive' } },
+        { product: { name: { contains: params.search, mode: 'insensitive' } } },
+        { product: { sku: { contains: params.search, mode: 'insensitive' } } },
+        { purchaseRequest: { requestNumber: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.purchaseRequestItem.findMany({
+        where, skip, take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          ...this.itemIncludes,
+          purchaseRequest: { select: { id: true, requestNumber: true, title: true, status: true, company: { select: { id: true, name: true } } } },
+        },
+      }),
+      this.prisma.purchaseRequestItem.count({ where }),
+    ]);
+
+    return { data, total, page, limit };
+  }
+
   async findOne(tenantId: string, id: string) {
     const pr = await this.prisma.purchaseRequest.findFirst({
       where: { id },
@@ -225,8 +256,6 @@ export class PurchaseRequestsService {
     const pr = await this.findOne(tenantId, prId);
     if (pr.status !== 'DRAFT') throw new BadRequestException('Can only add items to draft requests');
 
-    const maxItemNumber = pr.items.reduce((max, item) => Math.max(max, item.itemNumber), 0);
-
     // Get product to auto-fill description and uom
     const product = data.productId ? await this.prisma.product.findUnique({ where: { id: data.productId } }) : null;
 
@@ -244,7 +273,7 @@ export class PurchaseRequestsService {
 
     resolvedPrice = resolvedPrice ?? 0;
 
-    // Calculate invQty = originalPackagingQty * pcsPerPack (from vendor pricing)
+    // Calculate packaging from vendor pricing
     let pcsPerPack = 1;
     let opQty = 1;
     if (product && resolvedVendorId) {
@@ -256,6 +285,27 @@ export class PurchaseRequestsService {
         opQty = pricing.originalPackagingQty || 1;
       }
     }
+
+    // Check if same product+vendor already exists — increment quantity
+    if (data.productId) {
+      const existing = pr.items.find((i: any) =>
+        i.productId === data.productId && (i.vendorId || null) === (resolvedVendorId || null),
+      );
+      if (existing) {
+        const newQty = existing.quantity + opQty;
+        const invQty = newQty * pcsPerPack;
+        const price = resolvedPrice || existing.estimatedPrice || 0;
+        const item = await this.prisma.purchaseRequestItem.update({
+          where: { id: existing.id },
+          data: { quantity: newQty, totalPrice: invQty * price },
+          include: this.itemIncludes,
+        });
+        await this.recalcTotal(prId);
+        return item;
+      }
+    }
+
+    const maxItemNumber = pr.items.reduce((max, item) => Math.max(max, item.itemNumber), 0);
     const invQty = product ? opQty * pcsPerPack : (data.quantity || 1);
 
     const item = await this.prisma.purchaseRequestItem.create({

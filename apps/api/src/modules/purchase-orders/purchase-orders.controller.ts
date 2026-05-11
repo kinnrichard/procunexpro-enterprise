@@ -27,6 +27,11 @@ export class PurchaseOrdersController {
     });
   }
 
+  @Post('from-pr-items')
+  createFromPrItems(@Req() req: any, @Body() body: any) {
+    return this.purchaseOrdersService.createFromPrItems(req.user.tenantId, req.user.id, body);
+  }
+
   @Get(':id')
   findOne(@Req() req: any, @Param('id') id: string) {
     return this.purchaseOrdersService.findOne(req.user.tenantId, id);

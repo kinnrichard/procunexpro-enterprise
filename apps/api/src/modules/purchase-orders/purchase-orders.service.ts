@@ -133,6 +133,92 @@ export class PurchaseOrdersService {
     });
   }
 
+  async createFromPrItems(tenantId: string, userId: string, data: { itemIds: string[]; priority?: string; expectedDate?: string; paymentTerms?: string; shippingAddress?: string; notes?: string }) {
+    // Fetch the selected PR line items with their PR and vendor info
+    const prItems = await this.prisma.purchaseRequestItem.findMany({
+      where: {
+        id: { in: data.itemIds },
+        purchaseRequest: { tenantId, status: 'APPROVED' },
+      },
+      include: {
+        product: { select: { id: true, name: true, sku: true, unit: true } },
+        vendor: { select: { id: true, name: true } },
+        purchaseRequest: { select: { id: true, requestNumber: true } },
+      },
+    });
+
+    if (prItems.length === 0) throw new BadRequestException('No valid approved PR items found');
+
+    // Group items by vendor
+    const byVendor = new Map<string, typeof prItems>();
+    for (const item of prItems) {
+      const vendorId = item.vendorId || 'no-vendor';
+      const group = byVendor.get(vendorId) || [];
+      group.push(item);
+      byVendor.set(vendorId, group);
+    }
+
+    // Items without vendor cannot be converted
+    if (byVendor.has('no-vendor')) {
+      throw new BadRequestException('Some items have no vendor assigned. Assign vendors before creating POs.');
+    }
+
+    // Create one PO per vendor
+    const createdPOs: any[] = [];
+    for (const [vendorId, vendorItems] of byVendor.entries()) {
+      const orderNumber = await this.generateOrderNumber(tenantId);
+      const poItems = vendorItems.map((item, idx) => ({
+        productId: item.productId || undefined,
+        description: item.product?.name || item.description,
+        quantity: item.quantity,
+        unitPrice: item.estimatedPrice || 0,
+        totalPrice: item.totalPrice || 0,
+        notes: item.notes || null,
+      }));
+
+      const subtotal = poItems.reduce((sum, i) => sum + i.totalPrice, 0);
+      const prIds = [...new Set(vendorItems.map(i => i.purchaseRequest.id))];
+
+      const po = await this.prisma.purchaseOrder.create({
+        data: {
+          tenantId,
+          orderNumber,
+          vendorId,
+          createdById: userId,
+          purchaseRequestId: prIds.length === 1 ? prIds[0] : null,
+          status: 'DRAFT',
+          priority: data.priority || 'MEDIUM',
+          expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
+          subtotal,
+          taxAmount: 0,
+          shippingCost: 0,
+          totalAmount: subtotal,
+          paymentTerms: data.paymentTerms || null,
+          shippingAddress: data.shippingAddress || null,
+          notes: data.notes || null,
+          items: { create: poItems },
+        },
+        include: {
+          vendor: { select: { id: true, name: true } },
+          items: { include: { product: { select: { id: true, name: true, sku: true } } } },
+        },
+      });
+      createdPOs.push(po);
+    }
+
+    // Check if any PRs have all items converted — mark as CONVERTED
+    const affectedPrIds = [...new Set(prItems.map(i => i.purchaseRequest.id))];
+    for (const prId of affectedPrIds) {
+      const allItems = await this.prisma.purchaseRequestItem.findMany({ where: { purchaseRequestId: prId } });
+      const allConverted = allItems.every(item => data.itemIds.includes(item.id));
+      if (allConverted) {
+        await this.prisma.purchaseRequest.update({ where: { id: prId }, data: { status: 'CONVERTED' } });
+      }
+    }
+
+    return { created: createdPOs.length, purchaseOrders: createdPOs };
+  }
+
   async update(tenantId: string, id: string, data: any) {
     const po = await this.prisma.purchaseOrder.findFirst({ where: { id, tenantId } });
     if (!po) throw new NotFoundException('Purchase order not found');

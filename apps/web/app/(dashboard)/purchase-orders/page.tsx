@@ -21,9 +21,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useCurrencyStore } from '@/lib/currency';
 import {
   ShoppingCart, Plus, Pencil, Trash2, Send, CheckCircle, Truck, PackageCheck,
-  Clock, X,
+  Clock, X, Package, Filter,
 } from 'lucide-react';
 
 const poSchema = z.object({
@@ -44,6 +46,193 @@ const poSchema = z.object({
 });
 
 type POFormData = z.infer<typeof poSchema>;
+
+// ─── Create from PRs Tab ────────────────────────────────────
+function CreateFromPRs() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const fmt = useCurrencyStore((s) => s.format);
+  const [liPage, setLiPage] = useState(1);
+  const [liSearch, setLiSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const { data: liRes, isLoading: liLoading } = useQuery({
+    queryKey: ['pr-approved-items', liPage, liSearch],
+    queryFn: () => api.get('/purchase-requests/items/all', { params: { page: liPage, limit: 20, search: liSearch || undefined, prStatus: 'APPROVED' } }),
+  });
+
+  const liItems: any[] = liRes?.data?.data || [];
+  const liTotal = liRes?.data?.total || 0;
+
+  function toggleItem(id: string) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  }
+
+  function toggleAll() {
+    if (selectedIds.size === liItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(liItems.map((i: any) => i.id)));
+    }
+  }
+
+  // Group selected items by vendor for preview
+  const selectedItems = liItems.filter((i: any) => selectedIds.has(i.id));
+  const vendorGroups = new Map<string, { vendor: any; items: any[] }>();
+  for (const item of selectedItems) {
+    const vid = item.vendor?.id || 'no-vendor';
+    const group = vendorGroups.get(vid) || { vendor: item.vendor, items: [] };
+    group.items.push(item);
+    vendorGroups.set(vid, group);
+  }
+  const hasNoVendor = vendorGroups.has('no-vendor');
+
+  const createBatchMutation = useMutation({
+    mutationFn: () => api.post('/purchase-orders/from-pr-items', { itemIds: [...selectedIds] }),
+    onSuccess: (res) => {
+      const count = res.data?.created || 0;
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['pr-approved-items'] });
+      queryClient.invalidateQueries({ queryKey: ['purchase-requests'] });
+      setSelectedIds(new Set());
+      setConfirmOpen(false);
+      toast({ title: `${count} Purchase Order${count === 1 ? '' : 's'} created` });
+    },
+    onError: (err: any) => toast({ title: 'Failed', description: err?.response?.data?.message || 'Failed to create POs', variant: 'destructive' }),
+  });
+
+  const allSelected = liItems.length > 0 && selectedIds.size === liItems.length;
+  const someSelected = selectedIds.size > 0 && !allSelected;
+
+  return (
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Input placeholder="Search products, SKU, request #..." value={liSearch} onChange={(e) => { setLiSearch(e.target.value); setLiPage(1); }} className="max-w-xs h-9" />
+          <p className="text-sm text-muted-foreground">{liTotal} approved item{liTotal === 1 ? '' : 's'}</p>
+        </div>
+        {selectedIds.size > 0 && (
+          <Button onClick={() => setConfirmOpen(true)} disabled={hasNoVendor} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+            <Package className="h-4 w-4 mr-2" /> Create PO ({selectedIds.size} item{selectedIds.size === 1 ? '' : 's'})
+          </Button>
+        )}
+      </div>
+
+      {/* Items table */}
+      {liLoading ? (
+        <div className="flex items-center justify-center py-12"><div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
+      ) : liItems.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed border-border rounded-xl">
+          <p className="text-sm text-muted-foreground">No approved line items available for PO conversion.</p>
+        </div>
+      ) : (
+        <div className="border border-border rounded-xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50 text-muted-foreground text-[10.5px] uppercase tracking-wider">
+                <th className="px-3 py-2.5 w-[36px]">
+                  <button onClick={toggleAll} className={cn('w-4 h-4 rounded border-2 flex items-center justify-center transition-colors', allSelected ? 'bg-primary border-primary' : someSelected ? 'border-primary bg-primary/20' : 'border-border')}>
+                    {allSelected && <CheckCircle className="h-2.5 w-2.5 text-primary-foreground" />}
+                    {someSelected && <div className="w-2 h-0.5 bg-primary rounded-full" />}
+                  </button>
+                </th>
+                <th className="text-left px-3 py-2.5">Request #</th>
+                <th className="text-left px-3 py-2.5">Company</th>
+                <th className="text-left px-3 py-2.5">Product</th>
+                <th className="text-left px-3 py-2.5">Vendor</th>
+                <th className="text-center px-3 py-2.5">Qty</th>
+                <th className="text-right px-3 py-2.5">Unit Price</th>
+                <th className="text-right px-3 py-2.5">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {liItems.map((item: any) => (
+                <tr key={item.id} className={cn('transition-colors cursor-pointer', selectedIds.has(item.id) ? 'bg-primary/5' : 'hover:bg-accent/30')} onClick={() => toggleItem(item.id)}>
+                  <td className="px-3 py-2.5">
+                    <button onClick={(e) => { e.stopPropagation(); toggleItem(item.id); }} className={cn('w-4 h-4 rounded border-2 flex items-center justify-center transition-colors', selectedIds.has(item.id) ? 'bg-primary border-primary' : 'border-border hover:border-primary/50')}>
+                      {selectedIds.has(item.id) && <CheckCircle className="h-2.5 w-2.5 text-primary-foreground" />}
+                    </button>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <span className="font-medium text-primary">{item.purchaseRequest?.requestNumber || '—'}</span>
+                  </td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{item.purchaseRequest?.company?.name || '—'}</td>
+                  <td className="px-3 py-2.5">
+                    <p className="font-medium">{item.product?.name || item.description || '—'}</p>
+                    {item.product?.sku && <p className="font-mono text-xs text-muted-foreground">{item.product.sku}</p>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {item.vendor ? (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-slate-700 to-[#1e3a5f] flex items-center justify-center shrink-0">
+                          <span className="text-white text-[8px] font-bold">{item.vendor.name.charAt(0)}</span>
+                        </div>
+                        <span className="text-xs">{item.vendor.name}</span>
+                      </div>
+                    ) : <span className="text-xs text-amber-600 font-medium">No vendor</span>}
+                  </td>
+                  <td className="px-3 py-2.5 text-center font-mono">{item.quantity}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{fmt(item.estimatedPrice || 0)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-medium">{fmt(item.totalPrice || 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {liTotal > 20 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">Page {liPage} of {Math.ceil(liTotal / 20)}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={liPage <= 1} onClick={() => setLiPage(liPage - 1)}>Prev</Button>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={liPage >= Math.ceil(liTotal / 20)} onClick={() => setLiPage(liPage + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm dialog with vendor grouping preview */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Create Purchase Orders</DialogTitle>
+          <div className="space-y-4 mt-2">
+            <p className="text-sm text-muted-foreground">
+              {vendorGroups.size} PO{vendorGroups.size === 1 ? '' : 's'} will be created from {selectedIds.size} selected item{selectedIds.size === 1 ? '' : 's'}:
+            </p>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {[...vendorGroups.entries()].map(([vid, group]) => (
+                <div key={vid} className="p-3 rounded-lg bg-muted/50 border">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{group.vendor?.name || 'No Vendor'}</p>
+                    <span className="text-xs text-muted-foreground">{group.items.length} item{group.items.length === 1 ? '' : 's'}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Total: <span className="font-mono font-medium text-foreground">{fmt(group.items.reduce((s, i) => s + (i.totalPrice || 0), 0))}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+            {hasNoVendor && (
+              <p className="text-xs text-red-500">Some items have no vendor. Assign vendors before creating POs.</p>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button onClick={() => createBatchMutation.mutate()} disabled={hasNoVendor || createBatchMutation.isPending} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+                {createBatchMutation.isPending ? 'Creating...' : `Create ${vendorGroups.size} PO${vendorGroups.size === 1 ? '' : 's'}`}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 const priorityColors: Record<string, string> = {
   URGENT: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -206,6 +395,18 @@ export default function PurchaseOrdersPage() {
         </Button>
       </PageHeader>
 
+      <Tabs defaultValue="orders" className="w-full">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0">
+          <TabsTrigger value="orders" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
+            Orders
+          </TabsTrigger>
+          <TabsTrigger value="create-from-pr" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
+            Create from PRs
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="orders" className="mt-5 space-y-6">
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Orders" value={stats.total} icon={<ShoppingCart className="h-5 w-5" />} />
         <StatCard title="Pending" value={stats.pending} icon={<Clock className="h-5 w-5" />} />
@@ -235,6 +436,13 @@ export default function PurchaseOrdersPage() {
           </div>
         }
       />
+
+        </TabsContent>
+
+        <TabsContent value="create-from-pr" className="mt-5">
+          <CreateFromPRs />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 gap-0">

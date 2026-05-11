@@ -40,6 +40,15 @@ export class PurchaseRequestsController {
     });
   }
 
+  @Get('items/all')
+  findAllItems(@Req() req: any, @Query('page') page?: string, @Query('limit') limit?: string, @Query('search') search?: string, @Query('prStatus') prStatus?: string) {
+    return this.purchaseRequestsService.findAllItems(req.user.tenantId, {
+      page: page ? Number.parseInt(page) : undefined,
+      limit: limit ? Number.parseInt(limit) : undefined,
+      search, prStatus,
+    });
+  }
+
   @Get(':id')
   findOne(@Req() req: any, @Param('id') id: string) {
     return this.purchaseRequestsService.findOne(req.user.tenantId, id);
