@@ -4,44 +4,27 @@ import {
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PurchaseRequestsService } from './purchase-requests.service';
 
-class FindAllPurchaseRequestsQuery {
-  page?: string;
-  limit?: string;
-  search?: string;
-  status?: string;
-  priority?: string;
-  companyId?: string;
-  departmentId?: string;
-  requiredDateFrom?: string;
-  requiredDateTo?: string;
-  createdDateFrom?: string;
-  createdDateTo?: string;
-  amountMin?: string;
-  amountMax?: string;
-}
-
 @Controller('purchase-requests')
 @UseGuards(JwtAuthGuard)
 export class PurchaseRequestsController {
   constructor(private readonly purchaseRequestsService: PurchaseRequestsService) {}
 
   @Get()
-  findAll(@Req() req: any, @Query() query: FindAllPurchaseRequestsQuery) {
-    const { page, limit, search, status, priority, companyId, departmentId,
-      requiredDateFrom, requiredDateTo, createdDateFrom, createdDateTo,
-      amountMin, amountMax } = query;
+  findAll(
+    @Req() req: any,
+    @Query('page') page?: string, @Query('limit') limit?: string,
+    @Query('search') search?: string, @Query('status') status?: string,
+    @Query('priority') priority?: string, @Query('companyId') companyId?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('requiredDateFrom') requiredDateFrom?: string, @Query('requiredDateTo') requiredDateTo?: string,
+    @Query('createdDateFrom') createdDateFrom?: string, @Query('createdDateTo') createdDateTo?: string,
+    @Query('amountMin') amountMin?: string, @Query('amountMax') amountMax?: string,
+  ) {
     return this.purchaseRequestsService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
       limit: limit ? Number.parseInt(limit) : undefined,
-      search,
-      status,
-      priority,
-      companyId,
-      departmentId,
-      requiredDateFrom,
-      requiredDateTo,
-      createdDateFrom,
-      createdDateTo,
+      search, status, priority, companyId, departmentId,
+      requiredDateFrom, requiredDateTo, createdDateFrom, createdDateTo,
       amountMin: amountMin ? Number.parseFloat(amountMin) : undefined,
       amountMax: amountMax ? Number.parseFloat(amountMax) : undefined,
     });
