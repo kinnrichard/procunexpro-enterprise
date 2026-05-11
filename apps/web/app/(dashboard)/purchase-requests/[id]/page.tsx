@@ -192,6 +192,40 @@ function InlineEditCell({ value, onSave, type = 'number', prefix, suffix, align 
 }
 
 // ─── Helpers ──────────────────────────────────────────────
+function matchesSearch(item: any, query: string): boolean {
+  const q = query.toLowerCase();
+  const name = (item.product?.name || item.description || '').toLowerCase();
+  const sku = (item.product?.sku || '').toLowerCase();
+  const vendor = (item.vendor?.name || '').toLowerCase();
+  return name.includes(q) || sku.includes(q) || vendor.includes(q);
+}
+
+function filterLineItems(items: any[], filters: { vendorId: string; taxable: string; taxIncl: string; priceMin: string; priceMax: string; search: string }) {
+  return items.filter((item: any) => {
+    if (filters.vendorId && item.vendor?.id !== filters.vendorId) return false;
+    if (filters.taxable === 'yes' && !item.taxable) return false;
+    if (filters.taxable === 'no' && item.taxable) return false;
+    if (filters.taxIncl === 'yes' && !item.taxIncluded) return false;
+    if (filters.taxIncl === 'no' && item.taxIncluded) return false;
+    if (filters.priceMin && (item.estimatedPrice || 0) < Number.parseFloat(filters.priceMin)) return false;
+    if (filters.priceMax && (item.estimatedPrice || 0) > Number.parseFloat(filters.priceMax)) return false;
+    if (filters.search && !matchesSearch(item, filters.search)) return false;
+    return true;
+  });
+}
+
+function calcLineAmount(item: any, taxRate: number) {
+  const vp = getVendorPricing(item);
+  const pkgQty = item.quantity || vp.opQty;
+  const invQty = pkgQty * vp.pcsPerPack;
+  const subtotal = invQty * (item.estimatedPrice || 0);
+  const discounted = subtotal - (subtotal * (item.discount || 0) / 100);
+  if (item.taxable && taxRate > 0 && !item.taxIncluded) {
+    return discounted + (discounted * taxRate / 100);
+  }
+  return discounted;
+}
+
 function getVendorPricing(item: any) {
   if (item.vendor?.id && item.product?.pricings) {
     const pricing = item.product.pricings.find((p: any) => p.vendorId === item.vendor.id);
@@ -313,48 +347,15 @@ export default function PurchaseRequestDetailPage() {
 
   const isDraft = pr?.status === 'DRAFT';
 
-  const filteredItems = (pr?.items || []).filter((item: any) => {
-    if (itemVendorFilter && item.vendor?.id !== itemVendorFilter) return false;
-    if (itemTaxableFilter && itemTaxableFilter !== 'all') {
-      if (itemTaxableFilter === 'yes' && !item.taxable) return false;
-      if (itemTaxableFilter === 'no' && item.taxable) return false;
-    }
-    if (itemTaxInclFilter && itemTaxInclFilter !== 'all') {
-      if (itemTaxInclFilter === 'yes' && !item.taxIncluded) return false;
-      if (itemTaxInclFilter === 'no' && item.taxIncluded) return false;
-    }
-    if (itemPriceMin && (item.estimatedPrice || 0) < Number.parseFloat(itemPriceMin)) return false;
-    if (itemPriceMax && (item.estimatedPrice || 0) > Number.parseFloat(itemPriceMax)) return false;
-    if (itemSearch) {
-      const q = itemSearch.toLowerCase();
-      const name = (item.product?.name || item.description || '').toLowerCase();
-      const sku = (item.product?.sku || '').toLowerCase();
-      const vendor = (item.vendor?.name || '').toLowerCase();
-      if (!name.includes(q) && !sku.includes(q) && !vendor.includes(q)) return false;
-    }
-    return true;
+  const filteredItems = filterLineItems(pr?.items || [], {
+    vendorId: itemVendorFilter, taxable: itemTaxableFilter, taxIncl: itemTaxInclFilter,
+    priceMin: itemPriceMin, priceMax: itemPriceMax, search: itemSearch,
   });
 
   const itemTotalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const paginatedItems = filteredItems.slice((itemPage - 1) * ITEMS_PER_PAGE, itemPage * ITEMS_PER_PAGE);
 
   const itemVendors = [...new Map((pr?.items || []).filter((i: any) => i.vendor).map((i: any) => [i.vendor.id, i.vendor])).values()] as { id: string; name: string }[];
-
-  function calcLineAmount(item: any) {
-    const vp = getVendorPricing(item);
-    const pkgQty = item.quantity || vp.opQty;
-    const pcsPerPack = vp.pcsPerPack;
-    const invQty = pkgQty * pcsPerPack;
-    const subtotal = invQty * (item.estimatedPrice || 0);
-    const discounted = subtotal - (subtotal * (item.discount || 0) / 100);
-    if (item.taxable && taxRate > 0) {
-      if (item.taxIncluded) {
-        return discounted; // tax already in price
-      }
-      return discounted + (discounted * taxRate / 100);
-    }
-    return discounted;
-  }
 
   function inlineSave(itemId: string, field: string, value: number) {
     updateItemMutation.mutate({ itemId, data: { [field]: value } });
@@ -656,7 +657,7 @@ export default function PurchaseRequestDetailPage() {
     })
     .slice(0, addItemSearch ? 50 : 10);
 
-  const totalAmount = pr?.items?.reduce((sum: number, item: any) => sum + calcLineAmount(item), 0) || 0;
+  const totalAmount = pr?.items?.reduce((sum: number, item: any) => sum + calcLineAmount(item, taxRate), 0) || 0;
 
   if (isLoading) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Loading…</div>;
   if (!pr) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Purchase request not found</div>;
@@ -1043,7 +1044,7 @@ export default function PurchaseRequestDetailPage() {
                             return <p className="text-[10px] text-muted-foreground/70 mt-0.5">{formatCurrency(disc * taxRate / 100)}</p>;
                           })()}
                         </td>
-                        <td className="px-3 py-3 text-right font-mono font-medium">{formatCurrency(calcLineAmount(item))}</td>
+                        <td className="px-3 py-3 text-right font-mono font-medium">{formatCurrency(calcLineAmount(item, taxRate))}</td>
                         <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-0.5">
                             {item.notes ? (
