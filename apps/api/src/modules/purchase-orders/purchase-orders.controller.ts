@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards,
+  Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PurchaseOrdersService } from './purchase-orders.service';
@@ -50,6 +50,11 @@ export class PurchaseOrdersController {
   @Delete(':id')
   delete(@Req() req: any, @Param('id') id: string) {
     return this.purchaseOrdersService.delete(req.user.tenantId, id);
+  }
+
+  @Patch(':id/items/:itemId')
+  updateItem(@Req() req: any, @Param('id') id: string, @Param('itemId') itemId: string, @Body() body: any) {
+    return this.purchaseOrdersService.updateItem(req.user.tenantId, id, itemId, body);
   }
 
   @Put(':id/submit')

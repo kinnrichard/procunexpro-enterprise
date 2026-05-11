@@ -688,8 +688,12 @@ model PurchaseOrderItem {
   purchaseOrderId String
   productId       String
   description     String?
+  uom             String  @default("pcs")
   quantity        Int
   unitPrice       Float   @default(0)
+  discount        Float   @default(0)
+  taxable         Boolean @default(false)
+  taxIncluded     Boolean @default(false)
   totalPrice      Float   @default(0)
   receivedQty     Int     @default(0)
   notes           String?

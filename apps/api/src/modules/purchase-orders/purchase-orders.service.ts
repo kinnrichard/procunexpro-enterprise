@@ -78,8 +78,9 @@ export class PurchaseOrdersService {
         },
         items: {
           include: {
-            product: { select: { id: true, name: true, sku: true, unit: true, costPrice: true } },
+            product: { select: { id: true, name: true, sku: true, unit: true, costPrice: true, pricings: { select: { vendorId: true, originalPackagingQty: true, pcsPerPack: true, originalPackagingUom: true } } } },
           },
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
@@ -171,8 +172,12 @@ export class PurchaseOrdersService {
       const poItems = vendorItems.map((item) => ({
         product: { connect: { id: item.productId! } },
         description: item.product?.name || item.description,
+        uom: item.uom || 'pcs',
         quantity: item.quantity,
         unitPrice: item.estimatedPrice || 0,
+        discount: item.discount || 0,
+        taxable: item.taxable || false,
+        taxIncluded: item.taxIncluded || false,
         totalPrice: item.totalPrice || 0,
         notes: item.notes || null,
       }));
@@ -218,6 +223,42 @@ export class PurchaseOrdersService {
     }
 
     return { created: createdPOs.length, purchaseOrders: createdPOs };
+  }
+
+  async updateItem(tenantId: string, poId: string, itemId: string, data: any) {
+    const po = await this.prisma.purchaseOrder.findFirst({ where: { id: poId, tenantId } });
+    if (!po) throw new NotFoundException('Purchase order not found');
+    if (po.status !== 'DRAFT') throw new BadRequestException('Can only edit items in draft orders');
+
+    const existing = await this.prisma.purchaseOrderItem.findFirst({ where: { id: itemId, purchaseOrderId: poId } });
+    if (!existing) throw new NotFoundException('Item not found');
+
+    const updateData: any = {};
+    const fields = ['quantity', 'unitPrice', 'discount', 'taxable', 'taxIncluded', 'notes'];
+    for (const f of fields) {
+      if (data[f] !== undefined) updateData[f] = data[f];
+    }
+
+    // Recalc totalPrice
+    const qty = updateData.quantity ?? existing.quantity;
+    const price = updateData.unitPrice ?? existing.unitPrice;
+    updateData.totalPrice = qty * price;
+
+    const item = await this.prisma.purchaseOrderItem.update({
+      where: { id: itemId },
+      data: updateData,
+      include: { product: { select: { id: true, name: true, sku: true } } },
+    });
+
+    // Recalc PO totals
+    const allItems = await this.prisma.purchaseOrderItem.findMany({ where: { purchaseOrderId: poId } });
+    const subtotal = allItems.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+    await this.prisma.purchaseOrder.update({
+      where: { id: poId },
+      data: { subtotal, totalAmount: subtotal + (po.taxAmount || 0) + (po.shippingCost || 0) },
+    });
+
+    return item;
   }
 
   async update(tenantId: string, id: string, data: any) {
