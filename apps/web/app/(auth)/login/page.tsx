@@ -74,7 +74,6 @@ export default function LoginPage() {
         return next;
       });
     }
-    if (error) setError('');
   }
 
   return (
@@ -116,7 +115,7 @@ export default function LoginPage() {
             {/* Logo inside card */}
             <div className="text-center mb-10">
               <div className="inline-flex items-center mb-3">
-                <img src="/logo-primary.png" alt="Procunex" className="h-22" />
+                <img src="/logo-primary.png" alt="Procunex" className="h-20" />
               </div>
               <p className="text-sm text-gray-500">Sign in to your account</p>
             </div>

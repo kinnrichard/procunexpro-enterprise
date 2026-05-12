@@ -297,10 +297,13 @@ type ConfigItem = {
   _count?: { products?: number }
 }
 
+const CONFIG_PAGE_SIZE = 10;
+
 function SimpleConfigTable({ endpoint, label, hasCode }: Readonly<{ endpoint: string; label: string; hasCode?: boolean }>) {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<ConfigItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ConfigItem | null>(null)
@@ -315,7 +318,9 @@ function SimpleConfigTable({ endpoint, label, hasCode }: Readonly<{ endpoint: st
     },
   })
 
-  const items = response?.data ?? []
+  const allItems = response?.data ?? []
+  const totalPages = Math.ceil(allItems.length / CONFIG_PAGE_SIZE);
+  const items = allItems.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post(`/${endpoint}`, data),
@@ -418,6 +423,17 @@ function SimpleConfigTable({ endpoint, label, hasCode }: Readonly<{ endpoint: st
           {renderSimpleContent()}
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{allItems.length} {label.toLowerCase()}{allItems.length === 1 ? '' : 's'}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
+            <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
@@ -1037,6 +1053,7 @@ function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<ConfigWithDescItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ConfigWithDescItem | null>(null)
@@ -1050,7 +1067,9 @@ function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{
       return (await api.get<{ data: ConfigWithDescItem[] }>(`/${endpoint}?${params}`)).data
     },
   })
-  const items = response?.data ?? []
+  const allItems = response?.data ?? []
+  const totalPages = Math.ceil(allItems.length / CONFIG_PAGE_SIZE);
+  const items = allItems.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE);
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post(`/${endpoint}`, data),
@@ -1132,6 +1151,16 @@ function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{
           {renderConfigWithDescContent()}
         </CardContent>
       </Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{allItems.length} {label.toLowerCase()}{allItems.length === 1 ? '' : 's'}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
+            <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
       <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="max-w-sm">
           <DialogTitle>{editing ? `Edit ${label}` : `Add ${label}`}</DialogTitle>
@@ -1173,63 +1202,6 @@ function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{
 const COA_TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'] as const
 type CoaType = (typeof COA_TYPES)[number]
 
-const COA_HIERARCHY: Record<string, Record<string, Record<string, string[]>>> = {
-  Asset: {
-    'Current Asset': {
-      'Cash & Cash Equivalents': ['Cash'],
-      'Receivables': ['Trade', 'Non-Trade'],
-      'Inventories': ['Merchandise', 'Raw Materials', 'WIP', 'Finished Goods', 'Supplies'],
-      'Prepayments': [],
-      'Tax Credits': [],
-    },
-    'Non-Current Asset': {
-      'Property Plant & Equipment': ['Land', 'Building', 'Machinery', 'Office', 'Furniture', 'Transportation'],
-      'Other Non-Current': ['Leasehold'],
-    },
-  },
-  Liability: {
-    'Current Liability': {
-      'Trade Payables': [],
-      'Accrued Liabilities': [],
-      'Government Payables': ['SSS', 'PhilHealth', 'Pag-IBIG', 'BIR'],
-      'Short-Term Borrowings': [],
-    },
-    'Non-Current Liability': {
-      'Long-Term Borrowings': [],
-    },
-  },
-  Equity: {
-    'Owners Equity': {
-      'Share Capital': [],
-      'Retained Earnings': [],
-      'Other': [],
-    },
-  },
-  Revenue: {
-    'Operating Revenue': {
-      'Sales': [],
-      'Service': [],
-    },
-    'Non-Operating Revenue': {
-      'Other Income': [],
-    },
-  },
-  Expense: {
-    'Cost of Sales': {
-      'Direct Costs': [],
-      'Manufacturing Overhead': [],
-    },
-    'Operating Expense': {
-      'Personnel': ['Compensation', 'Benefits'],
-      'General & Admin': ['Office', 'Communication', 'Facilities', 'Travel', 'Professional', 'Training', 'Financial', 'Government', 'Other'],
-      'Selling': ['Marketing'],
-      'Non-Cash': ['Depreciation', 'Amortization', 'Provision'],
-    },
-    'Non-Operating Expense': {
-      'Losses': [],
-    },
-  },
-}
 
 type GlAccount = {
   id: string
@@ -1248,6 +1220,7 @@ function ChartOfAccountsConfig() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [search, setSearch] = useState('')
+  const [coaPage, setCoaPage] = useState(1)
   const [typeFilter, setTypeFilter] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<GlAccount | null>(null)
@@ -1270,8 +1243,33 @@ function ChartOfAccountsConfig() {
     },
   })
 
+  // Fetch all accounts for dynamic hierarchy
+  const { data: allAccountsRes } = useQuery({
+    queryKey: ['gl-accounts-all'],
+    queryFn: async () => (await api.get<{ data: GlAccount[] }>('/gl-accounts?limit=1000')).data,
+  })
+  const allAccountsForHierarchy = allAccountsRes?.data ?? []
+
+  // Build dynamic hierarchy from existing data
+  const dynamicHierarchy: Record<string, Record<string, Record<string, string[]>>> = {}
+  for (const acct of allAccountsForHierarchy) {
+    const type = acct.accountType || acct.type || ''
+    const cls = acct.classification || ''
+    const cat = acct.category || ''
+    const sub = acct.subCategory || ''
+    if (!type) continue
+    if (!dynamicHierarchy[type]) dynamicHierarchy[type] = {}
+    if (!dynamicHierarchy[type][cls]) dynamicHierarchy[type][cls] = {}
+    if (!dynamicHierarchy[type][cls][cat]) dynamicHierarchy[type][cls][cat] = []
+    if (sub && !dynamicHierarchy[type][cls][cat].includes(sub)) {
+      dynamicHierarchy[type][cls][cat].push(sub)
+    }
+  }
+
   const allAccounts = response?.data ?? []
-  const filtered = typeFilter ? allAccounts.filter((a) => (a.accountType || a.type) === typeFilter) : allAccounts
+  const allFiltered = typeFilter ? allAccounts.filter((a) => (a.accountType || a.type) === typeFilter) : allAccounts
+  const coaTotalPages = Math.ceil(allFiltered.length / CONFIG_PAGE_SIZE);
+  const filtered = allFiltered.slice((coaPage - 1) * CONFIG_PAGE_SIZE, coaPage * CONFIG_PAGE_SIZE)
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post('/gl-accounts', data),
@@ -1411,6 +1409,17 @@ function ChartOfAccountsConfig() {
         </CardContent>
       </Card>
 
+      {coaTotalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{allFiltered.length} account{allFiltered.length === 1 ? '' : 's'}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={coaPage <= 1} onClick={() => setCoaPage(coaPage - 1)}>Prev</Button>
+            <span className="text-xs text-muted-foreground px-2">{coaPage} / {coaTotalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={coaPage >= coaTotalPages} onClick={() => setCoaPage(coaPage + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+
       {/* Add/Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="max-w-md">
@@ -1418,9 +1427,10 @@ function ChartOfAccountsConfig() {
           <DialogDescription>{editing ? 'Update GL account details.' : 'Create a new GL account.'}</DialogDescription>
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
             {(() => {
-              const classifications = formData.type ? Object.keys(COA_HIERARCHY[formData.type] || {}) : [];
-              const categories = formData.type && formData.classification ? Object.keys(COA_HIERARCHY[formData.type]?.[formData.classification] || {}) : [];
-              const subCategories = formData.type && formData.classification && formData.category ? (COA_HIERARCHY[formData.type]?.[formData.classification]?.[formData.category] || []) : [];
+              const hierarchy = dynamicHierarchy;
+              const classifications = formData.type ? Object.keys(hierarchy[formData.type] || {}) : [];
+              const categories = formData.type && formData.classification ? Object.keys(hierarchy[formData.type]?.[formData.classification] || {}) : [];
+              const subCategories = formData.type && formData.classification && formData.category ? (hierarchy[formData.type]?.[formData.classification]?.[formData.category] || []) : [];
               const selectClass = "w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
               return (
                 <>
@@ -1434,28 +1444,28 @@ function ChartOfAccountsConfig() {
                   {formData.type && (
                     <div className="space-y-1.5">
                       <Label className="text-sm">Classification <span className="text-red-500">*</span></Label>
-                      <select value={formData.classification} onChange={(e) => setFormData({ ...formData, classification: e.target.value, category: '', subCategory: '' })} required className={selectClass}>
-                        <option value="">Select classification...</option>
-                        {classifications.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                      <Input list="coa-classifications" value={formData.classification} onChange={(e) => setFormData({ ...formData, classification: e.target.value, category: '', subCategory: '' })} required placeholder="Select or type new..." />
+                      <datalist id="coa-classifications">
+                        {classifications.map((c) => <option key={c} value={c} />)}
+                      </datalist>
                     </div>
                   )}
                   {formData.classification && (
                     <div className="space-y-1.5">
                       <Label className="text-sm">Category <span className="text-red-500">*</span></Label>
-                      <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: '' })} required className={selectClass}>
-                        <option value="">Select category...</option>
-                        {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                      <Input list="coa-categories" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: '' })} required placeholder="Select or type new..." />
+                      <datalist id="coa-categories">
+                        {categories.map((c) => <option key={c} value={c} />)}
+                      </datalist>
                     </div>
                   )}
-                  {formData.category && subCategories.length > 0 && (
+                  {formData.category && (
                     <div className="space-y-1.5">
                       <Label className="text-sm">Sub Category</Label>
-                      <select value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} className={selectClass}>
-                        <option value="">None</option>
-                        {subCategories.map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                      <Input list="coa-subcategories" value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} placeholder="Select or type new..." />
+                      <datalist id="coa-subcategories">
+                        {subCategories.map((s) => <option key={s} value={s} />)}
+                      </datalist>
                     </div>
                   )}
                   {formData.category && (
@@ -1505,12 +1515,13 @@ function ChartOfAccountsConfig() {
 export default function SettingsPage() {
   const { user } = useAuthStore()
   const { theme } = useTheme()
+
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage application preferences and configuration" />
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0 flex-wrap">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0 overflow-x-auto overflow-y-hidden whitespace-nowrap">
           <TabsTrigger value="general" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">General</TabsTrigger>
           <TabsTrigger value="company" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Company</TabsTrigger>
           <TabsTrigger value="departments" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Departments</TabsTrigger>
