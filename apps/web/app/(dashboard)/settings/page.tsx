@@ -1202,7 +1202,6 @@ function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{
 const COA_TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'] as const
 type CoaType = (typeof COA_TYPES)[number]
 
-
 type GlAccount = {
   id: string
   code: string
@@ -1216,7 +1215,485 @@ type GlAccount = {
   isActive: boolean
 }
 
-function ChartOfAccountsConfig() {
+type CoaClassification = {
+  id: string
+  name: string
+  accountType: string
+  isActive: boolean
+}
+
+type CoaCategory = {
+  id: string
+  name: string
+  classificationId: string
+  classification: { id: string; name: string; accountType: string }
+  isActive: boolean
+}
+
+type CoaSubCategory = {
+  id: string
+  name: string
+  categoryId: string
+  category: { id: string; name: string; classification: { id: string; name: string; accountType: string } }
+  isActive: boolean
+}
+
+// ── CoA: Classifications sub-section ────────────────────────
+
+function CoaClassificationsSection() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<CoaClassification | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<CoaClassification | null>(null)
+  const [formData, setFormData] = useState({ accountType: '' as CoaType | '', name: '' })
+
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['coa-classifications', search],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '1000' })
+      if (search) params.set('search', search)
+      return (await api.get<{ data: CoaClassification[] }>(`/coa/classifications?${params}`)).data
+    },
+  })
+
+  const allItems = response?.data ?? []
+  const filtered = search ? allItems.filter((i) => i.name.toLowerCase().includes(search.toLowerCase())) : allItems
+  const totalPages = Math.ceil(filtered.length / CONFIG_PAGE_SIZE)
+  const items = filtered.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE)
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/coa/classifications', data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-classifications'] }); closeModal(); toast({ title: 'Classification created' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to create classification.', variant: 'destructive' }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/coa/classifications/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-classifications'] }); closeModal(); toast({ title: 'Classification updated' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to update classification.', variant: 'destructive' }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/coa/classifications/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-classifications'] }); setDeleteTarget(null); toast({ title: 'Classification deleted' }) },
+    onError: () => toast({ title: 'Error', description: 'Failed to delete. It may have linked categories.', variant: 'destructive' }),
+  })
+
+  function openAdd() { setFormData({ accountType: '', name: '' }); setEditing(null); setModalOpen(true) }
+  function openEdit(item: CoaClassification) { setFormData({ accountType: item.accountType as CoaType, name: item.name }); setEditing(item); setModalOpen(true) }
+  function closeModal() { setModalOpen(false); setEditing(null) }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const payload = { accountType: formData.accountType, name: formData.name }
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+  const selectClass = 'w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring'
+
+  function renderContent() {
+    if (isLoading) {
+      return <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+    }
+    if (items.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No classifications found.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Account Type</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-medium">{item.name}</td>
+              <td className="px-4 py-2.5">
+                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">{item.accountType}</span>
+              </td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">{item.isActive ? 'Active' : 'Inactive'}</Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button type="button" onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Input placeholder="Search classifications..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs h-9" />
+        <Button size="sm" onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+          <Plus className="h-4 w-4 mr-1" /> Add Classification
+        </Button>
+      </div>
+      <Card><CardContent className="p-0">{renderContent()}</CardContent></Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{filtered.length} classification{filtered.length === 1 ? '' : 's'}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
+            <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>{editing ? 'Edit Classification' : 'Add Classification'}</DialogTitle>
+          <DialogDescription>{editing ? 'Update classification details.' : 'Create a new COA classification.'}</DialogDescription>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Account Type <span className="text-red-500">*</span></Label>
+              <select value={formData.accountType} onChange={(e) => setFormData({ ...formData, accountType: e.target.value as CoaType })} required className={selectClass}>
+                <option value="">Select type...</option>
+                {COA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Current Assets" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
+              <Button type="submit" disabled={!formData.accountType || !formData.name || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editing ? 'Save' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Delete Classification" description={`Delete "${deleteTarget?.name}"? This cannot be undone.`} confirmLabel="Delete" variant="destructive" onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)} isLoading={deleteMutation.isPending} />
+    </div>
+  )
+}
+
+// ── CoA: Categories sub-section ──────────────────────────────
+
+function CoaCategoriesSection() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<CoaCategory | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<CoaCategory | null>(null)
+  const [formData, setFormData] = useState({ classificationId: '', name: '' })
+
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['coa-categories'],
+    queryFn: async () => (await api.get<{ data: CoaCategory[] }>('/coa/categories?limit=1000')).data,
+  })
+
+  const { data: classRes } = useQuery({
+    queryKey: ['coa-classifications'],
+    queryFn: async () => (await api.get<{ data: CoaClassification[] }>('/coa/classifications?limit=1000')).data,
+  })
+
+  const allItems = response?.data ?? []
+  const classOptions = (classRes?.data ?? []).map((c) => ({ value: c.id, label: `${c.name} (${c.accountType})` }))
+  const filtered = search ? allItems.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()) || i.classification.name.toLowerCase().includes(search.toLowerCase())) : allItems
+  const totalPages = Math.ceil(filtered.length / CONFIG_PAGE_SIZE)
+  const items = filtered.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE)
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/coa/categories', data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-categories'] }); closeModal(); toast({ title: 'Category created' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to create category.', variant: 'destructive' }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/coa/categories/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-categories'] }); closeModal(); toast({ title: 'Category updated' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to update category.', variant: 'destructive' }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/coa/categories/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-categories'] }); setDeleteTarget(null); toast({ title: 'Category deleted' }) },
+    onError: () => toast({ title: 'Error', description: 'Failed to delete. It may have linked sub-categories.', variant: 'destructive' }),
+  })
+
+  function openAdd() { setFormData({ classificationId: '', name: '' }); setEditing(null); setModalOpen(true) }
+  function openEdit(item: CoaCategory) { setFormData({ classificationId: item.classificationId, name: item.name }); setEditing(item); setModalOpen(true) }
+  function closeModal() { setModalOpen(false); setEditing(null) }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const payload = { classificationId: formData.classificationId, name: formData.name }
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function renderContent() {
+    if (isLoading) {
+      return <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+    }
+    if (items.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No categories found.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Classification</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Type</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-medium">{item.name}</td>
+              <td className="px-4 py-2.5 text-muted-foreground text-xs">{item.classification.name}</td>
+              <td className="px-4 py-2.5">
+                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary/10 text-primary">{item.classification.accountType}</span>
+              </td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">{item.isActive ? 'Active' : 'Inactive'}</Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button type="button" onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Input placeholder="Search categories..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs h-9" />
+        <Button size="sm" onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+          <Plus className="h-4 w-4 mr-1" /> Add Category
+        </Button>
+      </div>
+      <Card><CardContent className="p-0">{renderContent()}</CardContent></Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{filtered.length} categor{filtered.length === 1 ? 'y' : 'ies'}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
+            <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>{editing ? 'Edit Category' : 'Add Category'}</DialogTitle>
+          <DialogDescription>{editing ? 'Update category details.' : 'Create a new COA category.'}</DialogDescription>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Classification <span className="text-red-500">*</span></Label>
+              <SearchableSelect options={classOptions} value={formData.classificationId} onChange={(val) => setFormData({ ...formData, classificationId: val })} placeholder="Select classification..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Cash & Cash Equivalents" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
+              <Button type="submit" disabled={!formData.classificationId || !formData.name || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editing ? 'Save' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Delete Category" description={`Delete "${deleteTarget?.name}"? This cannot be undone.`} confirmLabel="Delete" variant="destructive" onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)} isLoading={deleteMutation.isPending} />
+    </div>
+  )
+}
+
+// ── CoA: Sub-Categories sub-section ─────────────────────────
+
+function CoaSubCategoriesSection() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<CoaSubCategory | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<CoaSubCategory | null>(null)
+  const [formData, setFormData] = useState({ categoryId: '', name: '' })
+
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['coa-sub-categories'],
+    queryFn: async () => (await api.get<{ data: CoaSubCategory[] }>('/coa/sub-categories?limit=1000')).data,
+  })
+
+  const { data: catRes } = useQuery({
+    queryKey: ['coa-categories'],
+    queryFn: async () => (await api.get<{ data: CoaCategory[] }>('/coa/categories?limit=1000')).data,
+  })
+
+  const allItems = response?.data ?? []
+  const catOptions = (catRes?.data ?? []).map((c) => ({ value: c.id, label: `${c.name} — ${c.classification.name}` }))
+  const filtered = search
+    ? allItems.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()) || i.category.name.toLowerCase().includes(search.toLowerCase()))
+    : allItems
+  const totalPages = Math.ceil(filtered.length / CONFIG_PAGE_SIZE)
+  const items = filtered.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE)
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/coa/sub-categories', data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-sub-categories'] }); closeModal(); toast({ title: 'Sub-category created' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to create sub-category.', variant: 'destructive' }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/coa/sub-categories/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-sub-categories'] }); closeModal(); toast({ title: 'Sub-category updated' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to update sub-category.', variant: 'destructive' }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/coa/sub-categories/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['coa-sub-categories'] }); setDeleteTarget(null); toast({ title: 'Sub-category deleted' }) },
+    onError: () => toast({ title: 'Error', description: 'Failed to delete sub-category.', variant: 'destructive' }),
+  })
+
+  function openAdd() { setFormData({ categoryId: '', name: '' }); setEditing(null); setModalOpen(true) }
+  function openEdit(item: CoaSubCategory) { setFormData({ categoryId: item.categoryId, name: item.name }); setEditing(item); setModalOpen(true) }
+  function closeModal() { setModalOpen(false); setEditing(null) }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const payload = { categoryId: formData.categoryId, name: formData.name }
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function renderContent() {
+    if (isLoading) {
+      return <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+    }
+    if (items.length === 0) {
+      return <div className="text-center py-8 text-sm text-muted-foreground">No sub-categories found.</div>
+    }
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Category</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Classification</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-medium">{item.name}</td>
+              <td className="px-4 py-2.5 text-muted-foreground text-xs">{item.category.name}</td>
+              <td className="px-4 py-2.5 text-muted-foreground text-xs">{item.category.classification.name}</td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">{item.isActive ? 'Active' : 'Inactive'}</Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button type="button" onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Input placeholder="Search sub-categories..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="max-w-xs h-9" />
+        <Button size="sm" onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+          <Plus className="h-4 w-4 mr-1" /> Add Sub Category
+        </Button>
+      </div>
+      <Card><CardContent className="p-0">{renderContent()}</CardContent></Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{filtered.length} sub-categor{filtered.length === 1 ? 'y' : 'ies'}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
+            <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>{editing ? 'Edit Sub Category' : 'Add Sub Category'}</DialogTitle>
+          <DialogDescription>{editing ? 'Update sub-category details.' : 'Create a new COA sub-category.'}</DialogDescription>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Category <span className="text-red-500">*</span></Label>
+              <SearchableSelect options={catOptions} value={formData.categoryId} onChange={(val) => setFormData({ ...formData, categoryId: val })} placeholder="Select category..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Petty Cash" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
+              <Button type="submit" disabled={!formData.categoryId || !formData.name || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editing ? 'Save' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Delete Sub Category" description={`Delete "${deleteTarget?.name}"? This cannot be undone.`} confirmLabel="Delete" variant="destructive" onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)} isLoading={deleteMutation.isPending} />
+    </div>
+  )
+}
+
+// ── CoA: Accounts sub-section ────────────────────────────────
+
+type CoaSubTab = 'accounts' | 'classifications' | 'categories' | 'sub-categories'
+
+const COA_SUB_TABS: { key: CoaSubTab; label: string }[] = [
+  { key: 'accounts', label: 'Accounts' },
+  { key: 'classifications', label: 'Classifications' },
+  { key: 'categories', label: 'Categories' },
+  { key: 'sub-categories', label: 'Sub Categories' },
+]
+
+function CoaAccountsSection() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [search, setSearch] = useState('')
@@ -1227,9 +1704,9 @@ function ChartOfAccountsConfig() {
   const [deleteTarget, setDeleteTarget] = useState<GlAccount | null>(null)
   const [formData, setFormData] = useState({
     type: '' as CoaType | '',
-    classification: '',
-    category: '',
-    subCategory: '',
+    classificationId: '',
+    categoryId: '',
+    subCategoryId: '',
     name: '',
     code: '',
   })
@@ -1237,38 +1714,52 @@ function ChartOfAccountsConfig() {
   const { data: response, isLoading } = useQuery({
     queryKey: ['gl-accounts-config', search],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: '100' })
+      const params = new URLSearchParams({ limit: '1000' })
       if (search) params.set('search', search)
       return (await api.get<{ data: GlAccount[] }>(`/gl-accounts?${params}`)).data
     },
   })
 
-  // Fetch all accounts for dynamic hierarchy
-  const { data: allAccountsRes } = useQuery({
-    queryKey: ['gl-accounts-all'],
-    queryFn: async () => (await api.get<{ data: GlAccount[] }>('/gl-accounts?limit=1000')).data,
+  // Cascading: fetch classifications filtered by type
+  const { data: classRes } = useQuery({
+    queryKey: ['coa-classifications-for-account', formData.type],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '1000' })
+      if (formData.type) params.set('accountType', formData.type)
+      return (await api.get<{ data: CoaClassification[] }>(`/coa/classifications?${params}`)).data
+    },
+    enabled: !!formData.type,
   })
-  const allAccountsForHierarchy = allAccountsRes?.data ?? []
 
-  // Build dynamic hierarchy from existing data
-  const dynamicHierarchy: Record<string, Record<string, Record<string, string[]>>> = {}
-  for (const acct of allAccountsForHierarchy) {
-    const type = acct.accountType || acct.type || ''
-    const cls = acct.classification || ''
-    const cat = acct.category || ''
-    const sub = acct.subCategory || ''
-    if (!type) continue
-    if (!dynamicHierarchy[type]) dynamicHierarchy[type] = {}
-    if (!dynamicHierarchy[type][cls]) dynamicHierarchy[type][cls] = {}
-    if (!dynamicHierarchy[type][cls][cat]) dynamicHierarchy[type][cls][cat] = []
-    if (sub && !dynamicHierarchy[type][cls][cat].includes(sub)) {
-      dynamicHierarchy[type][cls][cat].push(sub)
-    }
-  }
+  // Cascading: fetch categories filtered by classificationId
+  const { data: catRes } = useQuery({
+    queryKey: ['coa-categories-for-account', formData.classificationId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '1000' })
+      if (formData.classificationId) params.set('classificationId', formData.classificationId)
+      return (await api.get<{ data: CoaCategory[] }>(`/coa/categories?${params}`)).data
+    },
+    enabled: !!formData.classificationId,
+  })
+
+  // Cascading: fetch sub-categories filtered by categoryId
+  const { data: subCatRes } = useQuery({
+    queryKey: ['coa-sub-categories-for-account', formData.categoryId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '1000' })
+      if (formData.categoryId) params.set('categoryId', formData.categoryId)
+      return (await api.get<{ data: CoaSubCategory[] }>(`/coa/sub-categories?${params}`)).data
+    },
+    enabled: !!formData.categoryId,
+  })
+
+  const classOptions = (classRes?.data ?? []).map((c) => ({ value: c.id, label: c.name }))
+  const catOptions = (catRes?.data ?? []).map((c) => ({ value: c.id, label: c.name }))
+  const subCatOptions = (subCatRes?.data ?? []).map((s) => ({ value: s.id, label: s.name }))
 
   const allAccounts = response?.data ?? []
   const allFiltered = typeFilter ? allAccounts.filter((a) => (a.accountType || a.type) === typeFilter) : allAccounts
-  const coaTotalPages = Math.ceil(allFiltered.length / CONFIG_PAGE_SIZE);
+  const coaTotalPages = Math.ceil(allFiltered.length / CONFIG_PAGE_SIZE)
   const filtered = allFiltered.slice((coaPage - 1) * CONFIG_PAGE_SIZE, coaPage * CONFIG_PAGE_SIZE)
 
   const createMutation = useMutation({
@@ -1290,7 +1781,7 @@ function ChartOfAccountsConfig() {
   })
 
   function openAdd() {
-    setFormData({ type: '', classification: '', category: '', subCategory: '', name: '', code: '' })
+    setFormData({ type: '', classificationId: '', categoryId: '', subCategoryId: '', name: '', code: '' })
     setEditing(null)
     setModalOpen(true)
   }
@@ -1298,9 +1789,9 @@ function ChartOfAccountsConfig() {
   function openEdit(account: GlAccount) {
     setFormData({
       type: (account.type || account.accountType) as CoaType,
-      classification: account.classification,
-      category: account.category,
-      subCategory: account.subCategory || '',
+      classificationId: account.classification,
+      categoryId: account.category,
+      subCategoryId: account.subCategory || '',
       name: account.title || account.name,
       code: account.code,
     })
@@ -1314,9 +1805,9 @@ function ChartOfAccountsConfig() {
     e.preventDefault()
     const payload = {
       accountType: formData.type,
-      classification: formData.classification,
-      category: formData.category,
-      subCategory: formData.subCategory || null,
+      classificationId: formData.classificationId || null,
+      categoryId: formData.categoryId || null,
+      subCategoryId: formData.subCategoryId || null,
       title: formData.name,
       code: formData.code,
     }
@@ -1325,7 +1816,8 @@ function ChartOfAccountsConfig() {
   }
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending
-  const canSubmit = !!formData.type && !!formData.classification && !!formData.category && !!formData.name && !!formData.code
+  const canSubmit = !!formData.type && !!formData.classificationId && !!formData.categoryId && !!formData.name && !!formData.code
+  const selectClass = 'w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring'
 
   function renderCoaContent() {
     if (isLoading) {
@@ -1360,18 +1852,12 @@ function ChartOfAccountsConfig() {
               <td className="px-4 py-2.5 text-muted-foreground text-xs">{account.category}</td>
               <td className="px-4 py-2.5 text-muted-foreground text-xs">{account.subCategory || '—'}</td>
               <td className="px-4 py-2.5 text-center">
-                <Badge variant={account.isActive ? 'default' : 'secondary'} className="text-[10px]">
-                  {account.isActive ? 'Active' : 'Inactive'}
-                </Badge>
+                <Badge variant={account.isActive ? 'default' : 'secondary'} className="text-[10px]">{account.isActive ? 'Active' : 'Inactive'}</Badge>
               </td>
               <td className="px-4 py-2.5">
                 <div className="flex items-center gap-0.5 justify-end">
-                  <button onClick={() => openEdit(account)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button onClick={() => setDeleteTarget(account)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  <button type="button" onClick={() => openEdit(account)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => setDeleteTarget(account)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
               </td>
             </tr>
@@ -1384,17 +1870,8 @@ function ChartOfAccountsConfig() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <Input
-          placeholder="Search accounts..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs h-9"
-        />
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        >
+        <Input placeholder="Search accounts..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs h-9" />
+        <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
           <option value="">All Types</option>
           {COA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
@@ -1402,13 +1879,7 @@ function ChartOfAccountsConfig() {
           <Plus className="h-4 w-4 mr-1" /> Add Account
         </Button>
       </div>
-
-      <Card>
-        <CardContent className="p-0 overflow-x-auto">
-          {renderCoaContent()}
-        </CardContent>
-      </Card>
-
+      <Card><CardContent className="p-0 overflow-x-auto">{renderCoaContent()}</CardContent></Card>
       {coaTotalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">{allFiltered.length} account{allFiltered.length === 1 ? '' : 's'}</p>
@@ -1419,70 +1890,48 @@ function ChartOfAccountsConfig() {
           </div>
         </div>
       )}
-
-      {/* Add/Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
         <DialogContent className="max-w-md">
           <DialogTitle>{editing ? 'Edit Account' : 'Add Account'}</DialogTitle>
           <DialogDescription>{editing ? 'Update GL account details.' : 'Create a new GL account.'}</DialogDescription>
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-            {(() => {
-              const hierarchy = dynamicHierarchy;
-              const classifications = formData.type ? Object.keys(hierarchy[formData.type] || {}) : [];
-              const categories = formData.type && formData.classification ? Object.keys(hierarchy[formData.type]?.[formData.classification] || {}) : [];
-              const subCategories = formData.type && formData.classification && formData.category ? (hierarchy[formData.type]?.[formData.classification]?.[formData.category] || []) : [];
-              const selectClass = "w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring";
-              return (
-                <>
-                  <div className="space-y-1.5">
-                    <Label className="text-sm">Account Type <span className="text-red-500">*</span></Label>
-                    <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as CoaType, classification: '', category: '', subCategory: '' })} required className={selectClass}>
-                      <option value="">Select type...</option>
-                      {COA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  {formData.type && (
-                    <div className="space-y-1.5">
-                      <Label className="text-sm">Classification <span className="text-red-500">*</span></Label>
-                      <Input list="coa-classifications" value={formData.classification} onChange={(e) => setFormData({ ...formData, classification: e.target.value, category: '', subCategory: '' })} required placeholder="Select or type new..." />
-                      <datalist id="coa-classifications">
-                        {classifications.map((c) => <option key={c} value={c} />)}
-                      </datalist>
-                    </div>
-                  )}
-                  {formData.classification && (
-                    <div className="space-y-1.5">
-                      <Label className="text-sm">Category <span className="text-red-500">*</span></Label>
-                      <Input list="coa-categories" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value, subCategory: '' })} required placeholder="Select or type new..." />
-                      <datalist id="coa-categories">
-                        {categories.map((c) => <option key={c} value={c} />)}
-                      </datalist>
-                    </div>
-                  )}
-                  {formData.category && (
-                    <div className="space-y-1.5">
-                      <Label className="text-sm">Sub Category</Label>
-                      <Input list="coa-subcategories" value={formData.subCategory} onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })} placeholder="Select or type new..." />
-                      <datalist id="coa-subcategories">
-                        {subCategories.map((s) => <option key={s} value={s} />)}
-                      </datalist>
-                    </div>
-                  )}
-                  {formData.category && (
-                    <>
-                      <div className="space-y-1.5">
-                        <Label className="text-sm">Account Title <span className="text-red-500">*</span></Label>
-                        <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Cash on Hand" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-sm">Account Code <span className="text-red-500">*</span></Label>
-                        <Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required placeholder="e.g., 1010" />
-                      </div>
-                    </>
-                  )}
-                </>
-              );
-            })()}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Account Type <span className="text-red-500">*</span></Label>
+              <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as CoaType, classificationId: '', categoryId: '', subCategoryId: '' })} required className={selectClass}>
+                <option value="">Select type...</option>
+                {COA_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            {formData.type && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Classification <span className="text-red-500">*</span></Label>
+                <SearchableSelect options={classOptions} value={formData.classificationId} onChange={(val) => setFormData({ ...formData, classificationId: val, categoryId: '', subCategoryId: '' })} placeholder="Select classification..." />
+              </div>
+            )}
+            {formData.classificationId && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Category <span className="text-red-500">*</span></Label>
+                <SearchableSelect options={catOptions} value={formData.categoryId} onChange={(val) => setFormData({ ...formData, categoryId: val, subCategoryId: '' })} placeholder="Select category..." />
+              </div>
+            )}
+            {formData.categoryId && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Sub Category</Label>
+                <SearchableSelect options={subCatOptions} value={formData.subCategoryId} onChange={(val) => setFormData({ ...formData, subCategoryId: val })} placeholder="None" />
+              </div>
+            )}
+            {formData.categoryId && (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Account Title <span className="text-red-500">*</span></Label>
+                  <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Cash on Hand" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Account Code <span className="text-red-500">*</span></Label>
+                  <Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required placeholder="e.g., 1010" />
+                </div>
+              </>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
               <Button type="submit" disabled={!canSubmit || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
@@ -1493,7 +1942,6 @@ function ChartOfAccountsConfig() {
           </form>
         </DialogContent>
       </Dialog>
-
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
@@ -1504,6 +1952,41 @@ function ChartOfAccountsConfig() {
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         isLoading={deleteMutation.isPending}
       />
+    </div>
+  )
+}
+
+// ── ChartOfAccountsConfig: outer wrapper with sub-tabs ───────
+
+function ChartOfAccountsConfig() {
+  const [activeSubTab, setActiveSubTab] = useState<CoaSubTab>('accounts')
+
+  return (
+    <div className="space-y-5">
+      {/* Sub-tab pill selector */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {COA_SUB_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveSubTab(tab.key)}
+            className={cn(
+              'px-4 py-1.5 rounded-full text-sm font-medium transition-colors',
+              activeSubTab === tab.key
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tab content */}
+      {activeSubTab === 'accounts' && <CoaAccountsSection />}
+      {activeSubTab === 'classifications' && <CoaClassificationsSection />}
+      {activeSubTab === 'categories' && <CoaCategoriesSection />}
+      {activeSubTab === 'sub-categories' && <CoaSubCategoriesSection />}
     </div>
   )
 }

@@ -172,6 +172,9 @@ model Tenant {
   supplierScores     SupplierScore[]
   companies          Company[]
   glAccounts         GlAccount[]
+  coaClassifications CoaClassification[]
+  coaCategories      CoaCategory[]
+  coaSubCategories   CoaSubCategory[]
   comments           Comment[]
   manufacturers      Manufacturer[]
   origins            Origin[]
@@ -435,6 +438,52 @@ model DeliveryType {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, name])
+}
+
+model CoaClassification {
+  id          String   @id @default(cuid())
+  tenantId    String
+  accountType String
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+  categories CoaCategory[]
+
+  @@unique([tenantId, accountType, name])
+}
+
+model CoaCategory {
+  id               String   @id @default(cuid())
+  tenantId         String
+  classificationId String
+  name             String
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  classification CoaClassification  @relation(fields: [classificationId], references: [id])
+  subCategories  CoaSubCategory[]
+
+  @@unique([tenantId, classificationId, name])
+}
+
+model CoaSubCategory {
+  id         String   @id @default(cuid())
+  tenantId   String
+  categoryId String
+  name       String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id])
+  category CoaCategory @relation(fields: [categoryId], references: [id])
+
+  @@unique([tenantId, categoryId, name])
 }
 
 model GlAccount {
