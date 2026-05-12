@@ -359,7 +359,7 @@ export default function PurchaseRequestDetailPage() {
     queryKey: ['gl-accounts-active'],
     queryFn: () => api.get('/gl-accounts/active'),
   });
-  const glAccountOptions = (glAccountsRes?.data?.data || []).map((g: any) => ({ value: g.id, label: `${g.code} - ${g.name}` }));
+  const glAccountOptions = (glAccountsRes?.data?.data || []).map((g: any) => ({ value: g.id, label: `${g.code} - ${g.title || g.name}` }));
   const defaultCurrency = (currenciesRes?.data?.data || []).find((c: any) => c.isDefault)?.code || 'USD';
 
   const { data: productsRes } = useQuery({

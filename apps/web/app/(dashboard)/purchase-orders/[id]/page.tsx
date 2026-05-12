@@ -197,7 +197,7 @@ export default function PurchaseOrderDetailPage() {
     queryKey: ['gl-accounts-active'],
     queryFn: () => api.get('/gl-accounts/active'),
   });
-  const glAccountOptions = (glAccountsRes?.data?.data || []).map((g: any) => ({ value: g.id, label: `${g.code} - ${g.name}` }));
+  const glAccountOptions = (glAccountsRes?.data?.data || []).map((g: any) => ({ value: g.id, label: `${g.code} - ${g.title || g.name}` }));
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['po-detail', poId] });

@@ -30,10 +30,18 @@ export class AuditInterceptor implements NestInterceptor {
   private resolveFkName(key: string, record: any, fallback: any): any {
     const fkMap: Record<string, string> = { companyId: 'company', departmentId: 'department', vendorId: 'vendor' };
     const rel = fkMap[key];
-    return rel && record?.[rel]?.name ? record[rel].name : fallback;
+    if (rel && record?.[rel]?.name) return record[rel].name;
+    if (key === 'glAccountId' && record?.glAccount) return `${record.glAccount.code} - ${record.glAccount.title || record.glAccount.name}`;
+    return fallback;
   }
 
-  private buildDiff(oldRecord: any, bodyValues: any, responseData: any): { oldValues: any; newValues: any } | null {
+  private async resolveGlAccountName(id: string | null): Promise<string | null> {
+    if (!id) return null;
+    const acct = await this.prisma.glAccount.findUnique({ where: { id }, select: { code: true, title: true } });
+    return acct ? `${acct.code} - ${acct.title}` : id;
+  }
+
+  private async buildDiff(oldRecord: any, bodyValues: any, responseData: any): Promise<{ oldValues: any; newValues: any } | null> {
     const changedOld: any = {};
     const changedNew: any = {};
     let hasChanges = false;
@@ -47,8 +55,13 @@ export class AuditInterceptor implements NestInterceptor {
 
       if (oldStr !== newStr) {
         hasChanges = true;
-        changedOld[key] = this.resolveFkName(key, oldRecord, oldRaw);
-        changedNew[key] = this.resolveFkName(key, responseData, bodyValues[key]);
+        if (key === 'glAccountId') {
+          changedOld[key] = await this.resolveGlAccountName(oldRaw) || '—';
+          changedNew[key] = await this.resolveGlAccountName(bodyValues[key]) || '—';
+        } else {
+          changedOld[key] = this.resolveFkName(key, oldRecord, oldRaw);
+          changedNew[key] = this.resolveFkName(key, responseData, bodyValues[key]);
+        }
       }
     }
 
@@ -57,11 +70,18 @@ export class AuditInterceptor implements NestInterceptor {
 
   private async fetchOldRecord(url: string, params: any): Promise<any> {
     try {
-      // Item update: /api/purchase-requests/:id/items/:itemId
-      if (url.includes('/items/') && params?.itemId) {
+      // PR Item update: /api/purchase-requests/:id/items/:itemId
+      if (url.includes('/purchase-requests/') && url.includes('/items/') && params?.itemId) {
         return this.prisma.purchaseRequestItem.findUnique({
           where: { id: params.itemId },
           include: { product: { select: { name: true } }, vendor: { select: { name: true } } },
+        });
+      }
+      // PO Item update: /api/purchase-orders/:id/items/:itemId
+      if (url.includes('/purchase-orders/') && url.includes('/items/') && params?.itemId) {
+        return this.prisma.purchaseOrderItem.findUnique({
+          where: { id: params.itemId },
+          include: { product: { select: { name: true } } },
         });
       }
       // PR update: /api/purchase-requests/:id
@@ -134,23 +154,24 @@ export class AuditInterceptor implements NestInterceptor {
           tap((responseData) => {
             if (!user?.tenantId) return;
 
-            const itemName = responseData?.product?.name || responseData?.description || oldRecord?.product?.name || null;
-            let logOldValues: any = null;
-            let logNewValues: any = { __url: url };
-            if (itemName) logNewValues.__itemName = itemName;
+            (async () => {
+              const itemName = responseData?.product?.name || responseData?.description || oldRecord?.product?.name || null;
+              let logOldValues: any = null;
+              let logNewValues: any = { __url: url };
+              if (itemName) logNewValues.__itemName = itemName;
 
-            if (oldRecord && bodyValues) {
-              const diff = this.buildDiff(oldRecord, bodyValues, responseData);
-              if (!diff) return; // Skip if nothing changed
-              logOldValues = diff.oldValues;
-              logNewValues = { ...logNewValues, ...diff.newValues };
-            } else if (bodyValues) {
-              logNewValues = { ...logNewValues, ...bodyValues };
-            }
+              if (oldRecord && bodyValues) {
+                const diff = await this.buildDiff(oldRecord, bodyValues, responseData);
+                if (!diff) return;
+                logOldValues = diff.oldValues;
+                logNewValues = { ...logNewValues, ...diff.newValues };
+              } else if (bodyValues) {
+                logNewValues = { ...logNewValues, ...bodyValues };
+              }
 
-            this.auditService
-              .log({ tenantId: user.tenantId, userId: user.id, action, entityType, entityId, oldValues: logOldValues, newValues: logNewValues, ipAddress, userAgent })
-              .catch(() => {});
+              await this.auditService
+                .log({ tenantId: user.tenantId, userId: user.id, action, entityType, entityId, oldValues: logOldValues, newValues: logNewValues, ipAddress, userAgent });
+            })().catch(() => {});
           }),
         ),
       ),

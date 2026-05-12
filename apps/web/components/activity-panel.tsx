@@ -26,6 +26,7 @@ const fieldLabels: Record<string, string> = {
   title: 'Title', description: 'Description', companyId: 'Company', departmentId: 'Department',
   priority: 'Priority', requiredDate: 'Required Date', purchaseTerms: 'Purchase Terms',
   deliveryTerms: 'Delivery Terms', deliveryType: 'Delivery Type',
+  glAccountId: 'COA Account', debitAmount: 'Debit', creditAmount: 'Credit', accountRemarks: 'Acct Remarks',
 };
 
 function formatValue(key: string, val: any): string {
@@ -55,7 +56,7 @@ function buildChanges(log: any, fields: string[]): { field: string; from: string
 
 type ActivityResult = { icon: any; color: string; text: string; changes?: { field: string; from: string; to: string }[]; detail?: string };
 
-const ITEM_FIELDS = ['quantity', 'estimatedPrice', 'discount', 'taxable', 'taxIncluded', 'vendorId', 'notes'];
+const ITEM_FIELDS = ['quantity', 'estimatedPrice', 'discount', 'taxable', 'taxIncluded', 'vendorId', 'glAccountId', 'debitAmount', 'creditAmount', 'accountRemarks', 'notes'];
 const PR_FIELDS = ['title', 'description', 'companyId', 'departmentId', 'priority', 'requiredDate', 'purchaseTerms', 'deliveryTerms', 'deliveryType', 'notes'];
 
 function getStatusChangeDescription(log: any, lastSegment: string): ActivityResult {
