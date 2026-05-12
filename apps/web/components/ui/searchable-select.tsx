@@ -39,7 +39,8 @@ function SearchableSelect({
     return options.filter((opt) => opt.label.toLowerCase().includes(lower))
   }, [options, search])
 
-  const visibleItems = filtered.slice(0, MAX_VISIBLE)
+  const [showAll, setShowAll] = React.useState(false)
+  const visibleItems = showAll ? filtered : filtered.slice(0, MAX_VISIBLE)
   const remainingCount = filtered.length - MAX_VISIBLE
 
   const selectedLabel = React.useMemo(() => {
@@ -55,6 +56,7 @@ function SearchableSelect({
       ) {
         setOpen(false)
         setSearch("")
+        setShowAll(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -70,6 +72,7 @@ function SearchableSelect({
           if (!disabled) {
             setOpen(!open)
             setSearch("")
+            setShowAll(false)
           }
         }}
         className={cn(
@@ -97,7 +100,7 @@ function SearchableSelect({
             />
           </div>
 
-          <div className="max-h-[calc(5*2.25rem)] overflow-y-auto p-1">
+          <div className="max-h-[300px] overflow-y-auto p-1">
             {filtered.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 No results found.
@@ -112,6 +115,7 @@ function SearchableSelect({
                       onChange?.(option.value)
                       setOpen(false)
                       setSearch("")
+                      setShowAll(false)
                     }}
                     className={cn(
                       "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
@@ -126,10 +130,14 @@ function SearchableSelect({
                     <span className="truncate">{option.label}</span>
                   </button>
                 ))}
-                {remainingCount > 0 && (
-                  <div className="py-1.5 px-2 text-xs text-muted-foreground text-center">
-                    ({remainingCount} more...)
-                  </div>
+                {remainingCount > 0 && !showAll && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAll(true)}
+                    className="w-full py-1.5 px-2 text-xs text-primary font-medium text-center hover:bg-accent rounded-sm"
+                  >
+                    Show {remainingCount} more...
+                  </button>
                 )}
               </>
             )}
