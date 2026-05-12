@@ -318,7 +318,7 @@ function SimpleConfigTable({ endpoint, label, hasCode }: Readonly<{ endpoint: st
     },
   })
 
-  const allItems = response?.data ?? []
+  const allItems: any[] = Array.isArray(response) ? response : (response?.data ?? [])
   const totalPages = Math.ceil(allItems.length / CONFIG_PAGE_SIZE);
   const items = allItems.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE);
 
@@ -1067,7 +1067,7 @@ function ConfigTableWithDesc({ endpoint, label, showDefault = true }: Readonly<{
       return (await api.get<{ data: ConfigWithDescItem[] }>(`/${endpoint}?${params}`)).data
     },
   })
-  const allItems = response?.data ?? []
+  const allItems: any[] = Array.isArray(response) ? response : (response?.data ?? [])
   const totalPages = Math.ceil(allItems.length / CONFIG_PAGE_SIZE);
   const items = allItems.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE);
 
@@ -1255,11 +1255,11 @@ function CoaClassificationsSection() {
     queryFn: async () => {
       const params = new URLSearchParams({ limit: '1000' })
       if (search) params.set('search', search)
-      return (await api.get<{ data: CoaClassification[] }>(`/coa/classifications?${params}`)).data
+      return (await api.get(`/coa/classifications?${params}`)).data
     },
   })
 
-  const allItems = response?.data ?? []
+  const allItems: any[] = Array.isArray(response) ? response : (response?.data ?? [])
   const filtered = search ? allItems.filter((i) => i.name.toLowerCase().includes(search.toLowerCase())) : allItems
   const totalPages = Math.ceil(filtered.length / CONFIG_PAGE_SIZE)
   const items = filtered.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE)
@@ -1400,16 +1400,16 @@ function CoaCategoriesSection() {
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['coa-categories'],
-    queryFn: async () => (await api.get<{ data: CoaCategory[] }>('/coa/categories?limit=1000')).data,
+    queryFn: async () => { const r = (await api.get('/coa/categories?limit=1000')).data; return Array.isArray(r) ? r : (r?.data ?? []); },
   })
 
   const { data: classRes } = useQuery({
     queryKey: ['coa-classifications'],
-    queryFn: async () => (await api.get<{ data: CoaClassification[] }>('/coa/classifications?limit=1000')).data,
+    queryFn: async () => (await api.get('/coa/classifications?limit=1000')).data,
   })
 
-  const allItems = response?.data ?? []
-  const classOptions = (classRes?.data ?? []).map((c) => ({ value: c.id, label: `${c.name} (${c.accountType})` }))
+  const allItems: any[] = Array.isArray(response) ? response : (response?.data ?? [])
+  const classOptions = (Array.isArray(classRes) ? classRes : classRes?.data ?? []).map((c: any) => ({ value: c.id, label: `${c.name} (${c.accountType})` }))
   const filtered = search ? allItems.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()) || i.classification.name.toLowerCase().includes(search.toLowerCase())) : allItems
   const totalPages = Math.ceil(filtered.length / CONFIG_PAGE_SIZE)
   const items = filtered.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE)
@@ -1548,16 +1548,16 @@ function CoaSubCategoriesSection() {
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['coa-sub-categories'],
-    queryFn: async () => (await api.get<{ data: CoaSubCategory[] }>('/coa/sub-categories?limit=1000')).data,
+    queryFn: async () => (await api.get('/coa/sub-categories?limit=1000')).data,
   })
 
   const { data: catRes } = useQuery({
     queryKey: ['coa-categories'],
-    queryFn: async () => (await api.get<{ data: CoaCategory[] }>('/coa/categories?limit=1000')).data,
+    queryFn: async () => { const r = (await api.get('/coa/categories?limit=1000')).data; return Array.isArray(r) ? r : (r?.data ?? []); },
   })
 
-  const allItems = response?.data ?? []
-  const catOptions = (catRes?.data ?? []).map((c) => ({ value: c.id, label: `${c.name} — ${c.classification.name}` }))
+  const allItems: any[] = Array.isArray(response) ? response : (response?.data ?? [])
+  const catOptions = (Array.isArray(catRes) ? catRes : catRes?.data ?? []).map((c: any) => ({ value: c.id, label: `${c.name} — ${c.classification.name}` }))
   const filtered = search
     ? allItems.filter((i) => i.name.toLowerCase().includes(search.toLowerCase()) || i.category.name.toLowerCase().includes(search.toLowerCase()))
     : allItems
@@ -1726,7 +1726,7 @@ function CoaAccountsSection() {
     queryFn: async () => {
       const params = new URLSearchParams({ limit: '1000' })
       if (formData.type) params.set('accountType', formData.type)
-      return (await api.get<{ data: CoaClassification[] }>(`/coa/classifications?${params}`)).data
+      return (await api.get(`/coa/classifications?${params}`)).data
     },
     enabled: !!formData.type,
   })
@@ -1737,7 +1737,7 @@ function CoaAccountsSection() {
     queryFn: async () => {
       const params = new URLSearchParams({ limit: '1000' })
       if (formData.classificationId) params.set('classificationId', formData.classificationId)
-      return (await api.get<{ data: CoaCategory[] }>(`/coa/categories?${params}`)).data
+      return (await api.get(`/coa/categories?${params}`)).data
     },
     enabled: !!formData.classificationId,
   })
@@ -1748,14 +1748,14 @@ function CoaAccountsSection() {
     queryFn: async () => {
       const params = new URLSearchParams({ limit: '1000' })
       if (formData.categoryId) params.set('categoryId', formData.categoryId)
-      return (await api.get<{ data: CoaSubCategory[] }>(`/coa/sub-categories?${params}`)).data
+      return (await api.get(`/coa/sub-categories?${params}`)).data
     },
     enabled: !!formData.categoryId,
   })
 
-  const classOptions = (classRes?.data ?? []).map((c) => ({ value: c.id, label: c.name }))
-  const catOptions = (catRes?.data ?? []).map((c) => ({ value: c.id, label: c.name }))
-  const subCatOptions = (subCatRes?.data ?? []).map((s) => ({ value: s.id, label: s.name }))
+  const classOptions = (Array.isArray(classRes) ? classRes : classRes?.data ?? []).map((c: any) => ({ value: c.id, label: c.name }))
+  const catOptions = (Array.isArray(catRes) ? catRes : catRes?.data ?? []).map((c: any) => ({ value: c.id, label: c.name }))
+  const subCatOptions = (Array.isArray(subCatRes) ? subCatRes : subCatRes?.data ?? []).map((s: any) => ({ value: s.id, label: s.name }))
 
   const allAccounts = response?.data ?? []
   const allFiltered = typeFilter ? allAccounts.filter((a) => (a.accountType || a.type) === typeFilter) : allAccounts
