@@ -1,0 +1,53 @@
+# ---------- Build stage ----------
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Build essentials for native modules + OpenSSL for Prisma
+RUN apt-get update && apt-get install -y python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
+RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
+
+# Install deps (workspace-aware)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* .npmrc* turbo.json* tsconfig*.json ./
+COPY apps/api/ ./apps/api/
+COPY apps/web/package.json ./apps/web/
+RUN pnpm install --frozen-lockfile
+
+# Prisma client + build
+RUN cd apps/api && pnpm prisma generate
+RUN pnpm --filter @procunexpro-enterprise/api build
+
+# Production-only node_modules (+ generated prisma client)
+RUN mkdir /app/prod-deps && \
+    cp apps/api/package.json /app/prod-deps/ && \
+    cd /app/prod-deps && \
+    npm install --omit=dev 2>/dev/null; \
+    cp -r /app/node_modules/.pnpm/@prisma+client@*/node_modules/.prisma /app/prod-deps/node_modules/.prisma 2>/dev/null || true
+
+# ---------- Runtime stage ----------
+FROM node:20-slim AS runner
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --system --gid 1001 nodejs && useradd --system --uid 1001 nestjs
+
+COPY --from=builder /app/prod-deps/node_modules ./node_modules
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/apps/api/package.json ./
+
+# Regenerate the client for this platform
+RUN npx prisma generate
+
+RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app
+USER nestjs
+
+ENV NODE_ENV=production
+ENV PORT=3004
+EXPOSE 3004
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3004/api/health',(r)=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+
+CMD ["node", "dist/main.js"]
