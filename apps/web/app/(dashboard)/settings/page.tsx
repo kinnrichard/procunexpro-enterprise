@@ -2485,28 +2485,29 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage application preferences and configuration" />
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0 flex flex-wrap gap-y-1">
-          <TabsTrigger value="general" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">General</TabsTrigger>
-          <TabsTrigger value="roles" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Roles &amp; Permissions</TabsTrigger>
-          <TabsTrigger value="company" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Company</TabsTrigger>
-          <TabsTrigger value="departments" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Departments</TabsTrigger>
-          <TabsTrigger value="warehouses" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Warehouses</TabsTrigger>
-          <TabsTrigger value="categories" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Categories</TabsTrigger>
-          <TabsTrigger value="manufacturers" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Manufacturers</TabsTrigger>
-          <TabsTrigger value="origins" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Origins</TabsTrigger>
-          <TabsTrigger value="units" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Units of Measure</TabsTrigger>
-          <TabsTrigger value="labor" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Labor Cost</TabsTrigger>
-          <TabsTrigger value="currencies" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Currencies</TabsTrigger>
-          <TabsTrigger value="taxes" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Taxes</TabsTrigger>
-          <TabsTrigger value="purchase-terms" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Purchase Terms</TabsTrigger>
-          <TabsTrigger value="delivery-terms" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Delivery Terms</TabsTrigger>
-          <TabsTrigger value="delivery-types" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Type of Delivery</TabsTrigger>
-          <TabsTrigger value="gl-accounts" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Chart of Accounts</TabsTrigger>
+      <Tabs defaultValue="general" orientation="vertical" className="flex items-start gap-6 w-full">
+        <TabsList className="flex flex-col h-auto w-52 shrink-0 items-stretch justify-start rounded-none border-r bg-transparent p-0 pr-2 gap-0.5">
+          <TabsTrigger value="general" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">General</TabsTrigger>
+          <TabsTrigger value="roles" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Roles &amp; Permissions</TabsTrigger>
+          <TabsTrigger value="company" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Company</TabsTrigger>
+          <TabsTrigger value="departments" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Departments</TabsTrigger>
+          <TabsTrigger value="warehouses" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Warehouses</TabsTrigger>
+          <TabsTrigger value="categories" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Categories</TabsTrigger>
+          <TabsTrigger value="manufacturers" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Manufacturers</TabsTrigger>
+          <TabsTrigger value="origins" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Origins</TabsTrigger>
+          <TabsTrigger value="units" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Units of Measure</TabsTrigger>
+          <TabsTrigger value="labor" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Labor Cost</TabsTrigger>
+          <TabsTrigger value="currencies" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Currencies</TabsTrigger>
+          <TabsTrigger value="taxes" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Taxes</TabsTrigger>
+          <TabsTrigger value="purchase-terms" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Purchase Terms</TabsTrigger>
+          <TabsTrigger value="delivery-terms" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Delivery Terms</TabsTrigger>
+          <TabsTrigger value="delivery-types" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Type of Delivery</TabsTrigger>
+          <TabsTrigger value="gl-accounts" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Chart of Accounts</TabsTrigger>
         </TabsList>
 
+        <div className="flex-1 min-w-0">
         {/* General Tab */}
-        <TabsContent value="general" className="mt-5">
+        <TabsContent value="general" className="mt-0">
           <div className="grid gap-6">
             <Card>
               <CardHeader>
@@ -2655,78 +2656,79 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Company Tab */}
-        <TabsContent value="company" className="mt-5">
+        <TabsContent value="company" className="mt-0">
           <CompanyConfig />
         </TabsContent>
 
         {/* Departments Tab */}
-        <TabsContent value="warehouses" className="mt-5">
+        <TabsContent value="warehouses" className="mt-0">
           <WarehousesConfig />
         </TabsContent>
 
-        <TabsContent value="departments" className="mt-5">
+        <TabsContent value="departments" className="mt-0">
           <DepartmentsConfig />
         </TabsContent>
 
         {/* Categories Tab */}
-        <TabsContent value="categories" className="mt-5">
+        <TabsContent value="categories" className="mt-0">
           <CategoriesConfig />
         </TabsContent>
 
         {/* Manufacturers Tab */}
-        <TabsContent value="manufacturers" className="mt-5">
+        <TabsContent value="manufacturers" className="mt-0">
           <SimpleConfigTable endpoint="manufacturers" label="Manufacturer" />
         </TabsContent>
 
         {/* Origins Tab */}
-        <TabsContent value="origins" className="mt-5">
+        <TabsContent value="origins" className="mt-0">
           <SimpleConfigTable endpoint="origins" label="Origin" hasCode />
         </TabsContent>
 
         {/* Units of Measure Tab */}
-        <TabsContent value="units" className="mt-5">
+        <TabsContent value="units" className="mt-0">
           <UomConfig />
         </TabsContent>
 
         {/* Labor Cost Tab */}
-        <TabsContent value="labor" className="mt-5">
+        <TabsContent value="labor" className="mt-0">
           <LaborRateConfig />
         </TabsContent>
 
         {/* Roles & Permissions Tab */}
-        <TabsContent value="roles" className="mt-5">
+        <TabsContent value="roles" className="mt-0">
           <RolesPermissionsConfig />
         </TabsContent>
 
         {/* Currencies Tab */}
-        <TabsContent value="currencies" className="mt-5">
+        <TabsContent value="currencies" className="mt-0">
           <CurrenciesConfig />
         </TabsContent>
 
         {/* Taxes Tab */}
-        <TabsContent value="taxes" className="mt-5">
+        <TabsContent value="taxes" className="mt-0">
           <TaxesConfig />
         </TabsContent>
 
         {/* Purchase Terms Tab */}
-        <TabsContent value="purchase-terms" className="mt-5">
+        <TabsContent value="purchase-terms" className="mt-0">
           <ConfigTableWithDesc endpoint="purchase-terms" label="Purchase Term" showDefault={false} />
         </TabsContent>
 
         {/* Delivery Terms Tab */}
-        <TabsContent value="delivery-terms" className="mt-5">
+        <TabsContent value="delivery-terms" className="mt-0">
           <ConfigTableWithDesc endpoint="delivery-terms" label="Delivery Term" showDefault={false} />
         </TabsContent>
 
         {/* Type of Delivery Tab */}
-        <TabsContent value="delivery-types" className="mt-5">
+        <TabsContent value="delivery-types" className="mt-0">
           <SimpleConfigTable endpoint="delivery-types" label="Delivery Type" />
         </TabsContent>
 
         {/* GL Accounts Tab */}
-        <TabsContent value="gl-accounts" className="mt-5">
+        <TabsContent value="gl-accounts" className="mt-0">
           <ChartOfAccountsConfig />
         </TabsContent>
+        </div>
       </Tabs>
     </div>
   )
