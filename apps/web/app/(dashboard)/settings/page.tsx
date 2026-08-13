@@ -2486,7 +2486,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" description="Manage application preferences and configuration" />
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0 overflow-x-auto overflow-y-hidden whitespace-nowrap">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0 flex flex-wrap gap-y-1">
           <TabsTrigger value="general" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">General</TabsTrigger>
           <TabsTrigger value="roles" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Roles &amp; Permissions</TabsTrigger>
           <TabsTrigger value="company" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Company</TabsTrigger>
