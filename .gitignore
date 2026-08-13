@@ -7,3 +7,6 @@ dist
 .env.local
 uploads
 .claude/
+
+# local DB backup
+backup_before_clear.sql

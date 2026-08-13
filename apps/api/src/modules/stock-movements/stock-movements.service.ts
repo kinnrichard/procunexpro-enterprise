@@ -77,8 +77,8 @@ export class StockMovementsService {
     const referenceNumber = await this.generateReferenceNumber(tenantId);
 
     // Update product stock based on movement type
-    const addTypes = ['PURCHASE', 'TRANSFER_IN', 'RETURN'];
-    const subtractTypes = ['SALE', 'TRANSFER_OUT', 'WRITE_OFF'];
+    const addTypes = ['PURCHASE', 'TRANSFER_IN', 'RETURN', 'PRODUCTION_IN'];
+    const subtractTypes = ['SALE', 'TRANSFER_OUT', 'WRITE_OFF', 'PRODUCTION_ISSUE'];
 
     let stockUpdate: any;
 

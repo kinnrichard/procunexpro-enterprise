@@ -140,7 +140,7 @@ export class PurchaseOrdersService {
     const prItems = await this.prisma.purchaseRequestItem.findMany({
       where: {
         id: { in: data.itemIds },
-        purchaseRequest: { tenantId, status: 'APPROVED' },
+        purchaseRequest: { tenantId, status: { in: ['PROCUREMENT', 'COMPLETED'] } },
       },
       include: {
         product: { select: { id: true, name: true, sku: true, unit: true } },
@@ -216,13 +216,16 @@ export class PurchaseOrdersService {
       createdPOs.push(po);
     }
 
-    // Check if any PRs have all items converted — mark as CONVERTED
+    // Mark PRs as COMPLETED if all items have been converted to POs
     const affectedPrIds = [...new Set(prItems.map(i => i.purchaseRequest.id))];
     for (const prId of affectedPrIds) {
       const allItems = await this.prisma.purchaseRequestItem.findMany({ where: { purchaseRequestId: prId } });
       const allConverted = allItems.every(item => data.itemIds.includes(item.id));
       if (allConverted) {
-        await this.prisma.purchaseRequest.update({ where: { id: prId }, data: { status: 'CONVERTED' } });
+        await this.prisma.purchaseRequest.update({
+          where: { id: prId },
+          data: { status: 'COMPLETED', procurementSubStatus: 'COMPLETED' },
+        });
       }
     }
 
@@ -379,7 +382,7 @@ export class PurchaseOrdersService {
   async receive(tenantId: string, id: string, userId: string) {
     const po = await this.prisma.purchaseOrder.findFirst({
       where: { id, tenantId },
-      include: { items: true },
+      include: { items: { include: { product: { select: { qcRequired: true } } } } },
     });
     if (!po) throw new NotFoundException('Purchase order not found');
     if (po.status !== 'SENT' && po.status !== 'PARTIALLY_RECEIVED') {
@@ -422,6 +425,20 @@ export class PurchaseOrdersService {
           purchaseOrderId: po.id,
           reason: `Received from PO ${po.orderNumber}`,
           performedBy: userId,
+        },
+      });
+
+      // Create a stock lot for the received quantity (expiry can be set later)
+      await this.prisma.stockLot.create({
+        data: {
+          tenantId,
+          productId: item.productId,
+          lotNumber: `${po.orderNumber}-${item.id.slice(-4)}`,
+          quantity: remainingQty,
+          initialQty: remainingQty,
+          source: `PO ${po.orderNumber}`,
+          status: 'AVAILABLE',
+          qcStatus: item.product?.qcRequired ? 'PENDING' : 'PASSED',
         },
       });
     }

@@ -225,9 +225,9 @@ export default function PurchaseRequestsPage() {
 
   const stats = useMemo(() => ({
     total,
-    pending: items.filter((i: any) => i.status === 'PENDING_APPROVAL').length,
-    approved: items.filter((i: any) => i.status === 'APPROVED').length,
-    rejected: items.filter((i: any) => i.status === 'REJECTED').length,
+    pending: items.filter((i: any) => ['MANAGER_APPROVAL', 'FINANCE_APPROVAL'].includes(i.status)).length,
+    procurement: items.filter((i: any) => i.status === 'PROCUREMENT').length,
+    completed: items.filter((i: any) => i.status === 'COMPLETED').length,
   }), [items, total]);
 
   const departments = (deptData?.data?.data || []).map((d: any) => ({ value: d.id, label: d.name }));
@@ -389,7 +389,17 @@ export default function PurchaseRequestsPage() {
       sortKey: (row: any) => calcPrTotal(row),
       render: (_: any, row: any) => <span className="font-mono font-medium">{formatCurrency(calcPrTotal(row))}</span>,
     },
-    { key: 'status', label: 'Status', sortable: true, render: (v: string) => <StatusBadge status={v} /> },
+    {
+      key: 'status', label: 'Status', sortable: true,
+      render: (_: any, row: any) => (
+        <div className="flex flex-col gap-0.5">
+          <StatusBadge status={row.status} />
+          {row.status === 'PROCUREMENT' && row.procurementSubStatus && (
+            <StatusBadge status={row.procurementSubStatus} />
+          )}
+        </div>
+      ),
+    },
     {
       key: 'actions', label: '',
       render: (_: any, row: any) => (
@@ -405,8 +415,8 @@ export default function PurchaseRequestsPage() {
     },
   ];
 
-  const statusFilters = ['', 'DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'CONVERTED', 'CANCELLED'];
-  const statusLabels: Record<string, string> = { '': 'All', DRAFT: 'Draft', PENDING_APPROVAL: 'Pending', APPROVED: 'Approved', REJECTED: 'Rejected', CONVERTED: 'Converted', CANCELLED: 'Cancelled' };
+  const statusFilters = ['', 'DRAFT', 'MANAGER_APPROVAL', 'FINANCE_APPROVAL', 'PROCUREMENT', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+  const statusLabels: Record<string, string> = { '': 'All', DRAFT: 'Draft', MANAGER_APPROVAL: 'Manager', FINANCE_APPROVAL: 'Finance', PROCUREMENT: 'Procurement', COMPLETED: 'Completed', REJECTED: 'Rejected', CANCELLED: 'Cancelled' };
 
   // ─── Render ─────────────────────────────────────────────
   return (
@@ -437,8 +447,8 @@ export default function PurchaseRequestsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Requests" value={stats.total} icon={<FileText className="h-5 w-5" />} />
         <StatCard title="Pending Approval" value={stats.pending} icon={<Clock className="h-5 w-5" />} />
-        <StatCard title="Approved" value={stats.approved} icon={<CheckCheck className="h-5 w-5" />} />
-        <StatCard title="Rejected" value={stats.rejected} icon={<FileX className="h-5 w-5" />} />
+        <StatCard title="In Procurement" value={stats.procurement} icon={<Package className="h-5 w-5" />} />
+        <StatCard title="Completed" value={stats.completed} icon={<CheckCheck className="h-5 w-5" />} />
       </div>
 
       <DataTable

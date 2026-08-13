@@ -100,11 +100,16 @@ export class PurchaseRequestsController {
 
   @Put(':id/approve')
   approve(@Req() req: any, @Param('id') id: string) {
-    return this.purchaseRequestsService.approve(req.user.tenantId, id, req.user.id);
+    return this.purchaseRequestsService.approve(req.user.tenantId, id, req.user.id, req.user.role);
   }
 
   @Put(':id/reject')
   reject(@Req() req: any, @Param('id') id: string, @Body() body: { rejectionNote?: string }) {
-    return this.purchaseRequestsService.reject(req.user.tenantId, id, body.rejectionNote || '', req.user.id);
+    return this.purchaseRequestsService.reject(req.user.tenantId, id, body.rejectionNote || '', req.user.id, req.user.role);
+  }
+
+  @Put(':id/procurement-sub-status')
+  updateProcurementSubStatus(@Req() req: any, @Param('id') id: string, @Body() body: { subStatus: string }) {
+    return this.purchaseRequestsService.updateProcurementSubStatus(req.user.tenantId, id, body.subStatus);
   }
 }

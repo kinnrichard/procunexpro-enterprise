@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards,
+  Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RfqService } from './rfq.service';
@@ -33,6 +33,16 @@ export class RfqController {
   @Get(':id/compare')
   compare(@Req() req: any, @Param('id') id: string) {
     return this.rfqService.compare(req.user.tenantId, id);
+  }
+
+  @Post('from-pr-items')
+  createFromPrItems(@Req() req: any, @Body() body: any) {
+    return this.rfqService.createFromPrItems(req.user.tenantId, req.user.id, body);
+  }
+
+  @Post('from-purchase-request')
+  createFromPurchaseRequest(@Req() req: any, @Body() body: any) {
+    return this.rfqService.createFromPurchaseRequest(req.user.tenantId, req.user.id, body);
   }
 
   @Post()
@@ -82,5 +92,43 @@ export class RfqController {
     @Param('quoteId') quoteId: string,
   ) {
     return this.rfqService.award(req.user.tenantId, id, quoteId);
+  }
+
+  @Post(':id/items')
+  addItem(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.rfqService.addItem(req.user.tenantId, id, body);
+  }
+
+  @Patch(':id/items/:itemId')
+  updateItem(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() body: any,
+  ) {
+    return this.rfqService.updateItem(req.user.tenantId, id, itemId, body);
+  }
+
+  @Delete(':id/items/:itemId')
+  deleteItem(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+  ) {
+    return this.rfqService.deleteItem(req.user.tenantId, id, itemId);
+  }
+
+  @Delete(':id/quotes/:quoteId')
+  deleteQuote(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('quoteId') quoteId: string,
+  ) {
+    return this.rfqService.deleteQuote(req.user.tenantId, id, quoteId);
+  }
+
+  @Put(':id/cancel')
+  cancel(@Req() req: any, @Param('id') id: string) {
+    return this.rfqService.cancel(req.user.tenantId, id);
   }
 }

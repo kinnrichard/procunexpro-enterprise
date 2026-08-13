@@ -23,7 +23,7 @@ import { ArrowLeftRight, Plus, ArrowDownRight, ArrowUpRight, RefreshCw, Package 
 const movementSchema = z.object({
   productId: z.string().min(1, 'Product is required'),
   type: z.enum(['PURCHASE', 'SALE', 'ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'RETURN', 'WRITE_OFF']),
-  quantity: z.coerce.number().min(1, 'Min 1'),
+  quantity: z.coerce.number().gt(0, 'Must be greater than 0'),
   fromWarehouseId: z.string().optional(),
   toWarehouseId: z.string().optional(),
   reason: z.string().optional(),
@@ -40,9 +40,11 @@ const typeColors: Record<string, string> = {
   ADJUSTMENT: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   RETURN: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
   WRITE_OFF: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  PRODUCTION_IN: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  PRODUCTION_ISSUE: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
 };
 
-const inTypes = new Set(['PURCHASE', 'TRANSFER_IN', 'RETURN']);
+const inTypes = new Set(['PURCHASE', 'TRANSFER_IN', 'RETURN', 'PRODUCTION_IN']);
 
 export default function StockMovementsPage() {
   const { toast } = useToast();
@@ -183,7 +185,7 @@ export default function StockMovementsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
-                <Input type="number" min={1} {...form.register('quantity', { valueAsNumber: true })} className="h-9 rounded-lg" />
+                <Input type="number" min={0} step="any" {...form.register('quantity', { valueAsNumber: true })} className="h-9 rounded-lg" />
               </div>
             </div>
             {showFrom && (

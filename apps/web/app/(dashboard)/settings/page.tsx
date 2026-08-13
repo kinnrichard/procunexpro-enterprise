@@ -477,6 +477,179 @@ function SimpleConfigTable({ endpoint, label, hasCode }: Readonly<{ endpoint: st
 }
 
 // ============================================================
+// Units of Measure Config
+// ============================================================
+
+const UOM_CATEGORIES = ['count', 'weight', 'volume', 'length']
+const uomSelectClass = 'h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring'
+
+function UomConfig() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [formData, setFormData] = useState({ code: '', name: '', category: 'count', baseFactor: '1' })
+
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['units-of-measure', search],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '1000' })
+      if (search) params.set('search', search)
+      return (await api.get<{ data: any[] }>(`/units-of-measure?${params}`)).data
+    },
+  })
+
+  const allItems: any[] = Array.isArray(response) ? response : (response?.data ?? [])
+  const totalPages = Math.ceil(allItems.length / CONFIG_PAGE_SIZE)
+  const items = allItems.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE)
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/units-of-measure', data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['units-of-measure'] }); queryClient.invalidateQueries({ queryKey: ['uom-active'] }); closeModal(); toast({ title: 'Unit created' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to create unit.', variant: 'destructive' }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/units-of-measure/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['units-of-measure'] }); queryClient.invalidateQueries({ queryKey: ['uom-active'] }); closeModal(); toast({ title: 'Unit updated' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to update unit.', variant: 'destructive' }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/units-of-measure/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['units-of-measure'] }); queryClient.invalidateQueries({ queryKey: ['uom-active'] }); setDeleteTarget(null); toast({ title: 'Unit deleted' }) },
+    onError: () => toast({ title: 'Error', description: 'Failed to delete unit.', variant: 'destructive' }),
+  })
+
+  function openAdd() { setFormData({ code: '', name: '', category: 'count', baseFactor: '1' }); setEditing(null); setModalOpen(true) }
+  function openEdit(item: any) { setFormData({ code: item.code, name: item.name, category: item.category, baseFactor: String(item.baseFactor) }); setEditing(item); setModalOpen(true) }
+  function closeModal() { setModalOpen(false); setEditing(null) }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const payload = { code: formData.code, name: formData.name, category: formData.category, baseFactor: Number.parseFloat(formData.baseFactor) || 1 }
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function renderContent() {
+    if (isLoading) return <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+    if (items.length === 0) return <div className="text-center py-8 text-sm text-muted-foreground">No units found.</div>
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Code</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Category</th>
+            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Base Factor</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-mono font-medium">{item.code}</td>
+              <td className="px-4 py-2.5">{item.name}</td>
+              <td className="px-4 py-2.5 capitalize text-muted-foreground">{item.category}</td>
+              <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{item.baseFactor}</td>
+              <td className="px-4 py-2.5 text-center">
+                <Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">{item.isActive ? 'Active' : 'Inactive'}</Badge>
+              </td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Input placeholder="Search units..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs h-9" />
+        <Button size="sm" onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+          <Plus className="h-4 w-4 mr-1" /> Add Unit
+        </Button>
+        <p className="text-xs text-muted-foreground ml-auto">Base factor = multiply to reach the category&apos;s base unit (e.g. kg = 1000 when base is g)</p>
+      </div>
+
+      <Card><CardContent className="p-0">{renderContent()}</CardContent></Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{allItems.length} unit{allItems.length === 1 ? '' : 's'}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
+            <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>{editing ? 'Edit Unit' : 'Add Unit'}</DialogTitle>
+          <DialogDescription>{editing ? 'Update unit details.' : 'Create a new unit of measure.'}</DialogDescription>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Code <span className="text-red-500">*</span></Label>
+                <Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required placeholder="e.g., kg" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Category</Label>
+                <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className={uomSelectClass}>
+                  {UOM_CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Kilogram" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Base Factor</Label>
+              <Input type="number" step="any" value={formData.baseFactor} onChange={(e) => setFormData({ ...formData, baseFactor: e.target.value })} placeholder="1" />
+              <p className="text-[11px] text-muted-foreground">1 {formData.code || 'unit'} = {formData.baseFactor || '1'} base unit(s) of {formData.category}</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
+              <Button type="submit" disabled={!formData.code || !formData.name || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editing ? 'Save' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete Unit"
+        description={`Delete "${deleteTarget?.name}" (${deleteTarget?.code})? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+        isLoading={deleteMutation.isPending}
+      />
+    </div>
+  )
+}
+
+// ============================================================
 // Company Config (Multi-Company CRUD)
 // ============================================================
 
@@ -2011,6 +2184,7 @@ export default function SettingsPage() {
           <TabsTrigger value="categories" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Categories</TabsTrigger>
           <TabsTrigger value="manufacturers" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Manufacturers</TabsTrigger>
           <TabsTrigger value="origins" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Origins</TabsTrigger>
+          <TabsTrigger value="units" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Units of Measure</TabsTrigger>
           <TabsTrigger value="currencies" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Currencies</TabsTrigger>
           <TabsTrigger value="taxes" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Taxes</TabsTrigger>
           <TabsTrigger value="purchase-terms" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Purchase Terms</TabsTrigger>
@@ -2191,6 +2365,11 @@ export default function SettingsPage() {
         {/* Origins Tab */}
         <TabsContent value="origins" className="mt-5">
           <SimpleConfigTable endpoint="origins" label="Origin" hasCode />
+        </TabsContent>
+
+        {/* Units of Measure Tab */}
+        <TabsContent value="units" className="mt-5">
+          <UomConfig />
         </TabsContent>
 
         {/* Currencies Tab */}

@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
 import { StatusBadge } from '@/components/status-badge'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { ProductCompositionDialog } from '@/components/product-composition-dialog'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -40,10 +41,13 @@ const productSchema = z.object({
   height: z.coerce.number().min(0).optional().or(z.literal('')),
   weight: z.coerce.number().min(0).optional().or(z.literal('')),
 
-  // Stock levels
-  minStock: z.coerce.number().int().min(0).default(1),
-  maxStock: z.coerce.number().int().min(0).default(1),
-  reorderQuantity: z.coerce.number().int().min(0).default(1),
+  // Stock levels (fractional allowed for weight/volume based items)
+  unit: z.string().default('pcs'),
+  minStock: z.coerce.number().min(0).default(1),
+  maxStock: z.coerce.number().min(0).default(1),
+  reorderQuantity: z.coerce.number().min(0).default(1),
+  shelfLifeDays: z.coerce.number().int().min(0).optional().or(z.literal('')),
+  qcRequired: z.boolean().optional().default(false),
 
   // Description
   description: z.string().optional().or(z.literal('')),
@@ -51,6 +55,25 @@ const productSchema = z.object({
 })
 
 type ProductFormData = z.infer<typeof productSchema>
+
+const inventoryTypeOptions = [
+  { value: 'product', label: 'Product (Finished Good)' },
+  { value: 'raw_material', label: 'Raw Material' },
+  { value: 'component', label: 'Component / Sub-Assembly' },
+  { value: 'consumable', label: 'Consumable / Supplies' },
+  { value: 'packaging', label: 'Packaging' },
+]
+
+const inventoryTypeLabel = (v: string) =>
+  inventoryTypeOptions.find((o) => o.value === v)?.label ?? 'Product (Finished Good)'
+
+const inventoryTypeBadge: Record<string, { label: string; className: string }> = {
+  product: { label: 'Finished Good', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  raw_material: { label: 'Raw Material', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  component: { label: 'Component', className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
+  consumable: { label: 'Consumable', className: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
+  packaging: { label: 'Packaging', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+}
 
 type Product = {
   id: string
@@ -66,9 +89,12 @@ type Product = {
   depth: number | null
   height: number | null
   weight: number | null
+  unit: string
   minStock: number
   maxStock: number
   reorderQuantity: number
+  shelfLifeDays: number | null
+  qcRequired: boolean
   currentStock: number
   reorderPoint: number
   costPrice: number
@@ -126,6 +152,7 @@ export default function ProductsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [compositionTarget, setCompositionTarget] = useState<Product | null>(null)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
 
   // --- Form ---
@@ -135,7 +162,7 @@ export default function ProductsPage() {
     name: '', manufacturerId: '', modelNumber: '', sku: '',
     categoryId: '', subCategoryId: '', originId: '',
     length: '', depth: '', height: '', weight: '',
-    minStock: 1, maxStock: 1, reorderQuantity: 1,
+    unit: 'pcs', minStock: 1, maxStock: 1, reorderQuantity: 1, shelfLifeDays: '', qcRequired: false,
     description: '',
   }
 
@@ -197,10 +224,17 @@ export default function ProductsPage() {
     enabled: !!selectedCategoryId,
   })
 
-  const manufacturerOptions = (manufacturersRes?.data ?? []).map((m) => ({ value: m.id, label: m.name }))
-  const originOptions = (originsRes?.data ?? []).map((o) => ({ value: o.id, label: o.name }))
-  const categoryOptions = (rootCategoriesRes?.data ?? []).map((c) => ({ value: c.id, label: c.name }))
-  const subCategoryOptions = (subCategoriesRes?.data ?? []).map((c) => ({ value: c.id, label: c.name }))
+  const { data: uomRes } = useQuery({
+    queryKey: ['uom-active'],
+    queryFn: async () => (await api.get<{ data: { code: string; name: string }[] }>('/units-of-measure/active')).data,
+  })
+
+  const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
+  const manufacturerOptions = asArray<DropdownItem>(manufacturersRes?.data).map((m) => ({ value: m.id, label: m.name }))
+  const originOptions = asArray<DropdownItem>(originsRes?.data).map((o) => ({ value: o.id, label: o.name }))
+  const uomOptions = asArray<{ code: string; name: string }>(uomRes?.data).map((u) => ({ value: u.code, label: `${u.code} — ${u.name}` }))
+  const categoryOptions = asArray<DropdownItem>(rootCategoriesRes?.data).map((c) => ({ value: c.id, label: c.name }))
+  const subCategoryOptions = asArray<DropdownItem>(subCategoriesRes?.data).map((c) => ({ value: c.id, label: c.name }))
 
   // --- Stats ---
 
@@ -270,9 +304,12 @@ export default function ProductsPage() {
       depth: product.depth ?? '',
       height: product.height ?? '',
       weight: product.weight ?? '',
+      unit: product.unit || 'pcs',
       minStock: product.minStock,
       maxStock: product.maxStock,
       reorderQuantity: product.reorderQuantity,
+      shelfLifeDays: product.shelfLifeDays ?? '',
+      qcRequired: product.qcRequired ?? false,
       description: product.description || '',
     })
     setEditing(product)
@@ -292,6 +329,7 @@ export default function ProductsPage() {
       depth: data.depth === '' ? undefined : data.depth,
       height: data.height === '' ? undefined : data.height,
       weight: data.weight === '' ? undefined : data.weight,
+      shelfLifeDays: data.shelfLifeDays === '' ? undefined : data.shelfLifeDays,
       description: data.description || undefined,
     }
     if (editing) {
@@ -331,6 +369,19 @@ export default function ProductsPage() {
           </div>
         </div>
       ),
+    },
+    {
+      key: 'inventoryType',
+      label: 'Type',
+      sortable: true,
+      render: (value: any) => {
+        const badge = inventoryTypeBadge[value as string] ?? inventoryTypeBadge.product
+        return (
+          <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', badge.className)}>
+            {badge.label}
+          </span>
+        )
+      },
     },
     {
       key: 'manufacturer.name',
@@ -374,6 +425,7 @@ export default function ProductsPage() {
             <span className={cn('font-mono text-sm font-semibold', isLow ? 'text-red-600' : 'text-foreground')}>
               {row.currentStock}
             </span>
+            <span className="text-xs text-muted-foreground">{row.unit}</span>
             {isLow && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
           </div>
         )
@@ -393,6 +445,15 @@ export default function ProductsPage() {
       className: 'w-[80px]',
       render: (_value: any, row: Product) => (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          {['product', 'component'].includes(row.inventoryType) && (
+            <button
+              onClick={() => setCompositionTarget(row)}
+              title="Composition"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <Layers className="h-3.5 w-3.5" />
+            </button>
+          )}
           <button
             onClick={() => openEdit(row)}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
@@ -491,12 +552,22 @@ export default function ProductsPage() {
           <div className="flex-1 overflow-y-auto px-6 py-5">
             <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
-              {/* Inventory Type (read-only display) */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              {/* Inventory Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-sm">Inventory Type</Label>
-                  <Input value="Product" disabled className="bg-muted" />
-                  <input type="hidden" {...register('inventoryType')} />
+                  <Controller
+                    control={control}
+                    name="inventoryType"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        options={inventoryTypeOptions}
+                        value={field.value || 'product'}
+                        onChange={(val) => field.onChange(val)}
+                        placeholder="Select type"
+                      />
+                    )}
+                  />
                 </div>
               </div>
 
@@ -636,20 +707,45 @@ export default function ProductsPage() {
                 <p className="text-sm font-medium text-muted-foreground mb-3">Stock Levels</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Stock Unit</Label>
+                  <Controller
+                    control={control}
+                    name="unit"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        options={uomOptions}
+                        value={field.value || 'pcs'}
+                        onChange={(val) => field.onChange(val)}
+                        placeholder="Select unit"
+                      />
+                    )}
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm">Min Stock</Label>
-                  <Input type="number" {...register('minStock')} placeholder="1" />
+                  <Input type="number" step="any" {...register('minStock')} placeholder="1" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm">Max Stock</Label>
-                  <Input type="number" {...register('maxStock')} placeholder="1" />
+                  <Input type="number" step="any" {...register('maxStock')} placeholder="1" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm">Reorder Qty</Label>
-                  <Input type="number" {...register('reorderQuantity')} placeholder="1" />
+                  <Input type="number" step="any" {...register('reorderQuantity')} placeholder="1" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Shelf Life (days)</Label>
+                  <Input type="number" {...register('shelfLifeDays')} placeholder="e.g., 730" />
                 </div>
               </div>
+
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" {...register('qcRequired')} className="h-4 w-4 rounded border-input" />
+                <span>Requires QC inspection</span>
+                <span className="text-xs text-muted-foreground">— received/produced lots start as Pending QC and can&apos;t be consumed until passed</span>
+              </label>
 
               {/* Description */}
               <div className="space-y-1.5">
@@ -687,6 +783,13 @@ export default function ProductsPage() {
       </Dialog>
 
       {/* Delete Confirmation */}
+      <ProductCompositionDialog
+        productId={compositionTarget?.id ?? null}
+        productName={compositionTarget?.name}
+        open={!!compositionTarget}
+        onOpenChange={(open) => !open && setCompositionTarget(null)}
+      />
+
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}

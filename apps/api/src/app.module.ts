@@ -10,6 +10,10 @@ import { WarehousesModule } from './modules/warehouses/warehouses.module';
 import { PurchaseRequestsModule } from './modules/purchase-requests/purchase-requests.module';
 import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
 import { StockMovementsModule } from './modules/stock-movements/stock-movements.module';
+import { ProductionsModule } from './modules/productions/productions.module';
+import { UnitsOfMeasureModule } from './modules/units-of-measure/units-of-measure.module';
+import { StockLotsModule } from './modules/stock-lots/stock-lots.module';
+import { ReplenishmentModule } from './modules/replenishment/replenishment.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
@@ -48,6 +52,10 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     PurchaseRequestsModule,
     PurchaseOrdersModule,
     StockMovementsModule,
+    ProductionsModule,
+    UnitsOfMeasureModule,
+    StockLotsModule,
+    ReplenishmentModule,
     DashboardModule,
     HealthModule,
     BudgetsModule,

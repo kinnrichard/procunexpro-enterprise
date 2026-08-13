@@ -27,7 +27,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   ArrowLeft, Plus, Trash2, Loader2, Send, CheckCircle, XCircle, X, Filter,
-  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info,
+  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info, Package, FileSearch,
 } from 'lucide-react';
 
 type Vendor = { id: string; name: string };
@@ -40,75 +40,172 @@ const priorityColors: Record<string, string> = {
 };
 
 // ─── Status Timeline ──────────────────────────────────────
-const statusOrder = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'CONVERTED'];
-const statusSteps = [
-  { key: 'DRAFT', label: 'Draft', icon: FileText },
-  { key: 'PENDING_APPROVAL', label: 'Pending', icon: Clock },
-  { key: 'APPROVED', label: 'Approved', icon: CheckCircle },
-  { key: 'CONVERTED', label: 'Converted to PO', icon: Link2 },
+const statusOrder = ['DRAFT', 'MANAGER_APPROVAL', 'FINANCE_APPROVAL', 'PROCUREMENT', 'COMPLETED'];
+
+const PROCUREMENT_SUB_STATUSES = [
+  { value: 'READY_TO_START', label: 'Ready to Start' },
+  { value: 'IN_PROGRESS', label: 'In Progress' },
+  { value: 'WAITING_ON_VENDOR', label: 'Waiting on Vendor Quotation' },
+  { value: 'WAITING_ON_REQUESTOR', label: 'Waiting on Requestor' },
+  { value: 'COMPLETED', label: 'Completed' },
 ];
 
-function StatusTimeline({ status, rejectionNote }: Readonly<{ status: string; rejectionNote?: string }>) {
+const STAGE_LABELS: Record<string, string> = {
+  DRAFT: 'Draft',
+  MANAGER_APPROVAL: 'Manager Approval',
+  FINANCE_APPROVAL: 'Finance Approval',
+  PROCUREMENT: 'Procurement',
+  COMPLETED: 'Completed',
+};
+
+type ApprovalStepData = { stepOrder: number; role: string; action?: string; comment?: string; actionAt?: string; user?: { id: string; firstName: string; lastName: string } | null };
+
+function StatusTimeline({ status, rejectionNote, rejectedAtStage, procurementSubStatus, approvalSteps = [], createdAt, requestedBy }: Readonly<{
+  status: string; rejectionNote?: string; rejectedAtStage?: string; procurementSubStatus?: string;
+  approvalSteps?: ApprovalStepData[]; createdAt?: string;
+  requestedBy?: { firstName: string; lastName: string } | null;
+}>) {
   const isRejected = status === 'REJECTED';
   const isCancelled = status === 'CANCELLED';
-  const currentIndex = statusOrder.indexOf(status);
+  const currentIndex = isRejected
+    ? statusOrder.indexOf(rejectedAtStage || 'MANAGER_APPROVAL')
+    : statusOrder.indexOf(status);
 
-  if (isRejected || isCancelled) {
-    return (
-      <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800">
-        <div className="w-9 h-9 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-          {isRejected ? <XCircle className="h-5 w-5 text-red-600" /> : <Ban className="h-5 w-5 text-red-600" />}
-        </div>
-        <div>
-          <p className="text-sm font-medium text-red-700 dark:text-red-400">{isRejected ? 'Rejected' : 'Cancelled'}</p>
-          {rejectionNote && <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-0.5">{rejectionNote}</p>}
-        </div>
-      </div>
-    );
+  const rejectionStep = isRejected
+    ? approvalSteps.find(s => s.action === 'REJECTED')
+    : null;
+
+  function getStepForStage(stageKey: string): ApprovalStepData | undefined {
+    const stageIndex = statusOrder.indexOf(stageKey);
+    return approvalSteps.find(s => s.stepOrder === stageIndex && s.action === 'APPROVED');
   }
 
-  const currentColors: Record<string, { chip: string; arrow: string }> = {
-    DRAFT: { chip: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300', arrow: 'text-gray-400' },
-    PENDING_APPROVAL: { chip: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', arrow: 'text-amber-400' },
-    APPROVED: { chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', arrow: 'text-emerald-400' },
-    CONVERTED: { chip: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', arrow: 'text-blue-400' },
-  };
-
-  const doneChip = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-  const doneArrow = 'text-green-400';
-
   return (
-    <div className="flex items-center gap-1">
-      {statusSteps.map((step, i) => {
-        const isCurrent = currentIndex === i;
-        const isDone = currentIndex > i;
-        const isActive = currentIndex >= i;
-        const Icon = step.icon;
-        const colors = currentColors[step.key];
-        let chipClass: string;
-        if (isDone) chipClass = doneChip;
-        else if (isCurrent) chipClass = colors.chip;
-        else chipClass = 'bg-muted text-muted-foreground';
-
-        let arrowClass: string;
-        if (isDone) arrowClass = doneArrow;
-        else if (isActive) arrowClass = colors.arrow;
-        else arrowClass = 'text-muted-foreground/30';
-        return (
-          <div key={step.key} className="flex items-center">
-            <div className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors',
-              chipClass
-            )}>
-              <Icon className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{step.label}</span>
+    <div className="w-full">
+      {/* Progress bar */}
+      <div className="flex items-center gap-0 mb-4">
+        {statusOrder.map((stageKey, i) => {
+          const isDone = currentIndex > i;
+          const isCurrent = currentIndex === i;
+          const isRejectedStage = isRejected && rejectedAtStage === stageKey;
+          return (
+            <div key={stageKey} className="flex items-center flex-1 last:flex-none">
+              <div className={cn(
+                'w-3 h-3 rounded-full border-2 shrink-0 transition-all',
+                isDone && 'bg-emerald-500 border-emerald-500',
+                isCurrent && !isRejectedStage && 'bg-primary border-primary ring-4 ring-primary/10',
+                isRejectedStage && 'bg-red-500 border-red-500 ring-4 ring-red-500/10',
+                !isDone && !isCurrent && !isRejectedStage && 'bg-background border-muted-foreground/30',
+              )} />
+              {i < statusOrder.length - 1 && (
+                <div className={cn('h-0.5 flex-1 mx-1', isDone ? 'bg-emerald-500' : 'bg-border')} />
+              )}
             </div>
-            {i < statusSteps.length - 1 && (
-              <ChevronRight className={cn('h-4 w-4 mx-0.5 shrink-0', arrowClass)} />
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {/* Cards */}
+      <div className="grid grid-cols-5 gap-3">
+        {statusOrder.map((stageKey, i) => {
+          const isDone = currentIndex > i;
+          const isCurrent = currentIndex === i;
+          const isUpcoming = currentIndex < i;
+          const isRejectedStage = isRejected && rejectedAtStage === stageKey;
+          const isDraft = stageKey === 'DRAFT';
+
+          const step = getStepForStage(stageKey);
+          const approvedBy = step?.user;
+          const approvedAt = step?.actionAt;
+
+          return (
+            <div
+              key={stageKey}
+              className={cn(
+                'rounded-lg border p-3 transition-all',
+                'bg-background',
+                isRejectedStage ? 'border-red-300 dark:border-red-800' : isCurrent ? 'border-primary/40' : 'border-border',
+                isUpcoming && !isRejected && 'opacity-35',
+              )}
+            >
+              {/* Label + status indicator */}
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-semibold text-foreground">{STAGE_LABELS[stageKey]}</p>
+                {isDone && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
+                {isRejectedStage && <XCircle className="h-3.5 w-3.5 text-red-500" />}
+                {isCurrent && !isRejectedStage && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
+              </div>
+
+              {/* Content */}
+              <div className="space-y-1 min-h-[32px]">
+                {isDraft && requestedBy && (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-slate-700 to-[#1e3a5f] flex items-center justify-center text-white text-[8px] font-semibold shrink-0">
+                        {getInitials(requestedBy.firstName, requestedBy.lastName)}
+                      </div>
+                      <span className="text-[11px] text-foreground truncate">{requestedBy.firstName} {requestedBy.lastName}</span>
+                    </div>
+                    {createdAt && <p className="text-[10px] text-muted-foreground">{formatDateTime(createdAt)}</p>}
+                  </>
+                )}
+
+                {!isDraft && isDone && approvedBy && (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-slate-700 to-[#1e3a5f] flex items-center justify-center text-white text-[8px] font-semibold shrink-0">
+                        {getInitials(approvedBy.firstName, approvedBy.lastName)}
+                      </div>
+                      <span className="text-[11px] text-foreground truncate">{approvedBy.firstName} {approvedBy.lastName}</span>
+                    </div>
+                    {approvedAt && <p className="text-[10px] text-muted-foreground">{formatDateTime(approvedAt)}</p>}
+                  </>
+                )}
+
+                {!isDraft && isDone && !approvedBy && (
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400">Approved</p>
+                )}
+
+                {isRejectedStage && (
+                  <>
+                    {rejectionStep?.user && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-[8px] font-semibold shrink-0">
+                          {getInitials(rejectionStep.user.firstName, rejectionStep.user.lastName)}
+                        </div>
+                        <span className="text-[11px] text-foreground truncate">{rejectionStep.user.firstName} {rejectionStep.user.lastName}</span>
+                      </div>
+                    )}
+                    {rejectionStep?.actionAt && <p className="text-[10px] text-muted-foreground">{formatDateTime(rejectionStep.actionAt)}</p>}
+                    {rejectionNote && <p className="text-[10px] text-red-500 mt-1 line-clamp-2">{rejectionNote}</p>}
+                  </>
+                )}
+
+                {isCurrent && !isDraft && !isRejected && (
+                  <p className="text-[10px] text-muted-foreground">Awaiting approval</p>
+                )}
+
+                {isUpcoming && !isRejected && (
+                  <p className="text-[10px] text-muted-foreground">Pending</p>
+                )}
+
+                {stageKey === 'PROCUREMENT' && (isCurrent || isDone) && procurementSubStatus && (
+                  <div className="mt-1">
+                    <StatusBadge status={procurementSubStatus} />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {isCancelled && (
+        <div className="flex items-center gap-2 p-3 mt-3 rounded-lg border border-red-200 dark:border-red-800">
+          <Ban className="h-4 w-4 text-red-500" />
+          <p className="text-sm font-medium text-red-600 dark:text-red-400">Cancelled</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -249,6 +346,97 @@ function getVendorPricing(item: any) {
 }
 
 // ─── Main Component ───────────────────────────────────────
+// ─── RFQ Summary Modal ───────────────────────────────────
+function RfqSummaryModal({ rfqId, prNumber, onClose }: Readonly<{ rfqId: string | null; prNumber?: string; onClose: () => void }>) {
+  const formatCurrency = useCurrencyStore((s) => s.format);
+
+  const { data: rfqRes, isLoading } = useQuery({
+    queryKey: ['rfq-summary', rfqId],
+    queryFn: () => api.get(`/rfq/${rfqId}`),
+    enabled: !!rfqId,
+  });
+
+  const rfq = rfqRes?.data;
+
+  return (
+    <Dialog open={!!rfqId} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg p-0 gap-0">
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {rfq && (
+          <>
+            <div className="px-5 pt-5 pb-3 border-b">
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-sm font-semibold">{rfq.rfqNumber}</DialogTitle>
+                <StatusBadge status={rfq.status} />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{rfq.title}</p>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Vendor</p>
+                  <p className="text-sm font-medium mt-0.5">{rfq.vendor?.name || 'Unassigned'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">PR Reference</p>
+                  <p className="text-sm font-medium mt-0.5">{prNumber || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Created</p>
+                  <p className="text-sm mt-0.5">{rfq.createdAt ? formatDateTime(rfq.createdAt) : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Quotes</p>
+                  <p className="text-sm mt-0.5">{rfq.quotes?.length || 0} received</p>
+                </div>
+              </div>
+
+              {/* Items table */}
+              {rfq.items?.length > 0 && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-2">Items ({rfq.items.length})</p>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-muted/50 border-b">
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">#</th>
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Description</th>
+                          <th className="text-center px-3 py-2 font-medium text-muted-foreground">Qty</th>
+                          <th className="text-center px-3 py-2 font-medium text-muted-foreground">Unit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {rfq.items.map((item: any, idx: number) => (
+                          <tr key={item.id} className="hover:bg-muted/30">
+                            <td className="px-3 py-2 text-muted-foreground font-mono">{idx + 1}</td>
+                            <td className="px-3 py-2 font-medium">{item.description}</td>
+                            <td className="px-3 py-2 text-center font-mono">{item.quantity}</td>
+                            <td className="px-3 py-2 text-center text-muted-foreground">{item.unit}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t flex justify-between">
+              <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+              <a href={`/rfq/${rfq.id}`} target="_blank" rel="noopener noreferrer">
+                <Button size="sm" variant="outline">View RFQ Details</Button>
+              </a>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function PurchaseRequestDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -266,6 +454,8 @@ export default function PurchaseRequestDetailPage() {
   const [coaItemId, setCoaItemId] = useState('');
   const [coaFormData, setCoaFormData] = useState({ glAccountId: '', debitAmount: 0, creditAmount: 0, accountRemarks: '' });
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
+  const [createRfqConfirmOpen, setCreateRfqConfirmOpen] = useState(false);
+  const [rfqSummaryId, setRfqSummaryId] = useState<string | null>(null);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
   const [rejectionNote, setRejectionNote] = useState('');
   const [editPrOpen, setEditPrOpen] = useState(false);
@@ -482,6 +672,16 @@ export default function PurchaseRequestDetailPage() {
     onError: () => toast({ title: 'Failed to approve', variant: 'destructive' }),
   });
 
+  const createRfqMutation = useMutation({
+    mutationFn: () => api.post('/rfq/from-purchase-request', { purchaseRequestId: prId }),
+    onSuccess: (res) => {
+      invalidate();
+      const count = res.data?.created || 0;
+      toast({ title: `${count} RFQ${count > 1 ? 's' : ''} created`, description: 'Sub-status updated to Waiting on Vendor Quotation' });
+    },
+    onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to create RFQ', variant: 'destructive' }),
+  });
+
   const rejectMutation = useMutation({
     mutationFn: (note: string) => api.put(`/purchase-requests/${prId}/reject`, { rejectionNote: note }),
     onSuccess: () => { invalidate(); setRejectConfirmOpen(false); setRejectionNote(''); toast({ title: 'Purchase request rejected' }); },
@@ -672,15 +872,28 @@ export default function PurchaseRequestDetailPage() {
   // Filtered products for the picker
   const filteredProducts = getFilteredProducts(products, addItemSearch);
 
+  const procurementSubStatusMutation = useMutation({
+    mutationFn: (subStatus: string) => api.put(`/purchase-requests/${prId}/procurement-sub-status`, { subStatus }),
+    onSuccess: () => { invalidate(); toast({ title: 'Sub-status updated' }); },
+    onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to update sub-status', variant: 'destructive' }),
+  });
+
   const totalAmount = pr?.items?.reduce((sum: number, item: any) => sum + calcLineAmount(item, taxRate), 0) || 0;
 
   if (isLoading) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Loading…</div>;
   if (!pr) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Purchase request not found</div>;
 
+  const isApprovalStage = ['MANAGER_APPROVAL', 'FINANCE_APPROVAL', 'PROCUREMENT'].includes(pr?.status);
+  const approvalStageLabel: Record<string, string> = {
+    MANAGER_APPROVAL: 'Manager Approve',
+    FINANCE_APPROVAL: 'Finance Approve',
+    PROCUREMENT: 'Procurement Approve',
+  };
+
   function renderHeaderActions() {
     return (
       <div className="flex items-center gap-2">
-        {(isDraft || pr.status === 'PENDING_APPROVAL') && (
+        {isDraft && (
           <Button variant="outline" size="sm" onClick={openEditPr}>
             <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
           </Button>
@@ -691,10 +904,10 @@ export default function PurchaseRequestDetailPage() {
             Submit for Approval
           </Button>
         )}
-        {pr.status === 'PENDING_APPROVAL' && (
+        {isApprovalStage && (
           <>
             <Button onClick={() => setApproveConfirmOpen(true)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
-              <CheckCircle className="h-4 w-4 mr-2" /> Approve
+              <CheckCircle className="h-4 w-4 mr-2" /> {approvalStageLabel[pr.status] || 'Approve'}
             </Button>
             <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}>
               <XCircle className="h-4 w-4 mr-2" /> Reject
@@ -747,13 +960,87 @@ export default function PurchaseRequestDetailPage() {
 
         {/* ─── Details Tab ──────────────────────────────── */}
         <TabsContent value="details" className="mt-5 space-y-6">
-          <div className="flex items-start justify-between gap-4">
-            <StatusTimeline status={pr.status} rejectionNote={pr.rejectionNote} />
-            <div className="text-right shrink-0">
+          <div className="flex items-center justify-between">
+            <div />
+            <div className="text-right">
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Total Amount</p>
               <p className="text-2xl font-bold font-mono text-primary">{formatCurrency(totalAmount)}</p>
             </div>
           </div>
+
+          <StatusTimeline
+            status={pr.status}
+            rejectionNote={pr.rejectionNote}
+            rejectedAtStage={pr.rejectedAtStage}
+            procurementSubStatus={pr.procurementSubStatus}
+            approvalSteps={pr.approvalSteps || []}
+            createdAt={pr.createdAt}
+            requestedBy={pr.requestedBy}
+          />
+
+          {pr.status === 'PROCUREMENT' && (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">Sub-status:</span>
+                <Select value={pr.procurementSubStatus || ''} onValueChange={(v) => procurementSubStatusMutation.mutate(v)}>
+                  <SelectTrigger className="h-7 w-[220px] border-border text-xs">
+                    <SelectValue placeholder="Set sub-status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROCUREMENT_SUB_STATUSES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {!(pr.rfqs?.length > 0) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCreateRfqConfirmOpen(true)}
+                  disabled={createRfqMutation.isPending || (pr.items?.length || 0) === 0}
+                >
+                  {createRfqMutation.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <FileSearch className="h-3.5 w-3.5 mr-1.5" />}
+                  Create RFQ
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Linked RFQs */}
+          {pr.rfqs?.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">RFQ Created</p>
+              <div className="flex flex-wrap gap-2">
+                {pr.rfqs.map((rfq: any) => (
+                  <button
+                    key={rfq.id}
+                    onClick={() => setRfqSummaryId(rfq.id)}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-background hover:bg-accent transition-colors text-left"
+                  >
+                    <FileSearch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-medium text-foreground">{rfq.rfqNumber}</p>
+                        <StatusBadge status={rfq.status} />
+                      </div>
+                      {rfq.vendor && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          <span className="font-medium text-foreground">{rfq.vendor.name}</span>
+                          {' · '}{pr.requestNumber}
+                        </p>
+                      )}
+                      {!rfq.vendor && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          No vendor · {pr.requestNumber}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-4">
             <div className="space-y-1">
@@ -1538,6 +1825,17 @@ export default function PurchaseRequestDetailPage() {
         isLoading={submitMutation.isPending}
       />
 
+      {/* ─── Create RFQ Confirm ──────────────────────────── */}
+      <ConfirmDialog
+        open={createRfqConfirmOpen}
+        onOpenChange={(open) => !open && setCreateRfqConfirmOpen(false)}
+        title="Create RFQ"
+        description={`Create Request for Quotation from "${pr?.requestNumber}"? One RFQ will be created per vendor.`}
+        confirmLabel="Create RFQ"
+        onConfirm={() => { createRfqMutation.mutate(undefined, { onSuccess: () => setCreateRfqConfirmOpen(false) }); }}
+        isLoading={createRfqMutation.isPending}
+      />
+
       {/* ─── Approve Confirm ─────────────────────────────── */}
       <ConfirmDialog
         open={approveConfirmOpen}
@@ -1646,6 +1944,9 @@ export default function PurchaseRequestDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ─── RFQ Summary Modal ─────────────────────────── */}
+      <RfqSummaryModal rfqId={rfqSummaryId} prNumber={pr?.requestNumber} onClose={() => setRfqSummaryId(null)} />
     </div>
   );
 }

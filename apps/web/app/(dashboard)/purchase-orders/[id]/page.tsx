@@ -14,6 +14,7 @@ import { ActivityPanel } from '@/components/activity-panel';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
@@ -186,6 +187,9 @@ export default function PurchaseOrderDetailPage() {
   const [rejectionNote, setRejectionNote] = useState('');
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
   const [receiveConfirmOpen, setReceiveConfirmOpen] = useState(false);
+  const [coaModalOpen, setCoaModalOpen] = useState(false);
+  const [coaItemId, setCoaItemId] = useState('');
+  const [coaFormData, setCoaFormData] = useState({ glAccountId: '', debitAmount: 0, creditAmount: 0, accountRemarks: '' });
 
   const { data: poData, isLoading } = useQuery({
     queryKey: ['po-detail', poId],
@@ -370,7 +374,7 @@ export default function PurchaseOrderDetailPage() {
               </div>
             ) : (
               <div className="border border-border rounded-xl overflow-x-auto">
-                <table className="w-full text-sm min-w-[1360px]">
+                <table className="w-full text-sm min-w-[1000px]">
                   <thead>
                     <tr className="bg-muted/50 text-muted-foreground text-[10.5px] uppercase tracking-wider">
                       <th className="text-left px-3 py-2.5 w-[40px]">#</th>
@@ -388,11 +392,8 @@ export default function PurchaseOrderDetailPage() {
                       <th className="text-right px-3 py-2.5 w-[70px]">Discount</th>
                       <th className="text-center px-3 py-2.5 w-[55px]">Taxable</th>
                       <th className="text-center px-3 py-2.5 w-[55px]">Tax Incl</th>
-                      <th className="text-left px-3 py-2.5 w-[140px]">Account</th>
-                      <th className="text-right px-3 py-2.5 w-[80px]">Debit</th>
-                      <th className="text-right px-3 py-2.5 w-[80px]">Credit</th>
-                      <th className="text-left px-3 py-2.5 w-[100px]">Acct Remarks</th>
                       <th className="text-right px-3 py-2.5 w-[90px]">Amount</th>
+                      <th className="text-center px-3 py-2.5 w-[60px]">COA</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -440,28 +441,16 @@ export default function PurchaseOrderDetailPage() {
                               {item.taxIncluded ? 'Yes' : 'No'}
                             </button>
                           </td>
-                          <td className="px-3 py-2 w-[140px]" onClick={(e) => e.stopPropagation()}>
-                            {isDraft ? (
-                              <SearchableSelect
-                                options={[{ value: '', label: '— None —' }, ...glAccountOptions]}
-                                value={item.glAccountId || ''}
-                                onChange={(v) => inlineSave(item.id, 'glAccountId', v || null)}
-                                placeholder="—"
-                              />
-                            ) : (
-                              <span className="text-xs text-muted-foreground">{item.glAccount?.code || '—'}</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 w-[80px]" onClick={(e) => e.stopPropagation()}>
-                            <InlineEditCell value={item.debitAmount || 0} onSave={(v) => inlineSave(item.id, 'debitAmount', v)} align="right" disabled={!isDraft} />
-                          </td>
-                          <td className="px-3 py-2 w-[80px]" onClick={(e) => e.stopPropagation()}>
-                            <InlineEditCell value={item.creditAmount || 0} onSave={(v) => inlineSave(item.id, 'creditAmount', v)} align="right" disabled={!isDraft} />
-                          </td>
-                          <td className="px-3 py-3 w-[100px]">
-                            <span className="text-xs text-muted-foreground">{item.accountRemarks || '—'}</span>
-                          </td>
                           <td className="px-3 py-3 text-right font-mono font-medium">{formatCurrency(calcItemAmount(item, vendorId, taxRate))}</td>
+                          <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => { setCoaItemId(item.id); setCoaFormData({ glAccountId: item.glAccountId || '', debitAmount: item.debitAmount || 0, creditAmount: item.creditAmount || 0, accountRemarks: item.accountRemarks || '' }); setCoaModalOpen(true); }}
+                              className={cn('inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors cursor-pointer hover:opacity-80', item.glAccountId ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-muted-foreground')}
+                            >
+                              {item.glAccountId ? (glAccountOptions.find((g: any) => g.value === item.glAccountId)?.label?.split(' - ')[0] || 'Set') : 'Set'}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -507,6 +496,50 @@ export default function PurchaseOrderDetailPage() {
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => { setRejectConfirmOpen(false); setRejectionNote(''); }}>Cancel</Button>
             <Button size="sm" variant="destructive" disabled={!rejectionNote.trim()}>Reject</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── COA Assignment Modal ─────────────────────── */}
+      <Dialog open={coaModalOpen} onOpenChange={(o) => { if (!o) setCoaModalOpen(false); }}>
+        <DialogContent className="max-w-sm p-0 gap-0">
+          <div className="px-5 pt-5 pb-3">
+            <DialogTitle className="text-sm font-semibold">Assign Chart of Account</DialogTitle>
+            <p className="text-xs text-muted-foreground mt-1">Select an account and enter debit/credit amounts.</p>
+          </div>
+          <div className="px-5 pb-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Account</Label>
+              <SearchableSelect
+                options={[{ value: '', label: '— None —' }, ...glAccountOptions]}
+                value={coaFormData.glAccountId}
+                onChange={(v) => setCoaFormData({ ...coaFormData, glAccountId: v })}
+                placeholder="Select account..."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Debit Amount</Label>
+                <Input type="number" min="0" step="0.01" value={coaFormData.debitAmount || ''} onChange={(e) => setCoaFormData({ ...coaFormData, debitAmount: Number.parseFloat(e.target.value) || 0 })} placeholder="0.00" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Credit Amount</Label>
+                <Input type="number" min="0" step="0.01" value={coaFormData.creditAmount || ''} onChange={(e) => setCoaFormData({ ...coaFormData, creditAmount: Number.parseFloat(e.target.value) || 0 })} placeholder="0.00" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Remarks</Label>
+              <Input value={coaFormData.accountRemarks} onChange={(e) => setCoaFormData({ ...coaFormData, accountRemarks: e.target.value })} placeholder="Optional remarks..." />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" size="sm" onClick={() => setCoaModalOpen(false)}>Cancel</Button>
+              <Button size="sm" className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90" onClick={() => {
+                updateItemMutation.mutate({ itemId: coaItemId, data: { glAccountId: coaFormData.glAccountId || null, debitAmount: coaFormData.debitAmount, creditAmount: coaFormData.creditAmount, accountRemarks: coaFormData.accountRemarks || null } }, { onSuccess: () => setCoaModalOpen(false) });
+              }} disabled={updateItemMutation.isPending}>
+                {updateItemMutation.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                Save
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -71,6 +71,10 @@ export class ProductsService {
           include: { vendor: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
         },
+        components: {
+          include: { material: { select: { id: true, name: true, sku: true, unit: true, currentStock: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
         purchaseRequestItems: {
           include: {
             purchaseRequest: {
@@ -297,6 +301,80 @@ export class ProductsService {
     return { message: 'Pricing deleted' };
   }
 
+  // --- Bill of Materials (composition) ---
+
+  async getComponents(tenantId: string, productId: string) {
+    const product = await this.prisma.product.findFirst({ where: { id: productId, tenantId } });
+    if (!product) throw new NotFoundException('Product not found');
+
+    return this.prisma.productComponent.findMany({
+      where: { tenantId, parentProductId: productId },
+      include: { material: { select: { id: true, name: true, sku: true, unit: true, currentStock: true, costPrice: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  // Replace the full component list for a product (BOM editor saves the whole list)
+  async setComponents(tenantId: string, productId: string, payload: any) {
+    const product = await this.prisma.product.findFirst({ where: { id: productId, tenantId } });
+    if (!product) throw new NotFoundException('Product not found');
+
+    const rows: any[] = Array.isArray(payload) ? payload : (Array.isArray(payload?.items) ? payload.items : []);
+    const laborCostPerUnit = payload?.laborCostPerUnit ?? product.laborCostPerUnit ?? 0;
+    const overheadCostPerUnit = payload?.overheadCostPerUnit ?? product.overheadCostPerUnit ?? 0;
+    const formulationMode = payload?.formulationMode ?? product.formulationMode ?? 'quantity';
+
+    // A product cannot be a component of itself
+    if (rows.some((r) => r.materialId === productId)) {
+      throw new ConflictException('A product cannot be a component of itself');
+    }
+
+    // Guard against duplicate materials in the submitted list
+    const seen = new Set<string>();
+    for (const r of rows) {
+      if (!r.materialId) throw new ConflictException('Each component requires a material');
+      if (seen.has(r.materialId)) throw new ConflictException('Duplicate material in composition');
+      seen.add(r.materialId);
+    }
+
+    // Roll up the material cost: sum(qty x material unit cost). Becomes the product's cost price.
+    const materials = await this.prisma.product.findMany({
+      where: { tenantId, id: { in: rows.map((r) => r.materialId) } },
+      select: { id: true, costPrice: true },
+    });
+    const costMap = new Map(materials.map((m) => [m.id, m.costPrice]));
+    // In percentage mode, quantity is a % of one batch unit → factor = pct/100
+    const factor = (q: number) => (formulationMode === 'percentage' ? (q ?? 0) / 100 : (q ?? 1));
+    const materialCost = rows.reduce((sum, r) => sum + factor(r.quantity) * (costMap.get(r.materialId) ?? 0), 0);
+    // Full unit cost = materials + labor + overhead
+    const rolledUpCost = materialCost + laborCostPerUnit + overheadCostPerUnit;
+
+    const ops: any[] = [
+      this.prisma.productComponent.deleteMany({ where: { tenantId, parentProductId: productId } }),
+      ...rows.map((r) =>
+        this.prisma.productComponent.create({
+          data: {
+            tenantId,
+            parentProductId: productId,
+            materialId: r.materialId,
+            quantity: r.quantity ?? 1,
+            uom: r.uom || 'pcs',
+            notes: r.notes || null,
+          },
+        }),
+      ),
+    ];
+
+    // Persist labor/overhead/mode always; overwrite cost only when a composition is defined
+    const productData: any = { laborCostPerUnit, overheadCostPerUnit, formulationMode };
+    if (rows.length > 0) productData.costPrice = rolledUpCost;
+    ops.push(this.prisma.product.update({ where: { id: productId }, data: productData }));
+
+    await this.prisma.$transaction(ops);
+
+    return this.getComponents(tenantId, productId);
+  }
+
   async create(tenantId: string, data: any) {
     const existing = await this.prisma.product.findFirst({
       where: { tenantId, sku: data.sku },
@@ -334,6 +412,8 @@ export class ProductsService {
         minStock: data.minStock ?? 1,
         maxStock: data.maxStock ?? 1,
         reorderQuantity: data.reorderQuantity ?? 1,
+        shelfLifeDays: data.shelfLifeDays ?? null,
+        qcRequired: data.qcRequired ?? false,
 
         // Legacy defaults
         unit: data.unit || 'pcs',
@@ -372,8 +452,8 @@ export class ProductsService {
       'inventoryType', 'name', 'slug', 'manufacturerId', 'modelNumber', 'sku', 'barcode',
       'description', 'categoryId', 'subCategoryId', 'vendorId', 'originId',
       'length', 'depth', 'height', 'weight',
-      'minStock', 'maxStock', 'reorderQuantity',
-      'unit', 'costPrice', 'sellingPrice', 'currentStock', 'reorderPoint',
+      'minStock', 'maxStock', 'reorderQuantity', 'shelfLifeDays', 'qcRequired',
+      'unit', 'costPrice', 'laborCostPerUnit', 'overheadCostPerUnit', 'formulationMode', 'sellingPrice', 'currentStock', 'reorderPoint',
       'warehouseId', 'locationId', 'isActive',
     ];
     for (const field of fields) {

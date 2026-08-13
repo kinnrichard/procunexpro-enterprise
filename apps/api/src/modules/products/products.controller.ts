@@ -53,6 +53,18 @@ export class ProductsController {
     return this.productsService.delete(req.user.tenantId, id);
   }
 
+  // --- Bill of Materials (composition) ---
+
+  @Get(':id/components')
+  getComponents(@Req() req: any, @Param('id') id: string) {
+    return this.productsService.getComponents(req.user.tenantId, id);
+  }
+
+  @Put(':id/components')
+  setComponents(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.productsService.setComponents(req.user.tenantId, id, body);
+  }
+
   // --- Images ---
 
   @Post(':id/images')

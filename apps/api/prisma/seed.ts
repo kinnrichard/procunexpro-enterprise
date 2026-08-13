@@ -531,7 +531,7 @@ async function main() {
       requestedById: admin.id,
       departmentId: engineering.id,
       priority: 'MEDIUM',
-      status: 'APPROVED',
+      status: 'COMPLETED',
       totalAmount: 149.35,
       approvedAt: new Date(),
     },

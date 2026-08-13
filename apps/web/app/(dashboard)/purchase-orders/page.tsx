@@ -60,7 +60,7 @@ function CreateFromPRs() {
 
   const { data: liRes, isLoading: liLoading } = useQuery({
     queryKey: ['pr-approved-items', liPage, liSearch],
-    queryFn: () => api.get('/purchase-requests/items/all', { params: { page: liPage, limit: 20, search: liSearch || undefined, prStatus: 'APPROVED' } }),
+    queryFn: () => api.get('/purchase-requests/items/all', { params: { page: liPage, limit: 20, search: liSearch || undefined, prStatus: 'PROCUREMENT' } }),
   });
 
   const liItems: any[] = liRes?.data?.data || [];
