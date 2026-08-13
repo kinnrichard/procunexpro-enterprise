@@ -114,6 +114,9 @@ export class UsersService {
 
   async create(tenantId: string, data: any) {
     await this.assertValidRole(tenantId, data.role);
+    if (data.role === 'SUPERADMIN') {
+      throw new BadRequestException('The SUPERADMIN role is reserved for the developer account and cannot be assigned.');
+    }
     const existing = await this.prisma.user.findFirst({
       where: {
         tenantId,
@@ -156,6 +159,13 @@ export class UsersService {
     const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
     if (!user) throw new NotFoundException('User not found');
     await this.assertValidRole(tenantId, data.role);
+    // SUPERADMIN is a constant developer-only role — can't be granted, and can't be removed from a SUPERADMIN via the app.
+    if (data.role === 'SUPERADMIN' && user.role !== 'SUPERADMIN') {
+      throw new BadRequestException('The SUPERADMIN role is reserved and cannot be assigned.');
+    }
+    if (user.role === 'SUPERADMIN' && data.role !== undefined && data.role !== 'SUPERADMIN') {
+      throw new BadRequestException('The developer (SUPERADMIN) role cannot be changed.');
+    }
 
     const updateData: any = {};
     if (data.firstName !== undefined) updateData.firstName = data.firstName;
