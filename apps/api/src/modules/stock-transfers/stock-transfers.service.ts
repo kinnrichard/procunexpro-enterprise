@@ -43,18 +43,23 @@ export class StockTransfersService {
   }
 
   async create(tenantId: string, userId: string, data: any) {
-    const { fromWarehouseId, toWarehouseId } = data;
-    if (!fromWarehouseId || !toWarehouseId) throw new BadRequestException('Both source and destination warehouses are required');
-    if (fromWarehouseId === toWarehouseId) throw new BadRequestException('Source and destination must differ');
+    const { toWarehouseId } = data;
+    // Source may be "Unassigned" (stock lots with no warehouse) — sent as 'UNASSIGNED' or empty.
+    const fromUnassigned = !data.fromWarehouseId || data.fromWarehouseId === 'UNASSIGNED';
+    const fromWarehouseId: string | null = fromUnassigned ? null : data.fromWarehouseId;
+    if (!toWarehouseId) throw new BadRequestException('Destination warehouse is required');
+    if (!fromUnassigned && fromWarehouseId === toWarehouseId) throw new BadRequestException('Source and destination must differ');
 
     const rows: any[] = Array.isArray(data?.items) ? data.items.filter((i: any) => i.productId && i.quantity > 0) : [];
     if (rows.length === 0) throw new BadRequestException('No items to transfer');
 
     const [fromWh, toWh] = await Promise.all([
-      this.prisma.warehouse.findFirst({ where: { id: fromWarehouseId, tenantId } }),
+      fromWarehouseId ? this.prisma.warehouse.findFirst({ where: { id: fromWarehouseId, tenantId } }) : Promise.resolve(null),
       this.prisma.warehouse.findFirst({ where: { id: toWarehouseId, tenantId } }),
     ]);
-    if (!fromWh || !toWh) throw new NotFoundException('Warehouse not found');
+    if (!toWh) throw new NotFoundException('Destination warehouse not found');
+    if (fromWarehouseId && !fromWh) throw new NotFoundException('Source warehouse not found');
+    const fromName = fromWh?.name || 'Unassigned';
 
     const today = new Date();
     const trPrefix = `TR-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
@@ -74,13 +79,13 @@ export class StockTransfersService {
       const lots = await this.prisma.stockLot.findMany({
         where: {
           tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
-          OR: [{ warehouseId: fromWarehouseId }, { warehouseId: null }],
+          ...(fromWarehouseId ? { OR: [{ warehouseId: fromWarehouseId }, { warehouseId: null }] } : { warehouseId: null }),
         },
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
       });
       const available = round(lots.reduce((s, l) => s + l.quantity, 0));
       if (available < need) {
-        throw new BadRequestException(`Insufficient stock at ${fromWh.name} for one of the items (available ${available}, need ${need})`);
+        throw new BadRequestException(`Insufficient stock at ${fromName} for one of the items (available ${available}, need ${need})`);
       }
 
       let remaining = need;
@@ -101,7 +106,7 @@ export class StockTransfersService {
           lotNumber: `${transferNumber}-${idx + 1}`,
           quantity: need, initialQty: need,
           expiryDate: earliestExpiry,
-          source: `Transfer ${transferNumber} from ${fromWh.name}`,
+          source: `Transfer ${transferNumber} from ${fromName}`,
           status: 'AVAILABLE', qcStatus: 'PASSED',
         },
       }));
@@ -109,7 +114,7 @@ export class StockTransfersService {
       // Movements out + in (net-zero to currentStock)
       ops.push(
         this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_OUT', quantity: need, fromWarehouseId, reason: `Transfer ${transferNumber} to ${toWh.name}`, performedBy: userId } }),
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_IN', quantity: need, toWarehouseId, reason: `Transfer ${transferNumber} from ${fromWh.name}`, performedBy: userId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_IN', quantity: need, toWarehouseId, reason: `Transfer ${transferNumber} from ${fromName}`, performedBy: userId } }),
       );
     }
 

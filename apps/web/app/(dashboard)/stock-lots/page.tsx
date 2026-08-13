@@ -42,7 +42,7 @@ export default function StockLotsPage() {
   const [filter, setFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState({ productId: '', lotNumber: '', quantity: 0, expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' });
+  const [form, setForm] = useState({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' });
 
   const expiringMode = filter === 'expiring';
   const qcFilter = filter === 'PENDING_QC' ? 'PENDING' : undefined;
@@ -57,6 +57,8 @@ export default function StockLotsPage() {
 
   const { data: expData } = useQuery({ queryKey: ['stock-lots-expiring'], queryFn: () => api.get('/stock-lots/expiring', { params: { days: 30 } }) });
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
+  const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
+  const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
 
   const rawItems = expiringMode ? (response?.data?.data || []) : (response?.data?.data || []);
   const items = Array.isArray(rawItems) ? rawItems : [];
@@ -67,8 +69,8 @@ export default function StockLotsPage() {
 
   const saveMut = useMutation({
     mutationFn: () => editing
-      ? api.put(`/stock-lots/${editing.id}`, { lotNumber: form.lotNumber, expiryDate: form.expiryDate || null, source: form.source, status: form.status, qcStatus: form.qcStatus })
-      : api.post('/stock-lots', { productId: form.productId, lotNumber: form.lotNumber, quantity: form.quantity, expiryDate: form.expiryDate || null, source: form.source }),
+      ? api.put(`/stock-lots/${editing.id}`, { lotNumber: form.lotNumber, warehouseId: form.warehouseId || null, expiryDate: form.expiryDate || null, source: form.source, status: form.status, qcStatus: form.qcStatus })
+      : api.post('/stock-lots', { productId: form.productId, lotNumber: form.lotNumber, quantity: form.quantity, warehouseId: form.warehouseId || null, expiryDate: form.expiryDate || null, source: form.source }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
       queryClient.invalidateQueries({ queryKey: ['stock-lots-expiring'] });
@@ -88,8 +90,8 @@ export default function StockLotsPage() {
     onError: () => toast({ title: 'Failed to update QC', variant: 'destructive' }),
   });
 
-  const openAdd = () => { setEditing(null); setForm({ productId: '', lotNumber: '', quantity: 0, expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' }); setModalOpen(true); };
-  const openEdit = (row: any) => { setEditing(row); setForm({ productId: row.productId, lotNumber: row.lotNumber, quantity: row.quantity, expiryDate: row.expiryDate ? row.expiryDate.slice(0, 10) : '', source: row.source || '', status: row.status, qcStatus: row.qcStatus }); setModalOpen(true); };
+  const openAdd = () => { setEditing(null); setForm({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' }); setModalOpen(true); };
+  const openEdit = (row: any) => { setEditing(row); setForm({ productId: row.productId, lotNumber: row.lotNumber, quantity: row.quantity, warehouseId: row.warehouseId || '', expiryDate: row.expiryDate ? row.expiryDate.slice(0, 10) : '', source: row.source || '', status: row.status, qcStatus: row.qcStatus }); setModalOpen(true); };
 
   const expiryClass = (d: number | null) => {
     if (d === null) return '';
@@ -191,6 +193,10 @@ export default function StockLotsPage() {
                   <Input type="number" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg" />
                 </div>
               )}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Warehouse</Label>
+              <SearchableSelect options={warehouses} value={form.warehouseId} onChange={(v) => setForm({ ...form, warehouseId: v })} placeholder="Unassigned (no warehouse)" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">

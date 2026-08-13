@@ -1180,7 +1180,7 @@ model StockTransfer {
   id              String   @id @default(cuid())
   tenantId        String
   transferNumber  String // TR-YYYYMMDD-####
-  fromWarehouseId String
+  fromWarehouseId String? // null = source was unassigned stock (no warehouse)
   toWarehouseId   String
   transferDate    DateTime @default(now())
   createdById     String?
@@ -1189,7 +1189,7 @@ model StockTransfer {
   updatedAt       DateTime @updatedAt
 
   tenant        Tenant              @relation(fields: [tenantId], references: [id])
-  fromWarehouse Warehouse           @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
+  fromWarehouse Warehouse?          @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
   toWarehouse   Warehouse           @relation("TransferTo", fields: [toWarehouseId], references: [id])
   items         StockTransferItem[]
 

@@ -80,6 +80,7 @@ export class StockLotsService {
           lotNumber: data.lotNumber,
           quantity: qty,
           initialQty: qty,
+          warehouseId: data.warehouseId || null,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
           source: data.source || 'Manual',
           status: 'AVAILABLE',
@@ -97,6 +98,7 @@ export class StockLotsService {
       where: { id },
       data: {
         ...(data.lotNumber !== undefined && { lotNumber: data.lotNumber }),
+        ...(data.warehouseId !== undefined && { warehouseId: data.warehouseId || null }),
         ...(data.expiryDate !== undefined && { expiryDate: data.expiryDate ? new Date(data.expiryDate) : null }),
         ...(data.source !== undefined && { source: data.source }),
         ...(data.status !== undefined && { status: data.status }),

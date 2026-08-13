@@ -593,9 +593,9 @@ function StockTab({ product }: Readonly<{ product: any }>) {
   const byWarehouse = Object.values(warehouseMap).sort((a, b) => b.quantity - a.quantity)
 
   const allWarehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }))
-  // Prefer warehouses that actually hold stock as the source
-  const fromOptions = byWarehouse.filter((w) => w.id).map((w) => ({ value: w.id as string, label: `${w.name} (${w.quantity.toLocaleString()} ${unit})` }))
-  const availableAtFrom = warehouseMap[fromWh]?.quantity ?? 0
+  // Sources = places that actually hold stock (incl. "Unassigned" lots with no warehouse)
+  const fromOptions = byWarehouse.map((w) => ({ value: w.id ?? 'UNASSIGNED', label: `${w.name} (${w.quantity.toLocaleString()} ${unit})` }))
+  const availableAtFrom = (fromWh === 'UNASSIGNED' ? warehouseMap['none']?.quantity : warehouseMap[fromWh]?.quantity) ?? 0
 
   const transferMut = useMutation({
     mutationFn: () => api.post('/stock-transfers', {
@@ -614,7 +614,7 @@ function StockTab({ product }: Readonly<{ product: any }>) {
   })
 
   const openTransfer = () => {
-    setFromWh(byWarehouse.find((w) => w.id)?.id || '')
+    setFromWh(byWarehouse[0] ? (byWarehouse[0].id ?? 'UNASSIGNED') : '')
     setToWh('')
     setQty(0)
     setNotes('')
@@ -662,7 +662,7 @@ function StockTab({ product }: Readonly<{ product: any }>) {
             <Warehouse className="h-4 w-4 text-muted-foreground" />
             <p className="text-sm font-semibold">Stock by warehouse</p>
           </div>
-          <Button size="sm" onClick={openTransfer} disabled={fromOptions.length === 0 || allWarehouses.length < 2} className="bg-gradient-primary text-white hover:opacity-90">
+          <Button size="sm" onClick={openTransfer} disabled={fromOptions.length === 0 || allWarehouses.length === 0} className="bg-gradient-primary text-white hover:opacity-90">
             <MoveHorizontal className="h-4 w-4 mr-2" /> Transfer stock
           </Button>
         </div>
