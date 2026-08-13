@@ -22,6 +22,7 @@ export class ProductionsService {
     },
     product: { select: { id: true, name: true, sku: true, unit: true, currentStock: true } },
     warehouse: { select: { id: true, name: true } },
+    laborRate: { select: { id: true, name: true, ratePerHour: true } },
   };
 
   private async generateReferenceNumber(tenantId: string): Promise<string> {
@@ -41,6 +42,15 @@ export class ProductionsService {
       where: { tenantId, referenceNumber: { startsWith: prefix } },
     });
     return Array.from({ length: n }, (_, i) => `${prefix}-${String(base + i + 1).padStart(4, '0')}`);
+  }
+
+  // labor cost = selected rate/hour x hours; falls back to an explicit laborCost
+  private async computeLaborCost(tenantId: string, laborRateId?: string, laborHours?: number, explicit?: number): Promise<number> {
+    if (laborRateId) {
+      const rate = await this.prisma.laborRate.findFirst({ where: { id: laborRateId, tenantId } });
+      return roundQty((rate?.ratePerHour ?? 0) * (laborHours ?? 0));
+    }
+    return explicit ?? 0;
   }
 
   async findAll(
@@ -120,6 +130,42 @@ export class ProductionsService {
     });
   }
 
+  // How many units of each BOM product can be built from current material stock
+  async forecast(tenantId: string) {
+    const parents = await this.prisma.product.findMany({
+      where: { tenantId, isActive: true, components: { some: {} } },
+      include: {
+        components: { include: { material: { select: { id: true, name: true, sku: true, unit: true, currentStock: true } } } },
+      },
+      orderBy: { name: 'asc' },
+    });
+    const uomMap = await this.uom.getMap(tenantId);
+
+    const data = parents.map((p) => {
+      let maxBuildable = Infinity;
+      let limitingMaterial: string | null = null;
+      const components = p.components.map((c) => {
+        const perUnit = p.formulationMode === 'percentage' ? c.quantity / 100 : c.quantity;
+        const requiredInStock = roundQty(convertQuantity(perUnit, c.uom, c.material.unit, uomMap));
+        const canMake = requiredInStock > 0 ? Math.floor(c.material.currentStock / requiredInStock) : Infinity;
+        if (canMake < maxBuildable) { maxBuildable = canMake; limitingMaterial = c.material.name; }
+        return { material: c.material.name, sku: c.material.sku, requiredPerUnit: requiredInStock, unit: c.material.unit, available: c.material.currentStock, canMake: Number.isFinite(canMake) ? canMake : null };
+      });
+      return {
+        productId: p.id,
+        name: p.name,
+        sku: p.sku,
+        unit: p.unit,
+        formulationMode: p.formulationMode,
+        maxBuildable: Number.isFinite(maxBuildable) ? maxBuildable : 0,
+        limitingMaterial,
+        components,
+      };
+    });
+
+    return { data };
+  }
+
   async create(tenantId: string, userId: string, data: any) {
     const product = await this.prisma.product.findFirst({ where: { id: data.productId, tenantId } });
     if (!product) throw new NotFoundException('Product not found');
@@ -148,6 +194,7 @@ export class ProductionsService {
     }
 
     const referenceNumber = await this.generateReferenceNumber(tenantId);
+    const laborCost = await this.computeLaborCost(tenantId, data.laborRateId, data.laborHours, data.laborCost);
 
     const production = await this.prisma.production.create({
       data: {
@@ -155,7 +202,9 @@ export class ProductionsService {
         referenceNumber,
         productId: data.productId,
         quantity,
-        laborCost: data.laborCost ?? 0,
+        laborRateId: data.laborRateId || null,
+        laborHours: data.laborHours ?? 0,
+        laborCost,
         overheadCost: data.overheadCost ?? 0,
         warehouseId: data.warehouseId || null,
         status: 'DRAFT',
@@ -183,8 +232,16 @@ export class ProductionsService {
     }
     if (data.warehouseId !== undefined) updateData.warehouseId = data.warehouseId || null;
     if (data.notes !== undefined) updateData.notes = data.notes || null;
-    if (data.laborCost !== undefined) updateData.laborCost = data.laborCost;
     if (data.overheadCost !== undefined) updateData.overheadCost = data.overheadCost;
+    if (data.laborRateId !== undefined || data.laborHours !== undefined) {
+      const laborRateId = data.laborRateId !== undefined ? data.laborRateId : production.laborRateId;
+      const laborHours = data.laborHours !== undefined ? data.laborHours : production.laborHours;
+      updateData.laborRateId = laborRateId || null;
+      updateData.laborHours = laborHours ?? 0;
+      updateData.laborCost = await this.computeLaborCost(tenantId, laborRateId, laborHours, data.laborCost);
+    } else if (data.laborCost !== undefined) {
+      updateData.laborCost = data.laborCost;
+    }
 
     // Replace items if supplied
     const ops: any[] = [

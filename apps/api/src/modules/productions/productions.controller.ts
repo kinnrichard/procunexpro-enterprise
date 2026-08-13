@@ -25,6 +25,11 @@ export class ProductionsController {
     });
   }
 
+  @Get('forecast')
+  forecast(@Req() req: any) {
+    return this.productionsService.forecast(req.user.tenantId);
+  }
+
   @Get('preview')
   preview(
     @Req() req: any,

@@ -650,6 +650,139 @@ function UomConfig() {
 }
 
 // ============================================================
+// Labor Rate Config
+// ============================================================
+
+function LaborRateConfig() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<any | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
+  const [formData, setFormData] = useState({ name: '', ratePerHour: '0' })
+
+  const { data: response, isLoading } = useQuery({
+    queryKey: ['labor-rates', search],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '1000' })
+      if (search) params.set('search', search)
+      return (await api.get<{ data: any[] }>(`/labor-rates?${params}`)).data
+    },
+  })
+
+  const allItems: any[] = Array.isArray(response) ? response : (response?.data ?? [])
+  const totalPages = Math.ceil(allItems.length / CONFIG_PAGE_SIZE)
+  const items = allItems.slice((page - 1) * CONFIG_PAGE_SIZE, page * CONFIG_PAGE_SIZE)
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/labor-rates', data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['labor-rates'] }); queryClient.invalidateQueries({ queryKey: ['labor-rates-active'] }); closeModal(); toast({ title: 'Labor rate created' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to create.', variant: 'destructive' }),
+  })
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.put(`/labor-rates/${id}`, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['labor-rates'] }); queryClient.invalidateQueries({ queryKey: ['labor-rates-active'] }); closeModal(); toast({ title: 'Labor rate updated' }) },
+    onError: (err: any) => toast({ title: 'Error', description: err?.response?.data?.message || 'Failed to update.', variant: 'destructive' }),
+  })
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/labor-rates/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['labor-rates'] }); queryClient.invalidateQueries({ queryKey: ['labor-rates-active'] }); setDeleteTarget(null); toast({ title: 'Labor rate deleted' }) },
+    onError: () => toast({ title: 'Error', description: 'Failed to delete.', variant: 'destructive' }),
+  })
+
+  function openAdd() { setFormData({ name: '', ratePerHour: '0' }); setEditing(null); setModalOpen(true) }
+  function openEdit(item: any) { setFormData({ name: item.name, ratePerHour: String(item.ratePerHour) }); setEditing(item); setModalOpen(true) }
+  function closeModal() { setModalOpen(false); setEditing(null) }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const payload = { name: formData.name, ratePerHour: Number.parseFloat(formData.ratePerHour) || 0 }
+    if (editing) updateMutation.mutate({ id: editing.id, data: payload })
+    else createMutation.mutate(payload)
+  }
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending
+
+  function renderContent() {
+    if (isLoading) return <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+    if (items.length === 0) return <div className="text-center py-8 text-sm text-muted-foreground">No labor rates yet.</div>
+    return (
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Rate / hour</th>
+            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+            <th className="w-[80px] px-4 py-2.5"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {items.map((item) => (
+            <tr key={item.id} className="hover:bg-accent/30 transition-colors">
+              <td className="px-4 py-2.5 font-medium">{item.name}</td>
+              <td className="px-4 py-2.5 text-right font-mono">{item.ratePerHour}</td>
+              <td className="px-4 py-2.5 text-center"><Badge variant={item.isActive ? 'default' : 'secondary'} className="text-[10px]">{item.isActive ? 'Active' : 'Inactive'}</Badge></td>
+              <td className="px-4 py-2.5">
+                <div className="flex items-center gap-0.5 justify-end">
+                  <button onClick={() => openEdit(item)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Input placeholder="Search labor rates..." value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs h-9" />
+        <Button size="sm" onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90"><Plus className="h-4 w-4 mr-1" /> Add Rate</Button>
+        <p className="text-xs text-muted-foreground ml-auto">Selected on a production run; cost = rate × hours worked</p>
+      </div>
+      <Card><CardContent className="p-0">{renderContent()}</CardContent></Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">{allItems.length} rate{allItems.length === 1 ? '' : 's'}</p>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Button>
+            <span className="text-xs text-muted-foreground px-2">{page} / {totalPages}</span>
+            <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+      <Dialog open={modalOpen} onOpenChange={(open) => !open && closeModal()}>
+        <DialogContent className="max-w-sm">
+          <DialogTitle>{editing ? 'Edit Labor Rate' : 'Add Labor Rate'}</DialogTitle>
+          <DialogDescription>{editing ? 'Update the rate.' : 'Create a named hourly labor rate.'}</DialogDescription>
+          <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required placeholder="e.g., Skilled Labor" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Rate per hour</Label>
+              <Input type="number" step="any" value={formData.ratePerHour} onChange={(e) => setFormData({ ...formData, ratePerHour: e.target.value })} placeholder="e.g., 150" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={closeModal}>Cancel</Button>
+              <Button type="submit" disabled={!formData.name || isSubmitting} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{editing ? 'Save' : 'Create'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)} title="Delete Labor Rate" description={`Delete "${deleteTarget?.name}"?`} confirmLabel="Delete" variant="destructive" onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)} isLoading={deleteMutation.isPending} />
+    </div>
+  )
+}
+
+// ============================================================
 // Company Config (Multi-Company CRUD)
 // ============================================================
 
@@ -2185,6 +2318,7 @@ export default function SettingsPage() {
           <TabsTrigger value="manufacturers" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Manufacturers</TabsTrigger>
           <TabsTrigger value="origins" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Origins</TabsTrigger>
           <TabsTrigger value="units" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Units of Measure</TabsTrigger>
+          <TabsTrigger value="labor" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Labor Cost</TabsTrigger>
           <TabsTrigger value="currencies" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Currencies</TabsTrigger>
           <TabsTrigger value="taxes" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Taxes</TabsTrigger>
           <TabsTrigger value="purchase-terms" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Purchase Terms</TabsTrigger>
@@ -2370,6 +2504,11 @@ export default function SettingsPage() {
         {/* Units of Measure Tab */}
         <TabsContent value="units" className="mt-5">
           <UomConfig />
+        </TabsContent>
+
+        {/* Labor Cost Tab */}
+        <TabsContent value="labor" className="mt-5">
+          <LaborRateConfig />
         </TabsContent>
 
         {/* Currencies Tab */}

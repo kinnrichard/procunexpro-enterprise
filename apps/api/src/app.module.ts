@@ -14,6 +14,11 @@ import { ProductionsModule } from './modules/productions/productions.module';
 import { UnitsOfMeasureModule } from './modules/units-of-measure/units-of-measure.module';
 import { StockLotsModule } from './modules/stock-lots/stock-lots.module';
 import { ReplenishmentModule } from './modules/replenishment/replenishment.module';
+import { CustomersModule } from './modules/customers/customers.module';
+import { LaborRatesModule } from './modules/labor-rates/labor-rates.module';
+import { GoodsReceiptsModule } from './modules/goods-receipts/goods-receipts.module';
+import { StockTransfersModule } from './modules/stock-transfers/stock-transfers.module';
+import { DeliveryReceiptsModule } from './modules/delivery-receipts/delivery-receipts.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
@@ -56,6 +61,11 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     UnitsOfMeasureModule,
     StockLotsModule,
     ReplenishmentModule,
+    CustomersModule,
+    LaborRatesModule,
+    GoodsReceiptsModule,
+    StockTransfersModule,
+    DeliveryReceiptsModule,
     DashboardModule,
     HealthModule,
     BudgetsModule,

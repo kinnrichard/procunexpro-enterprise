@@ -175,12 +175,16 @@ model Tenant {
   departments        Department[]
   categories         Category[]
   vendors            Vendor[]
+  customers          Customer[]
   products           Product[]
   warehouses         Warehouse[]
   productComponents  ProductComponent[]
   productions        Production[]
   stockLots          StockLot[]
   lotConsumptions    LotConsumption[]
+  goodsReceipts      GoodsReceipt[]
+  stockTransfers     StockTransfer[]
+  deliveryReceipts   DeliveryReceipt[]
   purchaseRequests   PurchaseRequest[]
   purchaseOrders     PurchaseOrder[]
   stockMovements     StockMovement[]
@@ -203,6 +207,7 @@ model Tenant {
   currencies         Currency[]
   taxes              Tax[]
   unitsOfMeasure     UnitOfMeasure[]
+  laborRates         LaborRate[]
   purchaseTerms      PurchaseTerm[]
   deliveryTerms      DeliveryTerm[]
   deliveryTypes      DeliveryType[]
@@ -362,6 +367,29 @@ model Vendor {
 // MANUFACTURERS & ORIGINS (Config)
 // ============================================================
 
+model Customer {
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  code          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  country       String?
+  taxId         String?
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  deliveryReceipts DeliveryReceipt[]
+
+  @@unique([tenantId, code])
+}
+
 model Manufacturer {
   id        String   @id @default(cuid())
   tenantId  String
@@ -418,6 +446,21 @@ model Tax {
   updatedAt DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+}
+
+model LaborRate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String // "Skilled Labor", "Line Operator"
+  ratePerHour Float    @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  productions Production[]
 
   @@unique([tenantId, name])
 }
@@ -614,6 +657,9 @@ model Product {
   productions          Production[] // production runs of this product
   productionItems      ProductionItem[] // consumed as a material in runs
   lots                 StockLot[] // batch/lot stock with expiry
+  goodsReceiptItems    GoodsReceiptItem[]
+  stockTransferItems   StockTransferItem[]
+  deliveryReceiptItems DeliveryReceiptItem[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, slug])
@@ -680,6 +726,9 @@ model Warehouse {
   stockMovementsFrom StockMovement[]     @relation("FromWarehouse")
   stockMovementsTo   StockMovement[]     @relation("ToWarehouse")
   productions        Production[]
+  stockLots          StockLot[]
+  transfersFrom      StockTransfer[]     @relation("TransferFrom")
+  transfersTo        StockTransfer[]     @relation("TransferTo")
 
   @@unique([tenantId, code])
 }
@@ -806,6 +855,7 @@ model PurchaseOrder {
   items           PurchaseOrderItem[]
   stockMovements  StockMovement[]
   approvalSteps   ApprovalStep[]
+  goodsReceipts   GoodsReceipt[]
 
   @@unique([tenantId, orderNumber])
 }
@@ -894,7 +944,9 @@ model Production {
   referenceNumber String // PRD-YYYYMMDD-####
   productId       String // finished product being produced
   quantity        Float            @default(1) // units produced
-  laborCost       Float            @default(0) // actual labor cost for this batch
+  laborRateId     String? // selected labor rate
+  laborHours      Float            @default(0) // hours worked on this batch
+  laborCost       Float            @default(0) // laborRate.ratePerHour x laborHours
   overheadCost    Float            @default(0) // actual overhead cost for this batch
   warehouseId     String?
   status          ProductionStatus @default(DRAFT)
@@ -907,6 +959,7 @@ model Production {
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
   product        Product          @relation(fields: [productId], references: [id])
   warehouse      Warehouse?       @relation(fields: [warehouseId], references: [id])
+  laborRate       LaborRate?       @relation(fields: [laborRateId], references: [id])
   items           ProductionItem[]
   stockMovements  StockMovement[]
   producedLots    StockLot[]
@@ -945,6 +998,7 @@ model StockLot {
   source       String? // "PO receipt", "Production PRD-...", "Manual", supplier ref
   status       String    @default("AVAILABLE") // AVAILABLE | DEPLETED | EXPIRED | QUARANTINE
   qcStatus     String    @default("PASSED") // PENDING | PASSED | FAILED | HOLD
+  warehouseId  String? // location of this lot
   productionId String? // set when produced in-house
   receivedAt   DateTime  @default(now())
   createdAt    DateTime  @default(now())
@@ -952,10 +1006,11 @@ model StockLot {
 
   tenant       Tenant           @relation(fields: [tenantId], references: [id])
   product      Product          @relation(fields: [productId], references: [id])
+  warehouse    Warehouse?       @relation(fields: [warehouseId], references: [id])
   production   Production?      @relation(fields: [productionId], references: [id])
   consumptions LotConsumption[]
 
-  @@unique([tenantId, productId, lotNumber])
+  @@unique([tenantId, productId, warehouseId, lotNumber])
 }
 
 // Traceability: which material lots were consumed by which finished production
@@ -970,6 +1025,121 @@ model LotConsumption {
   tenant     Tenant      @relation(fields: [tenantId], references: [id])
   lot        StockLot    @relation(fields: [lotId], references: [id])
   production Production? @relation(fields: [productionId], references: [id])
+}
+
+// ============================================================
+// GOODS RECEIPT (Receiving)
+// ============================================================
+
+model GoodsReceipt {
+  id              String   @id @default(cuid())
+  tenantId        String
+  receiptNumber   String // GR-YYYYMMDD-####
+  purchaseOrderId String?
+  supplierDrRef   String? // supplier's delivery receipt / invoice number
+  receiptDate     DateTime @default(now())
+  receivedById    String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  items         GoodsReceiptItem[]
+
+  @@unique([tenantId, receiptNumber])
+}
+
+model GoodsReceiptItem {
+  id                  String    @id @default(cuid())
+  goodsReceiptId      String
+  purchaseOrderItemId String?
+  productId           String
+  quantity            Float     @default(0)
+  uom                 String    @default("pcs")
+  lotNumber           String?
+  expiryDate          DateTime?
+  createdAt           DateTime  @default(now())
+
+  goodsReceipt GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
+}
+
+// ============================================================
+// DELIVERY RECEIPT (Release goods to customer + external sign)
+// ============================================================
+
+model DeliveryReceipt {
+  id            String    @id @default(cuid())
+  tenantId      String
+  drNumber      String // DR-YYYYMMDD-####
+  customerId    String
+  warehouseId   String?
+  status        String    @default("RELEASED") // DRAFT | RELEASED | SIGNED | CANCELLED
+  deliveryDate  DateTime  @default(now())
+  notes         String?
+  token         String    @unique // for the external, no-login sign page
+  signedByName  String?
+  signatureData String? // base64 data URL of the drawn signature
+  signedAt      DateTime?
+  releasedAt    DateTime?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id])
+  customer Customer             @relation(fields: [customerId], references: [id])
+  items    DeliveryReceiptItem[]
+
+  @@unique([tenantId, drNumber])
+}
+
+model DeliveryReceiptItem {
+  id                String   @id @default(cuid())
+  deliveryReceiptId String
+  productId         String
+  quantity          Float    @default(0)
+  uom               String   @default("pcs")
+  createdAt         DateTime @default(now())
+
+  deliveryReceipt DeliveryReceipt @relation(fields: [deliveryReceiptId], references: [id], onDelete: Cascade)
+  product         Product         @relation(fields: [productId], references: [id])
+}
+
+// ============================================================
+// STOCK TRANSFER (Location movement)
+// ============================================================
+
+model StockTransfer {
+  id              String   @id @default(cuid())
+  tenantId        String
+  transferNumber  String // TR-YYYYMMDD-####
+  fromWarehouseId String
+  toWarehouseId   String
+  transferDate    DateTime @default(now())
+  createdById     String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  fromWarehouse Warehouse           @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse           @relation("TransferTo", fields: [toWarehouseId], references: [id])
+  items         StockTransferItem[]
+
+  @@unique([tenantId, transferNumber])
+}
+
+model StockTransferItem {
+  id         String   @id @default(cuid())
+  transferId String
+  productId  String
+  quantity   Float    @default(0)
+  uom        String   @default("pcs")
+  createdAt  DateTime @default(now())
+
+  transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product  Product       @relation(fields: [productId], references: [id])
 }
 
 // ============================================================

@@ -45,7 +45,8 @@ export default function ProductionsPage() {
   const [quantity, setQuantity] = useState(1);
   const [warehouseId, setWarehouseId] = useState('');
   const [notes, setNotes] = useState('');
-  const [laborCost, setLaborCost] = useState(0);
+  const [laborRateId, setLaborRateId] = useState('');
+  const [laborHours, setLaborHours] = useState(0);
   const [overheadCost, setOverheadCost] = useState(0);
 
   const { data: response, isLoading } = useQuery({
@@ -55,6 +56,7 @@ export default function ProductionsPage() {
 
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
+  const { data: laborData } = useQuery({ queryKey: ['labor-rates-active'], queryFn: () => api.get('/labor-rates/active') });
 
   // Live BOM preview for the selected product + quantity
   const { data: previewData, isFetching: previewLoading } = useQuery({
@@ -75,12 +77,16 @@ export default function ProductionsPage() {
   const hasShortage = preview.some((r) => !r.sufficient);
   const canSubmit = !!productId && quantity > 0 && preview.length > 0 && !hasShortage;
 
+  const laborRates = (laborData?.data?.data || []);
+  const laborRateOptions = laborRates.map((r: any) => ({ value: r.id, label: `${r.name} (${r.ratePerHour}/hr)` }));
+  const selectedRate = laborRates.find((r: any) => r.id === laborRateId);
+  const laborCost = (selectedRate?.ratePerHour || 0) * (laborHours || 0);
   const materialsCost = preview.reduce((s, r) => s + (r.lineCost || 0), 0);
-  const batchCost = materialsCost + (laborCost || 0) + (overheadCost || 0);
+  const batchCost = materialsCost + laborCost + (overheadCost || 0);
   const unitCost = quantity > 0 ? batchCost / quantity : 0;
 
   const createMut = useMutation({
-    mutationFn: () => api.post('/productions', { productId, quantity, warehouseId: warehouseId || undefined, notes: notes || undefined, laborCost, overheadCost }),
+    mutationFn: () => api.post('/productions', { productId, quantity, warehouseId: warehouseId || undefined, notes: notes || undefined, laborRateId: laborRateId || undefined, laborHours, overheadCost }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['productions'] });
       setModalOpen(false);
@@ -114,7 +120,8 @@ export default function ProductionsPage() {
     setQuantity(1);
     setWarehouseId('');
     setNotes('');
-    setLaborCost(0);
+    setLaborRateId('');
+    setLaborHours(0);
     setOverheadCost(0);
     setModalOpen(true);
   };
@@ -285,13 +292,21 @@ export default function ProductionsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-[13px] text-muted-foreground">Labor cost</Label>
-                    <Input type="number" step="any" value={laborCost} onChange={(e) => setLaborCost(Number.parseFloat(e.target.value) || 0)} className="h-8 rounded-lg" />
+                    <Label className="text-[13px] text-muted-foreground">Labor rate</Label>
+                    <SearchableSelect options={laborRateOptions} value={laborRateId} onChange={setLaborRateId} placeholder="Select rate" />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[13px] text-muted-foreground">Overhead cost</Label>
-                    <Input type="number" step="any" value={overheadCost} onChange={(e) => setOverheadCost(Number.parseFloat(e.target.value) || 0)} className="h-8 rounded-lg" />
+                    <Label className="text-[13px] text-muted-foreground">Labor hours</Label>
+                    <Input type="number" step="any" value={laborHours} onChange={(e) => setLaborHours(Number.parseFloat(e.target.value) || 0)} className="h-8 rounded-lg" />
                   </div>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Labor cost {selectedRate ? `(${selectedRate.ratePerHour}/hr × ${laborHours}h)` : ''}</span>
+                  <span className="tabular-nums font-medium">{formatCurrency(laborCost)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <Label className="text-[13px] text-muted-foreground">Overhead cost</Label>
+                  <Input type="number" step="any" value={overheadCost} onChange={(e) => setOverheadCost(Number.parseFloat(e.target.value) || 0)} className="h-8 w-28 rounded-lg text-right" />
                 </div>
                 <div className="flex items-center justify-between border-t pt-2 text-sm">
                   <span className="font-medium">Batch total / unit cost</span>
