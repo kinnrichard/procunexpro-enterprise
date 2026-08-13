@@ -474,7 +474,7 @@ export default function ProductsPage() {
   // --- Render ---
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader title="Products" description="Manage your product catalog and inventory items">
         <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">

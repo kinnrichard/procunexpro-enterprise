@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Truck, Pencil, Trash2, CheckCircle, Clock, Ban, Loader2 } from 'lucide-react'
+import { Truck, Pencil, Trash2, CheckCircle, Clock, Ban, Loader2, Plus } from 'lucide-react'
 import api from '@/lib/api'
 import { DataTable, Column } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
@@ -268,13 +268,13 @@ export default function VendorsPage() {
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => openEdit(row)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setDeleteTarget(row)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -286,11 +286,11 @@ export default function VendorsPage() {
   // --- Render ---
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader title="Vendors" description="Manage and view all registered vendors">
         <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
-          Add Vendor
+          <Plus className="h-4 w-4 mr-2" /> New Vendor
         </Button>
       </PageHeader>
 
@@ -357,7 +357,7 @@ export default function VendorsPage() {
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 gap-0">
           {/* Header */}
           <div className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
-            <DialogTitle className="text-xl font-semibold">
+            <DialogTitle>
               {editing ? 'Edit Vendor' : 'Add New Vendor'}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground mt-1">
@@ -371,20 +371,20 @@ export default function VendorsPage() {
               {/* Row: Name, Code */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Name <span className="text-red-500">*</span></Label>
                   <Input
                     {...register('name')}
                     placeholder="e.g., ABC Supplies Inc."
-                    className={cn(errors.name && 'border-red-300 focus-visible:ring-red-200')}
+                    className={cn('h-9 rounded-lg', errors.name && 'border-red-300 focus-visible:ring-red-200')}
                   />
                   {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Code <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Code <span className="text-red-500">*</span></Label>
                   <Input
                     {...register('code')}
                     placeholder="e.g., VND-001"
-                    className={cn(errors.code && 'border-red-300 focus-visible:ring-red-200')}
+                    className={cn('h-9 rounded-lg', errors.code && 'border-red-300 focus-visible:ring-red-200')}
                   />
                   {errors.code && <p className="text-xs text-red-500">{errors.code.message}</p>}
                 </div>
@@ -393,15 +393,15 @@ export default function VendorsPage() {
               {/* Row: Contact Person, Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Contact Person</Label>
-                  <Input {...register('contactPerson')} placeholder="Full name" />
+                  <Label className="text-[13px]">Contact Person</Label>
+                  <Input {...register('contactPerson')} placeholder="Full name" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Email</Label>
+                  <Label className="text-[13px]">Email</Label>
                   <Input
                     {...register('email')}
                     placeholder="vendor@email.com"
-                    className={cn(errors.email && 'border-red-300 focus-visible:ring-red-200')}
+                    className={cn('h-9 rounded-lg', errors.email && 'border-red-300 focus-visible:ring-red-200')}
                   />
                   {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
                 </div>
@@ -410,8 +410,8 @@ export default function VendorsPage() {
               {/* Row: Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Phone</Label>
-                  <Input {...register('phone')} placeholder="+1 234 567 8900" />
+                  <Label className="text-[13px]">Phone</Label>
+                  <Input {...register('phone')} placeholder="+1 234 567 8900" className="h-9 rounded-lg" />
                 </div>
               </div>
 
@@ -423,18 +423,18 @@ export default function VendorsPage() {
               {/* Row: Address, City, Country */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Address</Label>
-                  <Input {...register('address')} placeholder="Street address" />
+                  <Label className="text-[13px]">Address</Label>
+                  <Input {...register('address')} placeholder="Street address" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">City</Label>
-                  <Input {...register('city')} placeholder="City" />
+                  <Label className="text-[13px]">City</Label>
+                  <Input {...register('city')} placeholder="City" className="h-9 rounded-lg" />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Country</Label>
-                  <Input {...register('country')} placeholder="Country" />
+                  <Label className="text-[13px]">Country</Label>
+                  <Input {...register('country')} placeholder="Country" className="h-9 rounded-lg" />
                 </div>
               </div>
 
@@ -446,18 +446,18 @@ export default function VendorsPage() {
               {/* Row: Website, Tax ID, Payment Terms */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Website</Label>
-                  <Input {...register('website')} placeholder="https://example.com" />
+                  <Label className="text-[13px]">Website</Label>
+                  <Input {...register('website')} placeholder="https://example.com" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Tax ID</Label>
-                  <Input {...register('taxId')} placeholder="Tax identification number" />
+                  <Label className="text-[13px]">Tax ID</Label>
+                  <Input {...register('taxId')} placeholder="Tax identification number" className="h-9 rounded-lg" />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Payment Terms</Label>
-                  <Input {...register('paymentTerms')} placeholder="e.g., Net 30" />
+                  <Label className="text-[13px]">Payment Terms</Label>
+                  <Input {...register('paymentTerms')} placeholder="e.g., Net 30" className="h-9 rounded-lg" />
                 </div>
               </div>
 
@@ -469,47 +469,43 @@ export default function VendorsPage() {
               {/* Row: Bank Name, Bank Account, Bank Routing */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Bank Name</Label>
-                  <Input {...register('bankName')} placeholder="Bank name" />
+                  <Label className="text-[13px]">Bank Name</Label>
+                  <Input {...register('bankName')} placeholder="Bank name" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Bank Account</Label>
-                  <Input {...register('bankAccount')} placeholder="Account number" />
+                  <Label className="text-[13px]">Bank Account</Label>
+                  <Input {...register('bankAccount')} placeholder="Account number" className="h-9 rounded-lg" />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Bank Routing</Label>
-                  <Input {...register('bankRouting')} placeholder="Routing number" />
+                  <Label className="text-[13px]">Bank Routing</Label>
+                  <Input {...register('bankRouting')} placeholder="Routing number" className="h-9 rounded-lg" />
                 </div>
               </div>
 
               {/* Notes */}
               <div className="space-y-1.5">
-                <Label className="text-sm">Notes</Label>
+                <Label className="text-[13px]">Notes</Label>
                 <Textarea
                   {...register('notes')}
                   placeholder="Additional notes about this vendor..."
-                  className="min-h-[80px]"
+                  className="rounded-lg min-h-[80px]"
                 />
               </div>
             </form>
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-border/50 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={closeModal}
-              className="text-sm font-medium text-muted-foreground hover:text-red-500 transition-colors"
-            >
+          <div className="px-6 py-4 border-t border-border flex justify-between">
+            <Button type="button" variant="ghost" onClick={closeModal}>
               Cancel
-            </button>
+            </Button>
             <Button
               type="submit"
               form="vendor-form"
               disabled={!isValid || isSubmitting}
-              className="bg-gradient-primary text-white hover:opacity-90 rounded-lg"
+              className="bg-gradient-primary text-white"
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editing ? 'Save Changes' : 'Create Vendor'}

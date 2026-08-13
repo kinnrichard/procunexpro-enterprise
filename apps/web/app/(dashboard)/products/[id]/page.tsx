@@ -1056,7 +1056,7 @@ export default function ProductDetailPage() {
   }
 
   return (
-    <div className="p-6">
+    <div>
       {/* Back button */}
       <button onClick={() => router.push('/products')} className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" /> Back to Products
