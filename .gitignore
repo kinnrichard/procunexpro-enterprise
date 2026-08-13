@@ -5,7 +5,8 @@ dist
 *.tsbuildinfo
 .env
 .env.local
-uploads
+# runtime upload folder (NOT the src/modules/uploads source module)
+/apps/api/uploads/
 .claude/
 
 # local DB backup
