@@ -27,6 +27,7 @@ import {
   MoveRight,
   Send,
   Contact,
+  Scale,
   Wallet,
   TrendingUp,
   BarChart3,
@@ -65,23 +66,33 @@ const navigation: NavSection[] = [
       { label: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
       { label: 'RFQ', href: '/rfq', icon: FileSearch },
       { label: 'Vendors', href: '/vendors', icon: Building2 },
-      { label: 'Customers', href: '/customers', icon: Users },
       { label: 'Contracts', href: '/contracts', icon: FileSignature },
+      { label: 'Replenishment', href: '/replenishment', icon: PackagePlus },
     ],
   },
   {
     title: 'INVENTORY',
     items: [
       { label: 'Products', href: '/products', icon: Package },
-      { label: 'Warehouses', href: '/warehouses', icon: Warehouse },
+      { label: 'Inventory Balance', href: '/inventory-balance', icon: Scale },
       { label: 'Goods Receipts', href: '/goods-receipts', icon: PackageCheck },
       { label: 'Stock Movements', href: '/stock-movements', icon: ArrowLeftRight },
       { label: 'Stock Transfers', href: '/stock-transfers', icon: MoveRight },
       { label: 'Stock Lots & Expiry', href: '/stock-lots', icon: Boxes },
+    ],
+  },
+  {
+    title: 'PRODUCTION',
+    items: [
       { label: 'Production', href: '/productions', icon: Factory },
       { label: 'Forecast', href: '/forecast', icon: TrendingUp },
+    ],
+  },
+  {
+    title: 'SALES & DELIVERY',
+    items: [
+      { label: 'Customers', href: '/customers', icon: Users },
       { label: 'Deliveries', href: '/deliveries', icon: Send },
-      { label: 'Replenishment', href: '/replenishment', icon: PackagePlus },
     ],
   },
   {

@@ -43,6 +43,23 @@ export class WarehousesController {
     return this.warehousesService.delete(req.user.tenantId, id);
   }
 
+  // --- Areas ---
+
+  @Get(':id/areas')
+  getAreas(@Req() req: any, @Param('id') id: string) {
+    return this.warehousesService.getAreas(id, req.user.tenantId);
+  }
+
+  @Post(':id/areas')
+  createArea(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.warehousesService.createArea(id, req.user.tenantId, body);
+  }
+
+  @Delete(':warehouseId/areas/:areaId')
+  deleteArea(@Req() req: any, @Param('warehouseId') warehouseId: string, @Param('areaId') areaId: string) {
+    return this.warehousesService.deleteArea(warehouseId, areaId, req.user.tenantId);
+  }
+
   // --- Locations ---
 
   @Get(':id/locations')

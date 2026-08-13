@@ -99,28 +99,64 @@ export class WarehousesService {
     return { message: 'Warehouse deleted' };
   }
 
+  private async assertWarehouse(warehouseId: string, tenantId: string) {
+    const warehouse = await this.prisma.warehouse.findFirst({ where: { id: warehouseId, tenantId } });
+    if (!warehouse) throw new NotFoundException('Warehouse not found');
+    return warehouse;
+  }
+
+  // --- Areas (zones within a warehouse) ---
+
+  async getAreas(warehouseId: string, tenantId: string) {
+    await this.assertWarehouse(warehouseId, tenantId);
+    return this.prisma.warehouseArea.findMany({
+      where: { warehouseId },
+      orderBy: { name: 'asc' },
+      include: { _count: { select: { locations: true } } },
+    });
+  }
+
+  async createArea(warehouseId: string, tenantId: string, data: any) {
+    await this.assertWarehouse(warehouseId, tenantId);
+    const existing = await this.prisma.warehouseArea.findFirst({ where: { warehouseId, code: data.code } });
+    if (existing) throw new ConflictException('Area code already exists in this warehouse');
+
+    return this.prisma.warehouseArea.create({
+      data: {
+        warehouseId,
+        name: data.name,
+        code: data.code,
+        description: data.description || null,
+        isActive: data.isActive === undefined ? true : data.isActive,
+      },
+    });
+  }
+
+  async deleteArea(warehouseId: string, areaId: string, tenantId: string) {
+    await this.assertWarehouse(warehouseId, tenantId);
+    const area = await this.prisma.warehouseArea.findFirst({ where: { id: areaId, warehouseId } });
+    if (!area) throw new NotFoundException('Area not found');
+    await this.prisma.warehouseArea.delete({ where: { id: areaId } });
+    return { message: 'Area deleted' };
+  }
+
   // --- Locations ---
 
   async getLocations(warehouseId: string, tenantId: string) {
-    const warehouse = await this.prisma.warehouse.findFirst({
-      where: { id: warehouseId, tenantId },
-    });
-    if (!warehouse) throw new NotFoundException('Warehouse not found');
+    await this.assertWarehouse(warehouseId, tenantId);
 
     return this.prisma.warehouseLocation.findMany({
       where: { warehouseId },
       orderBy: { createdAt: 'desc' },
       include: {
+        area: { select: { id: true, name: true } },
         _count: { select: { products: true } },
       },
     });
   }
 
   async createLocation(warehouseId: string, tenantId: string, data: any) {
-    const warehouse = await this.prisma.warehouse.findFirst({
-      where: { id: warehouseId, tenantId },
-    });
-    if (!warehouse) throw new NotFoundException('Warehouse not found');
+    await this.assertWarehouse(warehouseId, tenantId);
 
     const existing = await this.prisma.warehouseLocation.findFirst({
       where: { warehouseId, code: data.code },
@@ -130,11 +166,13 @@ export class WarehousesService {
     return this.prisma.warehouseLocation.create({
       data: {
         warehouseId,
+        areaId: data.areaId || null,
         name: data.name,
         code: data.code,
         description: data.description || null,
         isActive: data.isActive === undefined ? true : data.isActive,
       },
+      include: { area: { select: { id: true, name: true } } },
     });
   }
 

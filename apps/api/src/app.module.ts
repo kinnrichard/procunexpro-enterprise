@@ -13,6 +13,7 @@ import { StockMovementsModule } from './modules/stock-movements/stock-movements.
 import { ProductionsModule } from './modules/productions/productions.module';
 import { UnitsOfMeasureModule } from './modules/units-of-measure/units-of-measure.module';
 import { StockLotsModule } from './modules/stock-lots/stock-lots.module';
+import { InventoryBalanceModule } from './modules/inventory-balance/inventory-balance.module';
 import { ReplenishmentModule } from './modules/replenishment/replenishment.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { StaffModule } from './modules/staff/staff.module';
@@ -62,6 +63,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     ProductionsModule,
     UnitsOfMeasureModule,
     StockLotsModule,
+    InventoryBalanceModule,
     ReplenishmentModule,
     CustomersModule,
     StaffModule,
