@@ -37,7 +37,10 @@ export class StockLotsService {
         skip,
         take: limit,
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
-        include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
+        include: {
+          product: { select: { id: true, name: true, sku: true, unit: true } },
+          warehouse: { select: { id: true, name: true } },
+        },
       }),
       this.prisma.stockLot.count({ where }),
     ]);

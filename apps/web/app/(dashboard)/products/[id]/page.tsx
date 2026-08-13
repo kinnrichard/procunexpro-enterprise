@@ -25,7 +25,7 @@ import {
   Plus, Pencil, Trash2, Loader2, Star, CheckCircle2,
   ShoppingCart, ClipboardList, Upload, Download, Eye,
   Tag, Factory, Hash, Layers, Globe, Boxes, ArrowDownUp,
-  Weight, MoveHorizontal, MoveVertical,
+  Weight, MoveHorizontal, MoveVertical, Warehouse, AlertTriangle,
 } from 'lucide-react'
 
 type DropdownItem = { id: string; name: string }
@@ -539,6 +539,154 @@ function PurchaseRequestsTab({ product }: Readonly<{ product: any }>) {
         </table>
       </CardContent>
     </Card>
+  )
+}
+
+// ============================================================
+// Stock Tab — where this product's stock is held
+// ============================================================
+const LOT_STATUS_CLASS: Record<string, string> = {
+  AVAILABLE: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  QUARANTINE: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  EXPIRED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  DEPLETED: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+}
+const LOT_QC_CLASS: Record<string, string> = {
+  PASSED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  FAILED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  HOLD: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+}
+
+function StockTab({ product }: Readonly<{ product: any }>) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['product-stock-lots', product.id],
+    queryFn: () => api.get('/stock-lots', { params: { productId: product.id, limit: 1000 } }),
+  })
+
+  const lots: any[] = data?.data?.data || []
+  const unit = product.unit || ''
+  const activeLots = lots.filter((l) => l.status !== 'DEPLETED' && (l.quantity || 0) > 0)
+  const onHand = activeLots.reduce((s, l) => s + (l.quantity || 0), 0)
+  const reorderPoint = product.reorderPoint ?? product.minStock ?? 0
+  const isLow = reorderPoint > 0 && (product.currentStock ?? onHand) <= reorderPoint
+
+  const warehouseMap: Record<string, { name: string; quantity: number; lots: number }> = {}
+  for (const l of activeLots) {
+    const key = l.warehouseId || 'none'
+    if (!warehouseMap[key]) warehouseMap[key] = { name: l.warehouse?.name || 'Unassigned', quantity: 0, lots: 0 }
+    warehouseMap[key].quantity += l.quantity || 0
+    warehouseMap[key].lots += 1
+  }
+  const byWarehouse = Object.values(warehouseMap).sort((a, b) => b.quantity - a.quantity)
+
+  if (isLoading) {
+    return (
+      <Card><CardContent className="flex items-center justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Total on-hand</p>
+          <p className="mt-1 text-2xl font-bold"><span className="font-mono">{onHand.toLocaleString()}</span> <span className="text-sm font-normal text-muted-foreground">{unit}</span></p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Reorder point</p>
+          <p className="mt-1 text-2xl font-bold font-mono">{Number(reorderPoint).toLocaleString()}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Warehouses</p>
+          <p className="mt-1 text-2xl font-bold font-mono">{byWarehouse.length}</p>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <p className="text-xs text-muted-foreground">Active lots</p>
+          <p className="mt-1 text-2xl font-bold font-mono">{activeLots.length}</p>
+        </CardContent></Card>
+      </div>
+
+      {isLow && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-400">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> On-hand is at or below the reorder point ({Number(reorderPoint).toLocaleString()} {unit}).
+        </div>
+      )}
+
+      {/* By warehouse */}
+      <Card>
+        <div className="px-4 py-3 border-b flex items-center gap-2">
+          <Warehouse className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-semibold">Stock by warehouse</p>
+        </div>
+        <CardContent className="p-0">
+          {byWarehouse.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">No stock is currently placed in any warehouse.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="text-left px-4 py-3">Warehouse</th>
+                  <th className="text-right px-4 py-3">Lots</th>
+                  <th className="text-right px-4 py-3">On-hand</th>
+                  <th className="text-right px-4 py-3">Share</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {byWarehouse.map((w) => (
+                  <tr key={w.name} className="hover:bg-accent/30 transition-colors">
+                    <td className="px-4 py-2.5 font-medium"><span className="flex items-center gap-2"><Warehouse className="h-3.5 w-3.5 text-muted-foreground" /> {w.name}</span></td>
+                    <td className="px-4 py-2.5 text-right font-mono">{w.lots}</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-semibold">{w.quantity.toLocaleString()} <span className="text-xs text-muted-foreground font-sans">{unit}</span></td>
+                    <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{onHand > 0 ? Math.round((w.quantity / onHand) * 100) : 0}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Individual lots */}
+      <Card>
+        <div className="px-4 py-3 border-b flex items-center gap-2">
+          <Boxes className="h-4 w-4 text-muted-foreground" />
+          <p className="text-sm font-semibold">Lots</p>
+        </div>
+        <CardContent className="p-0">
+          {lots.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">No stock lots recorded for this product yet.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="text-left px-4 py-3">Lot #</th>
+                  <th className="text-left px-4 py-3">Warehouse</th>
+                  <th className="text-right px-4 py-3">Qty</th>
+                  <th className="text-center px-4 py-3">Status</th>
+                  <th className="text-center px-4 py-3">QC</th>
+                  <th className="text-left px-4 py-3">Expiry</th>
+                  <th className="text-left px-4 py-3">Source</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {lots.map((l) => (
+                  <tr key={l.id} className="hover:bg-accent/30 transition-colors">
+                    <td className="px-4 py-2.5 font-mono text-sm font-medium">{l.lotNumber}</td>
+                    <td className="px-4 py-2.5"><span className="flex items-center gap-1.5"><Warehouse className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> {l.warehouse?.name || <span className="text-muted-foreground">Unassigned</span>}</span></td>
+                    <td className="px-4 py-2.5 text-right font-mono font-medium">{(l.quantity ?? 0).toLocaleString()} <span className="text-xs text-muted-foreground font-sans">{unit}</span></td>
+                    <td className="px-4 py-2.5 text-center"><span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', LOT_STATUS_CLASS[l.status] || LOT_STATUS_CLASS.DEPLETED)}>{l.status}</span></td>
+                    <td className="px-4 py-2.5 text-center"><span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', LOT_QC_CLASS[l.qcStatus] || LOT_QC_CLASS.PASSED)}>{l.qcStatus}</span></td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{l.expiryDate ? new Date(l.expiryDate).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground text-xs">{l.source || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -1069,6 +1217,9 @@ export default function ProductDetailPage() {
           <TabsTrigger value="profile" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
             Profile
           </TabsTrigger>
+          <TabsTrigger value="stock" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">
+            Stock
+          </TabsTrigger>
           <TabsTrigger value="pricing" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm gap-1.5">
             Pricing {(product.pricings?.length || 0) > 0 && <span className="text-[10px] font-semibold bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">{product.pricings.length}</span>}
           </TabsTrigger>
@@ -1087,6 +1238,7 @@ export default function ProductDetailPage() {
         </TabsList>
 
         <TabsContent value="profile" className="mt-5"><ProfileTab product={product} /></TabsContent>
+        <TabsContent value="stock" className="mt-5"><StockTab product={product} /></TabsContent>
         <TabsContent value="pricing" className="mt-5"><PricingTab product={product} /></TabsContent>
         <TabsContent value="media" className="mt-5"><MediaTab product={product} /></TabsContent>
         <TabsContent value="documents" className="mt-5"><DocumentsTab product={product} /></TabsContent>
