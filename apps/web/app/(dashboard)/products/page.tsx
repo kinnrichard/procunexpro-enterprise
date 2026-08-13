@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Package, Pencil, Trash2, AlertTriangle, Layers, Loader2 } from 'lucide-react'
+import { Package, Pencil, Trash2, AlertTriangle, Layers, Loader2, Plus } from 'lucide-react'
 import api from '@/lib/api'
 import { DataTable, Column } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
@@ -449,20 +449,20 @@ export default function ProductsPage() {
             <button
               onClick={() => setCompositionTarget(row)}
               title="Composition"
-              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <Layers className="h-3.5 w-3.5" />
             </button>
           )}
           <button
             onClick={() => openEdit(row)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setDeleteTarget(row)}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -478,7 +478,7 @@ export default function ProductsPage() {
       {/* Header */}
       <PageHeader title="Products" description="Manage your product catalog and inventory items">
         <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
-          Add Product
+          <Plus className="h-4 w-4 mr-2" /> New Product
         </Button>
       </PageHeader>
 
@@ -540,7 +540,7 @@ export default function ProductsPage() {
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 gap-0">
           {/* Header */}
           <div className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
-            <DialogTitle className="text-xl font-semibold">
+            <DialogTitle>
               {editing ? 'Edit Product' : 'Add New Product'}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground mt-1">
@@ -555,7 +555,7 @@ export default function ProductsPage() {
               {/* Inventory Type */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Inventory Type</Label>
+                  <Label className="text-[13px]">Inventory Type</Label>
                   <Controller
                     control={control}
                     name="inventoryType"
@@ -574,16 +574,16 @@ export default function ProductsPage() {
               {/* Row: Name, Manufacturer, Model Number, SKU */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Name <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Name <span className="text-red-500">*</span></Label>
                   <Input
                     {...register('name')}
                     placeholder="e.g., Latex Gloves"
-                    className={cn(errors.name && 'border-red-300 focus-visible:ring-red-200')}
+                    className={cn('h-9 rounded-lg', errors.name && 'border-red-300 focus-visible:ring-red-200')}
                   />
                   {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Manufacturer <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Manufacturer <span className="text-red-500">*</span></Label>
                   <Controller
                     control={control}
                     name="manufacturerId"
@@ -602,25 +602,25 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Model Number <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Model Number <span className="text-red-500">*</span></Label>
                   <Input
                     {...register('modelNumber')}
                     placeholder="e.g., MDL-2024"
-                    className={cn(errors.modelNumber && 'border-red-300 focus-visible:ring-red-200')}
+                    className={cn('h-9 rounded-lg', errors.modelNumber && 'border-red-300 focus-visible:ring-red-200')}
                   />
                   {errors.modelNumber && <p className="text-xs text-red-500">{errors.modelNumber.message}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">SKU <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">SKU <span className="text-red-500">*</span></Label>
                   <Input
                     {...register('sku')}
                     placeholder="e.g., PRD-001"
-                    className={cn(errors.sku && 'border-red-300 focus-visible:ring-red-200')}
+                    className={cn('h-9 rounded-lg', errors.sku && 'border-red-300 focus-visible:ring-red-200')}
                   />
                   {errors.sku && <p className="text-xs text-red-500">{errors.sku.message}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Origin <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Origin <span className="text-red-500">*</span></Label>
                   <Controller
                     control={control}
                     name="originId"
@@ -640,7 +640,7 @@ export default function ProductsPage() {
               {/* Row: Category, Sub Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Category <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Category <span className="text-red-500">*</span></Label>
                   <Controller
                     control={control}
                     name="categoryId"
@@ -660,7 +660,7 @@ export default function ProductsPage() {
                   {errors.categoryId && <p className="text-xs text-red-500">{errors.categoryId.message}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Sub Category <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Sub Category <span className="text-red-500">*</span></Label>
                   <Controller
                     control={control}
                     name="subCategoryId"
@@ -685,20 +685,20 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Length</Label>
-                  <Input type="number" step="0.01" {...register('length')} placeholder="0" />
+                  <Label className="text-[13px]">Length</Label>
+                  <Input type="number" step="0.01" {...register('length')} placeholder="0" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Depth</Label>
-                  <Input type="number" step="0.01" {...register('depth')} placeholder="0" />
+                  <Label className="text-[13px]">Depth</Label>
+                  <Input type="number" step="0.01" {...register('depth')} placeholder="0" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Height</Label>
-                  <Input type="number" step="0.01" {...register('height')} placeholder="0" />
+                  <Label className="text-[13px]">Height</Label>
+                  <Input type="number" step="0.01" {...register('height')} placeholder="0" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Weight</Label>
-                  <Input type="number" step="0.01" {...register('weight')} placeholder="0" />
+                  <Label className="text-[13px]">Weight</Label>
+                  <Input type="number" step="0.01" {...register('weight')} placeholder="0" className="h-9 rounded-lg" />
                 </div>
               </div>
 
@@ -709,7 +709,7 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Stock Unit</Label>
+                  <Label className="text-[13px]">Stock Unit</Label>
                   <Controller
                     control={control}
                     name="unit"
@@ -724,20 +724,20 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Min Stock</Label>
-                  <Input type="number" step="any" {...register('minStock')} placeholder="1" />
+                  <Label className="text-[13px]">Min Stock</Label>
+                  <Input type="number" step="any" {...register('minStock')} placeholder="1" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Max Stock</Label>
-                  <Input type="number" step="any" {...register('maxStock')} placeholder="1" />
+                  <Label className="text-[13px]">Max Stock</Label>
+                  <Input type="number" step="any" {...register('maxStock')} placeholder="1" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Reorder Qty</Label>
-                  <Input type="number" step="any" {...register('reorderQuantity')} placeholder="1" />
+                  <Label className="text-[13px]">Reorder Qty</Label>
+                  <Input type="number" step="any" {...register('reorderQuantity')} placeholder="1" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-sm">Shelf Life (days)</Label>
-                  <Input type="number" {...register('shelfLifeDays')} placeholder="e.g., 730" />
+                  <Label className="text-[13px]">Shelf Life (days)</Label>
+                  <Input type="number" {...register('shelfLifeDays')} placeholder="e.g., 730" className="h-9 rounded-lg" />
                 </div>
               </div>
 
@@ -749,11 +749,11 @@ export default function ProductsPage() {
 
               {/* Description */}
               <div className="space-y-1.5">
-                <Label className="text-sm">Description</Label>
+                <Label className="text-[13px]">Description</Label>
                 <Textarea
                   {...register('description')}
                   placeholder="Additional notes about this product..."
-                  className="min-h-[80px]"
+                  className="rounded-lg min-h-[80px]"
                 />
               </div>
 
@@ -761,19 +761,15 @@ export default function ProductsPage() {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-border/50 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={closeModal}
-              className="text-sm font-medium text-muted-foreground hover:text-red-500 transition-colors"
-            >
+          <div className="px-6 py-4 border-t border-border flex justify-between">
+            <Button type="button" variant="ghost" onClick={closeModal}>
               Cancel
-            </button>
+            </Button>
             <Button
               type="submit"
               form="product-form"
               disabled={!isValid || isSubmitting}
-              className="bg-gradient-primary text-white hover:opacity-90 rounded-lg"
+              className="bg-gradient-primary text-white"
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editing ? 'Save Changes' : 'Create Product'}
