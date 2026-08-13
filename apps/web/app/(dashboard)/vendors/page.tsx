@@ -289,7 +289,7 @@ export default function VendorsPage() {
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <PageHeader title="Vendors" description="Manage and view all registered vendors">
-        <Button onClick={openAdd} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+        <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
           Add Vendor
         </Button>
       </PageHeader>
@@ -339,10 +339,10 @@ export default function VendorsPage() {
                 key={chip.id}
                 onClick={() => handleStatusFilter(chip.id)}
                 className={cn(
-                  'shrink-0 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors',
+                  'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
                   statusFilter === chip.id
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-background text-muted-foreground border-border hover:bg-accent'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-accent'
                 )}
               >
                 {chip.label}
@@ -509,7 +509,7 @@ export default function VendorsPage() {
               type="submit"
               form="vendor-form"
               disabled={!isValid || isSubmitting}
-              className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90 rounded-lg"
+              className="bg-gradient-primary text-white hover:opacity-90 rounded-lg"
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editing ? 'Save Changes' : 'Create Vendor'}

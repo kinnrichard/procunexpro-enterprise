@@ -106,7 +106,7 @@ function CreateFromPRs() {
         <Button
           onClick={() => setConfirmOpen(true)}
           disabled={selectedIds.size === 0}
-          className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90"
+          className="bg-gradient-primary text-white hover:opacity-90"
         >
           <Plus className="h-4 w-4 mr-1.5" /> Create RFQ ({selectedIds.size})
         </Button>
@@ -187,7 +187,7 @@ function CreateFromPRs() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(false)}>Cancel</Button>
-              <Button size="sm" className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90" onClick={handleCreate} disabled={!rfqTitle.trim() || createMut.isPending}>
+              <Button size="sm" className="bg-gradient-primary text-white hover:opacity-90" onClick={handleCreate} disabled={!rfqTitle.trim() || createMut.isPending}>
                 {createMut.isPending && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
                 Create RFQ
               </Button>
@@ -308,7 +308,7 @@ export default function RFQPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Request for Quotation" description="Create RFQs, collect and compare vendor quotes">
-        <Button onClick={openCreate} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
           <Plus className="h-4 w-4 mr-2" /> New RFQ
         </Button>
       </PageHeader>
@@ -405,7 +405,7 @@ export default function RFQPage() {
           </form>
           <div className="px-6 py-4 border-t border-border flex justify-between">
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button type="submit" form="rfq-form" className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90" disabled={!form.formState.isValid || createMut.isPending || updateMut.isPending}>
+            <Button type="submit" form="rfq-form" className="bg-gradient-primary text-white hover:opacity-90" disabled={!form.formState.isValid || createMut.isPending || updateMut.isPending}>
               {editing ? 'Update RFQ' : 'Create RFQ'}
             </Button>
           </div>

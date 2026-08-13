@@ -30,6 +30,7 @@ export default function DeliveriesPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
@@ -37,8 +38,8 @@ export default function DeliveriesPage() {
   const [rows, setRows] = useState<Row[]>([]);
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ['delivery-receipts', page, search],
-    queryFn: () => api.get('/delivery-receipts', { params: { page, limit: 10, search } }),
+    queryKey: ['delivery-receipts', page, search, statusFilter],
+    queryFn: () => api.get('/delivery-receipts', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }) } }),
   });
   const { data: custData } = useQuery({ queryKey: ['customers-active'], queryFn: () => api.get('/customers/active') });
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
@@ -98,6 +99,9 @@ export default function DeliveriesPage() {
 
   const canSave = !!customerId && rows.some((r) => r.productId && r.quantity > 0);
 
+  const statusFilters = ['', 'RELEASED', 'SIGNED', 'CANCELLED'];
+  const statusLabels: Record<string, string> = { '': 'All', RELEASED: 'Awaiting sign', SIGNED: 'Signed', CANCELLED: 'Cancelled' };
+
   return (
     <div className="space-y-6">
       <PageHeader title="Deliveries" description="Release finished goods to a customer — creates a Delivery Receipt with an external sign link">
@@ -110,7 +114,18 @@ export default function DeliveriesPage() {
         <StatCard title="Awaiting sign" value={items.filter((i: any) => i.status === 'RELEASED').length} icon={<Send className="h-5 w-5" />} />
       </div>
 
-      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search deliveries..." isLoading={isLoading} emptyMessage="No deliveries yet" />
+      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search deliveries..." isLoading={isLoading} emptyMessage="No deliveries yet"
+        toolbar={
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {statusFilters.map((s) => (
+              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+                className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+                {statusLabels[s]}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-2xl p-0 gap-0">
