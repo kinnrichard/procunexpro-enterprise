@@ -80,7 +80,7 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env pull
             # Custom roles: safe-cast the role enum -> text before db push (idempotent; Prisma won't auto-cast).
             docker compose -f docker-compose.prod.yml --env-file .env up -d postgres && sleep 4
-            docker compose -f docker-compose.prod.yml --env-file .env exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER TABLE \"User\" ALTER COLUMN \"role\" TYPE text USING \"role\"::text; ALTER TABLE \"ApprovalWorkflowRule\" ALTER COLUMN \"role\" TYPE text USING \"role\"::text; ALTER TABLE \"ApprovalStep\" ALTER COLUMN \"role\" TYPE text USING \"role\"::text; DROP TYPE IF EXISTS \"Role\";"' || true
+            docker compose -f docker-compose.prod.yml --env-file .env exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER TABLE \"User\" ALTER COLUMN \"role\" DROP DEFAULT; ALTER TABLE \"User\" ALTER COLUMN \"role\" TYPE text USING \"role\"::text; ALTER TABLE \"ApprovalWorkflowRule\" ALTER COLUMN \"role\" TYPE text USING \"role\"::text; ALTER TABLE \"ApprovalStep\" ALTER COLUMN \"role\" TYPE text USING \"role\"::text; DROP TYPE IF EXISTS \"Role\";"' || true
             # Apply the Prisma schema to the DB (project uses db push, not migrations)
             docker compose -f docker-compose.prod.yml --env-file .env run --rm api npx prisma db push --skip-generate || true
             docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
