@@ -27,7 +27,7 @@ import { WarehousesConfig } from '@/components/warehouses-config'
 
 import {
   Building2, Palette, Bell, Shield, Factory, Globe, Network, Users, Coins, Star, Percent, FileText, Truck,
-  Plus, Pencil, Trash2, Loader2, ChevronRight, FolderTree,
+  Plus, Pencil, Trash2, Loader2, ChevronRight, FolderTree, X, Lock,
 } from 'lucide-react'
 
 // ============================================================
@@ -801,14 +801,24 @@ function RolesPermissionsConfig() {
   const [selectedRole, setSelectedRole] = useState('')
   // matrix keyed by `${role}|${module}` -> {canView,...}
   const [matrix, setMatrix] = useState<Record<string, any>>({})
+  const [newOpen, setNewOpen] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [deleteRole, setDeleteRole] = useState<any>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['permissions-matrix'],
     queryFn: async () => (await api.get('/permissions')).data,
   })
+  const { data: rolesList } = useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => (await api.get('/roles')).data,
+  })
 
   const roles: string[] = data?.roles ?? []
   const modules: Array<{ key: string; label: string }> = data?.modules ?? []
+  const roleMeta = (key: string): any => (rolesList ?? []).find((r: any) => r.key === key)
+  const roleName = (key: string) => roleMeta(key)?.label || roleLabel(key)
 
   // Seed local state once data arrives
   if (data && Object.keys(matrix).length === 0 && data.permissions?.length) {
@@ -833,23 +843,55 @@ function RolesPermissionsConfig() {
     onError: () => toast({ title: 'Failed to save permissions', variant: 'destructive' }),
   })
 
+  const createRoleMut = useMutation({
+    mutationFn: () => api.post('/roles', { label: newName, description: newDesc }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      queryClient.invalidateQueries({ queryKey: ['permissions-matrix'] })
+      setNewOpen(false); setNewName(''); setNewDesc('')
+      if (res?.data?.key) setSelectedRole(res.data.key)
+      toast({ title: 'Role created' })
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to create role', variant: 'destructive' }),
+  })
+  const deleteRoleMut = useMutation({
+    mutationFn: (id: string) => api.delete(`/roles/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] })
+      queryClient.invalidateQueries({ queryKey: ['permissions-matrix'] })
+      toast({ title: 'Role deleted' })
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to delete role', variant: 'destructive' }),
+  })
+
   if (isLoading) return <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-medium text-muted-foreground">Role:</span>
-        {roles.map((r) => (
-          <button key={r} type="button" onClick={() => setSelectedRole(r)}
-            className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', selectedRole === r ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-            {roleLabel(r)}
-          </button>
-        ))}
-        <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="ml-auto bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="text-xs font-medium text-muted-foreground mr-1">Role:</span>
+        {roles.map((r) => {
+          const meta = roleMeta(r)
+          const active = selectedRole === r
+          return (
+            <span key={r} className={cn('inline-flex items-center rounded-full text-xs font-medium transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+              <button type="button" onClick={() => setSelectedRole(r)} className="flex items-center gap-1 pl-3 pr-2 py-1.5">
+                {meta?.isSystem && <Lock className="h-3 w-3 opacity-60" />}{roleName(r)}
+              </button>
+              {meta && !meta.isSystem && (
+                <button type="button" title="Delete role" onClick={() => setDeleteRole(meta)} className="pl-0.5 pr-2 py-1.5 opacity-70 hover:opacity-100 hover:text-red-500">
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </span>
+          )
+        })}
+        <Button size="sm" variant="outline" onClick={() => setNewOpen(true)}><Plus className="h-3.5 w-3.5 mr-1" /> New Role</Button>
+        <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="ml-auto bg-gradient-primary text-white hover:opacity-90">
           {saveMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Save
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">SUPERADMIN and ADMIN always have full access and aren&apos;t listed here. Set what <b>{selectedRole ? roleLabel(selectedRole) : 'each role'}</b> can do per module.</p>
+      <p className="text-xs text-muted-foreground">SUPERADMIN and ADMIN always have full access and aren&apos;t listed here. Set what <b>{selectedRole ? roleName(selectedRole) : 'each role'}</b> can do per module.{(() => { const c = roleMeta(selectedRole)?.userCount; return c ? ` · ${c} user${c === 1 ? '' : 's'}` : ''; })()}</p>
 
       <Card>
         <CardContent className="p-0">
@@ -875,6 +917,43 @@ function RolesPermissionsConfig() {
           </table>
         </CardContent>
       </Card>
+
+      <Dialog open={newOpen} onOpenChange={setNewOpen}>
+        <DialogContent className="max-w-md p-0 gap-0">
+          <div className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
+            <DialogTitle>New Role</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">Create a custom role, then set its per-module permissions below.</DialogDescription>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Role name <span className="text-red-500">*</span></Label>
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="h-9 rounded-lg" placeholder="e.g., Production Officer" />
+              <p className="text-[11px] text-muted-foreground">Stored as <span className="font-mono">{newName.trim().toUpperCase().replaceAll(/[^A-Z0-9]+/g, '_').replaceAll(/^_+|_+$/g, '') || 'ROLE_KEY'}</span></p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Description</Label>
+              <Textarea value={newDesc} onChange={(e) => setNewDesc(e.target.value)} className="rounded-lg" rows={2} placeholder="What can this role do?" />
+            </div>
+          </div>
+          <div className="px-6 py-4 border-t border-border flex justify-between">
+            <Button type="button" variant="ghost" onClick={() => setNewOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={() => createRoleMut.mutate()} className="bg-gradient-primary text-white" disabled={!newName.trim() || createRoleMut.isPending}>
+              {createRoleMut.isPending ? 'Creating…' : 'Create role'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteRole}
+        onOpenChange={(open) => !open && setDeleteRole(null)}
+        title="Delete Role"
+        description={`Delete the "${deleteRole?.label}" role? Any users with this role must be reassigned first. This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => { if (deleteRole) deleteRoleMut.mutate(deleteRole.id, { onSuccess: () => setDeleteRole(null) }); }}
+        isLoading={deleteRoleMut.isPending}
+      />
     </div>
   )
 }

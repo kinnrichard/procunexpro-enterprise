@@ -11,16 +11,6 @@ datasource db {
 // ENUMS
 // ============================================================
 
-enum Role {
-  SUPERADMIN
-  ADMIN
-  MANAGER
-  PROCUREMENT_OFFICER
-  WAREHOUSE_STAFF
-  FINANCE_OFFICER
-  VIEWER
-}
-
 enum TenantStatus {
   ACTIVE
   SUSPENDED
@@ -213,6 +203,24 @@ model Tenant {
   purchaseTerms      PurchaseTerm[]
   deliveryTerms      DeliveryTerm[]
   deliveryTypes      DeliveryType[]
+  roles              Role[]
+}
+
+// Tenant-scoped roles. The 7 built-ins are seeded as isSystem=true; admins can
+// add custom roles. `key` is what lands on User.role and the RolePermission matrix.
+model Role {
+  id          String   @id @default(cuid())
+  tenantId    String
+  key         String
+  label       String
+  description String?
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
 }
 
 model User {
@@ -223,7 +231,7 @@ model User {
   passwordHash        String
   firstName           String
   lastName            String
-  role                Role      @default(VIEWER)
+  role                String    @default("VIEWER") // Role.key (system or custom, per tenant)
   departmentId        String?
   avatar              String?
   phone               String?
@@ -1390,7 +1398,7 @@ model ApprovalWorkflowRule {
   id         String   @id @default(cuid())
   workflowId String
   stepOrder  Int
-  role       Role
+  role       String
   isRequired Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -1403,7 +1411,7 @@ model ApprovalStep {
   purchaseRequestId String?
   purchaseOrderId   String?
   stepOrder         Int
-  role              Role
+  role              String
   userId            String?
   action            ApprovalAction?
   comment           String?

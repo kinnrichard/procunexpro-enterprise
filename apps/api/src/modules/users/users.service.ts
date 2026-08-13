@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../database/prisma.service';
+import { SYSTEM_ROLES } from '../roles/roles.constants';
 
 @Injectable()
 export class UsersService {
@@ -104,7 +105,15 @@ export class UsersService {
     return user;
   }
 
+  private async assertValidRole(tenantId: string, role?: string) {
+    if (!role) return;
+    if (SYSTEM_ROLES.some((r) => r.key === role)) return; // built-ins are always valid
+    const exists = await this.prisma.role.findUnique({ where: { tenantId_key: { tenantId, key: role } } });
+    if (!exists) throw new BadRequestException(`Unknown role "${role}"`);
+  }
+
   async create(tenantId: string, data: any) {
+    await this.assertValidRole(tenantId, data.role);
     const existing = await this.prisma.user.findFirst({
       where: {
         tenantId,
@@ -146,6 +155,7 @@ export class UsersService {
   async update(tenantId: string, id: string, data: any) {
     const user = await this.prisma.user.findFirst({ where: { id, tenantId } });
     if (!user) throw new NotFoundException('User not found');
+    await this.assertValidRole(tenantId, data.role);
 
     const updateData: any = {};
     if (data.firstName !== undefined) updateData.firstName = data.firstName;

@@ -18,6 +18,7 @@ import { ReplenishmentModule } from './modules/replenishment/replenishment.modul
 import { CustomersModule } from './modules/customers/customers.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
+import { RolesModule } from './modules/roles/roles.module';
 import { LaborRatesModule } from './modules/labor-rates/labor-rates.module';
 import { GoodsReceiptsModule } from './modules/goods-receipts/goods-receipts.module';
 import { StockTransfersModule } from './modules/stock-transfers/stock-transfers.module';
@@ -68,6 +69,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     CustomersModule,
     StaffModule,
     PermissionsModule,
+    RolesModule,
     LaborRatesModule,
     GoodsReceiptsModule,
     StockTransfersModule,

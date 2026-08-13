@@ -23,8 +23,6 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { Users, Plus, Pencil, Trash2, UserCheck, UserX, Shield } from 'lucide-react';
-
-const roles = ['ADMIN', 'MANAGER', 'PROCUREMENT_OFFICER', 'WAREHOUSE_STAFF', 'FINANCE_OFFICER', 'VIEWER'];
 const roleColors: Record<string, string> = {
   SUPERADMIN: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   ADMIN: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
@@ -84,9 +82,15 @@ export default function UsersPage() {
     queryFn: () => api.get('/departments', { params: { limit: 1000 } }),
   });
 
+  const { data: rolesData } = useQuery({ queryKey: ['roles'], queryFn: () => api.get('/roles') });
+
   const items = response?.data?.data || [];
   const total = response?.data?.total || 0;
   const departments = (deptData?.data?.data || []).map((d: any) => ({ value: d.id, label: d.name }));
+  const allRoles: any[] = rolesData?.data || [];
+  const roleLabel = (key: string) => allRoles.find((r) => r.key === key)?.label || key.replaceAll('_', ' ');
+  // SUPERADMIN is developer-only — not assignable through the UI
+  const assignableRoles = allRoles.filter((r) => r.key !== 'SUPERADMIN');
 
   const form = useForm({
     resolver: zodResolver(userSchema),
@@ -148,8 +152,8 @@ export default function UsersPage() {
     { key: 'username', label: 'Username', render: (v: string) => <span className="font-mono text-sm">{v}</span> },
     {
       key: 'role', label: 'Role', render: (v: string) => (
-        <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', roleColors[v])}>
-          {v.replaceAll('_', ' ')}
+        <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', roleColors[v] || 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400')}>
+          {roleLabel(v)}
         </span>
       ),
     },
@@ -206,7 +210,7 @@ export default function UsersPage() {
                 <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All roles" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Roles</SelectItem>
-                  {roles.map(r => <SelectItem key={r} value={r}>{r.replaceAll('_', ' ')}</SelectItem>)}
+                  {allRoles.map((r) => <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </FilterField>
@@ -267,7 +271,7 @@ export default function UsersPage() {
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {roles.map(r => <SelectItem key={r} value={r}>{r.replaceAll('_', ' ')}</SelectItem>)}
+                      {assignableRoles.map((r) => <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )} />
