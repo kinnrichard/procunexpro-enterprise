@@ -127,23 +127,9 @@ const STATUS_CHIPS = [
 ] as const
 
 const UOM_OPTIONS = [
-  { value: 'pcs', label: 'Pieces (pcs)' },
-  { value: 'box', label: 'Box' },
-  { value: 'pack', label: 'Pack' },
-  { value: 'set', label: 'Set' },
-  { value: 'kg', label: 'Kilogram (kg)' },
-  { value: 'g', label: 'Gram (g)' },
-  { value: 'l', label: 'Liter (L)' },
-  { value: 'ml', label: 'Milliliter (mL)' },
-  { value: 'm', label: 'Meter (m)' },
-  { value: 'roll', label: 'Roll' },
-  { value: 'bag', label: 'Bag' },
-  { value: 'bottle', label: 'Bottle' },
-  { value: 'can', label: 'Can' },
-  { value: 'pair', label: 'Pair' },
-  { value: 'ream', label: 'Ream' },
-  { value: 'unit', label: 'Unit' },
-]
+  'pcs', 'box', 'pack', 'set', 'kg', 'g', 'l', 'ml', 'm',
+  'roll', 'bag', 'bottle', 'can', 'pair', 'ream', 'unit',
+].map((code) => ({ value: code, label: code }))
 
 // --- Page ---
 
@@ -266,7 +252,7 @@ export default function ProductsPage() {
   const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
   const manufacturerOptions = asArray<DropdownItem>(manufacturersRes?.data).map((m) => ({ value: m.id, label: m.name }))
   const originOptions = asArray<DropdownItem>(originsRes?.data).map((o) => ({ value: o.id, label: o.name }))
-  const uomOptions = asArray<{ code: string; name: string }>(uomRes?.data).map((u) => ({ value: u.code, label: `${u.code} — ${u.name}` }))
+  const uomOptions = asArray<{ code: string; name: string }>(uomRes?.data).map((u) => ({ value: u.code, label: u.code }))
   // Prefer configured Units of Measure; fall back to the standard list so the picker is never empty
   const stockUnitOptions = uomOptions.length > 0 ? uomOptions : UOM_OPTIONS
   const categoryOptions = asArray<DropdownItem>(rootCategoriesRes?.data).map((c) => ({ value: c.id, label: c.name }))
