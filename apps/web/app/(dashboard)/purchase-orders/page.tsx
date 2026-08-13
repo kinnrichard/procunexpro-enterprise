@@ -14,6 +14,7 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -255,9 +256,34 @@ export default function PurchaseOrdersPage() {
   const [editing, setEditing] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
+  // Advanced filters
+  const [filterVendorId, setFilterVendorId] = useState('');
+  const [filterPriority, setFilterPriority] = useState('');
+  const [filterOrderFrom, setFilterOrderFrom] = useState<Date | undefined>();
+  const [filterOrderTo, setFilterOrderTo] = useState<Date | undefined>();
+  const [filterAmountMin, setFilterAmountMin] = useState('');
+  const [filterAmountMax, setFilterAmountMax] = useState('');
+  const activeFilterCount = [filterVendorId, filterPriority, filterOrderFrom, filterOrderTo, filterAmountMin, filterAmountMax].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterVendorId(''); setFilterPriority('');
+    setFilterOrderFrom(undefined); setFilterOrderTo(undefined);
+    setFilterAmountMin(''); setFilterAmountMax('');
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['purchase-orders', page, search, statusFilter],
-    queryFn: () => api.get('/purchase-orders', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }) } }),
+    queryKey: ['purchase-orders', page, search, statusFilter, filterVendorId, filterPriority, filterOrderFrom, filterOrderTo, filterAmountMin, filterAmountMax],
+    queryFn: () => api.get('/purchase-orders', { params: {
+      page, limit: 10, search,
+      ...(statusFilter && { status: statusFilter }),
+      ...(filterVendorId && { vendorId: filterVendorId }),
+      ...(filterPriority && { priority: filterPriority }),
+      ...(filterOrderFrom && { orderDateFrom: toDateStr(filterOrderFrom) }),
+      ...(filterOrderTo && { orderDateTo: toDateStr(filterOrderTo) }),
+      ...(filterAmountMin && { amountMin: filterAmountMin }),
+      ...(filterAmountMax && { amountMax: filterAmountMax }),
+    } }),
   });
 
   const { data: vendorData } = useQuery({
@@ -433,13 +459,41 @@ export default function PurchaseOrdersPage() {
         emptyMessage="No purchase orders found"
         onRowClick={(row: any) => router.push(`/purchase-orders/${row.id}`)}
         toolbar={
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {statusFilters.map(s => (
-              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-                {statusLabels[s]}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Vendor">
+                <SearchableSelect options={vendors} value={filterVendorId} onChange={(v) => { setFilterVendorId(v); setPage(1); }} placeholder="All vendors" />
+              </FilterField>
+              <FilterField label="Priority">
+                <Select value={filterPriority || 'ALL'} onValueChange={(v) => { setFilterPriority(v === 'ALL' ? '' : v); setPage(1); }}>
+                  <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All priorities" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All priorities</SelectItem>
+                    {['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Order Date">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterOrderFrom} onChange={(d) => { setFilterOrderFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterOrderTo} onChange={(d) => { setFilterOrderTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+              <FilterField label="Total Amount">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input type="number" value={filterAmountMin} onChange={(e) => { setFilterAmountMin(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="Min" />
+                  <Input type="number" value={filterAmountMax} onChange={(e) => { setFilterAmountMax(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="Max" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {statusFilters.map(s => (
+                <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+                  {statusLabels[s]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />

@@ -20,7 +20,10 @@ export class PurchaseOrdersService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; search?: string; status?: string; priority?: string },
+    params: {
+      page?: number; limit?: number; search?: string; status?: string; priority?: string;
+      vendorId?: string; orderDateFrom?: string; orderDateTo?: string; amountMin?: string; amountMax?: string;
+    },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -30,6 +33,19 @@ export class PurchaseOrdersService {
 
     if (params.status) where.status = params.status;
     if (params.priority) where.priority = params.priority;
+    if (params.vendorId) where.vendorId = params.vendorId;
+
+    if (params.orderDateFrom || params.orderDateTo) {
+      where.orderDate = {};
+      if (params.orderDateFrom) where.orderDate.gte = new Date(params.orderDateFrom);
+      if (params.orderDateTo) where.orderDate.lte = new Date(`${params.orderDateTo}T23:59:59.999Z`);
+    }
+
+    if (params.amountMin || params.amountMax) {
+      where.totalAmount = {};
+      if (params.amountMin) where.totalAmount.gte = Number(params.amountMin);
+      if (params.amountMax) where.totalAmount.lte = Number(params.amountMax);
+    }
 
     if (params.search) {
       where.OR = [

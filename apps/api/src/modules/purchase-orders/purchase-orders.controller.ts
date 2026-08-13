@@ -22,6 +22,11 @@ export class PurchaseOrdersController {
     @Query('search') search?: string,
     @Query('status') status?: string,
     @Query('priority') priority?: string,
+    @Query('vendorId') vendorId?: string,
+    @Query('orderDateFrom') orderDateFrom?: string,
+    @Query('orderDateTo') orderDateTo?: string,
+    @Query('amountMin') amountMin?: string,
+    @Query('amountMax') amountMax?: string,
   ) {
     return this.purchaseOrdersService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
@@ -29,6 +34,11 @@ export class PurchaseOrdersController {
       search,
       status,
       priority,
+      vendorId,
+      orderDateFrom,
+      orderDateTo,
+      amountMin,
+      amountMax,
     });
   }
 
