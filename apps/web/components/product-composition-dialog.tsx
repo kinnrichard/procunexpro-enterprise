@@ -42,7 +42,7 @@ export function ProductCompositionDialog({ productId, productName, open, onOpenC
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: uomData } = useQuery({ queryKey: ['uom-active'], queryFn: () => api.get('/units-of-measure/active') });
   const uomList = Array.isArray(uomData?.data?.data) ? uomData.data.data : [];
-  const uomOptions = uomList.map((u: any) => ({ value: u.code, label: `${u.code} — ${u.name}` }));
+  const uomOptions = uomList.map((u: any) => ({ value: u.code, label: u.code }));
 
   // Load existing components into editable rows when the dialog opens / data arrives
   useEffect(() => {

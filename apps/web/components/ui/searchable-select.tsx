@@ -11,6 +11,17 @@ interface Option {
   label: string
 }
 
+// Radix Dialog locks page scroll (react-remove-scroll), which also swallows
+// wheel events on portaled popover content. Manually scroll the list so the
+// mouse wheel works whether or not the select lives inside a modal.
+function handleListWheel(e: WheelEvent) {
+  const el = e.currentTarget as HTMLDivElement
+  if (el.scrollHeight <= el.clientHeight) return
+  e.preventDefault()
+  e.stopPropagation()
+  el.scrollTop += e.deltaY
+}
+
 interface SearchableSelectProps {
   options: Option[]
   value?: string
@@ -32,6 +43,17 @@ function SearchableSelect({
   const [search, setSearch] = React.useState("")
   const [showAll, setShowAll] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
+  const listRef = React.useRef<HTMLDivElement | null>(null)
+
+  const setListRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (listRef.current) {
+      listRef.current.removeEventListener("wheel", handleListWheel)
+    }
+    listRef.current = node
+    if (node) {
+      node.addEventListener("wheel", handleListWheel, { passive: false })
+    }
+  }, [])
 
   const MAX_VISIBLE = 5
 
@@ -101,7 +123,7 @@ function SearchableSelect({
           />
         </div>
 
-        <div className="max-h-[min(300px,var(--radix-popover-content-available-height))] overflow-y-auto p-1">
+        <div ref={setListRef} className="max-h-[min(300px,var(--radix-popover-content-available-height))] overflow-y-auto p-1">
           {filtered.length === 0 ? (
             <div className="py-6 text-center text-sm text-muted-foreground">
               No results found.
