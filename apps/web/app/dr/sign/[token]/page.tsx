@@ -15,8 +15,14 @@ function SignaturePad({ onChange }: Readonly<{ onChange: (data: string) => void 
   const drawing = useRef(false);
 
   const pos = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    // Scale from displayed size to the canvas's internal coordinate space,
+    // so strokes land under the finger on any screen width.
+    const c = e.currentTarget;
+    const rect = c.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (c.width / rect.width),
+      y: (e.clientY - rect.top) * (c.height / rect.height),
+    };
   };
   const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
     drawing.current = true;
@@ -115,32 +121,38 @@ export default function DrSignPage() {
             </table>
           </div>
 
-          {alreadySigned ? (
-            <div className="rounded-lg border bg-green-50 dark:bg-green-900/20 px-4 py-4 text-center space-y-2">
-              <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto" />
-              <p className="font-medium text-green-700 dark:text-green-400">Received & signed</p>
-              <p className="text-sm text-muted-foreground">by {done ? name : dr.signedByName}</p>
-              {(signature || dr.signatureData) && <img src={done ? signature : dr.signatureData} alt="signature" className="mx-auto max-h-24 border rounded bg-white" />}
-            </div>
-          ) : dr.status === 'CANCELLED' ? (
-            <div className="rounded-lg border bg-red-50 px-4 py-4 text-center text-red-700">This delivery receipt was cancelled.</div>
-          ) : (
-            <div className="space-y-3 border-t pt-4">
-              <p className="text-sm font-medium">Confirm receipt of the goods above</p>
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">Received by (name) <span className="text-red-500">*</span></Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="h-9 rounded-lg" />
+          {(() => {
+            if (alreadySigned) {
+              return (
+                <div className="rounded-lg border bg-green-50 dark:bg-green-900/20 px-4 py-4 text-center space-y-2">
+                  <CheckCircle2 className="h-8 w-8 text-green-600 mx-auto" />
+                  <p className="font-medium text-green-700 dark:text-green-400">Received & signed</p>
+                  <p className="text-sm text-muted-foreground">by {done ? name : dr.signedByName}</p>
+                  {(signature || dr.signatureData) && <img src={done ? signature : dr.signatureData} alt="signature" className="mx-auto max-h-24 border rounded bg-white" />}
+                </div>
+              );
+            }
+            if (dr.status === 'CANCELLED') {
+              return <div className="rounded-lg border bg-red-50 px-4 py-4 text-center text-red-700">This delivery receipt was cancelled.</div>;
+            }
+            return (
+              <div className="space-y-3 border-t pt-4">
+                <p className="text-sm font-medium">Confirm receipt of the goods above</p>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Received by (name) <span className="text-red-500">*</span></Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="h-9 rounded-lg" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Signature</Label>
+                  <SignaturePad onChange={setSignature} />
+                </div>
+                <Button type="button" onClick={() => signMut.mutate()} disabled={!name || signMut.isPending} className="w-full bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white">
+                  {signMut.isPending ? 'Submitting…' : 'Confirm & Sign'}
+                </Button>
+                {signMut.isError && <p className="text-sm text-red-600 text-center">Could not submit. Please try again.</p>}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">Signature</Label>
-                <SignaturePad onChange={setSignature} />
-              </div>
-              <Button type="button" onClick={() => signMut.mutate()} disabled={!name || signMut.isPending} className="w-full bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white">
-                {signMut.isPending ? 'Submitting…' : 'Confirm & Sign'}
-              </Button>
-              {signMut.isError && <p className="text-sm text-red-600 text-center">Could not submit. Please try again.</p>}
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

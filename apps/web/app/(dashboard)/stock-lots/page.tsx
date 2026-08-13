@@ -91,12 +91,20 @@ export default function StockLotsPage() {
   const openAdd = () => { setEditing(null); setForm({ productId: '', lotNumber: '', quantity: 0, expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' }); setModalOpen(true); };
   const openEdit = (row: any) => { setEditing(row); setForm({ productId: row.productId, lotNumber: row.lotNumber, quantity: row.quantity, expiryDate: row.expiryDate ? row.expiryDate.slice(0, 10) : '', source: row.source || '', status: row.status, qcStatus: row.qcStatus }); setModalOpen(true); };
 
+  const expiryClass = (d: number | null) => {
+    if (d === null) return '';
+    if (d < 0) return 'text-red-600 font-medium';
+    if (d <= 30) return 'text-amber-600 font-medium';
+    return 'text-foreground';
+  };
+  const expirySuffix = (d: number | null) => {
+    if (d === null) return '';
+    return d < 0 ? ' (expired)' : ` (${d}d)`;
+  };
   const renderExpiry = (v: string | null) => {
     if (!v) return <span className="text-muted-foreground">—</span>;
     const d = daysUntil(v);
-    const cls = d === null ? '' : d < 0 ? 'text-red-600 font-medium' : d <= 30 ? 'text-amber-600 font-medium' : 'text-foreground';
-    const suffix = d === null ? '' : d < 0 ? ` (expired)` : ` (${d}d)`;
-    return <span className={cls}>{formatDate(v)}{suffix}</span>;
+    return <span className={expiryClass(d)}>{formatDate(v)}{expirySuffix(d)}</span>;
   };
 
   const columns = [

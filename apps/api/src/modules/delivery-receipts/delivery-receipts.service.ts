@@ -158,9 +158,15 @@ export class DeliveryReceiptsService {
     if (dr.status === 'CANCELLED') throw new BadRequestException('This delivery receipt was cancelled');
     if (!body?.signedByName) throw new BadRequestException('Please enter the name of the person receiving');
 
+    // Only accept an image data URL for the signature (unauthenticated endpoint)
+    const signatureData = typeof body.signatureData === 'string' ? body.signatureData : null;
+    if (signatureData && !signatureData.startsWith('data:image/')) {
+      throw new BadRequestException('Invalid signature data');
+    }
+
     await this.prisma.deliveryReceipt.update({
       where: { token },
-      data: { status: 'SIGNED', signedByName: body.signedByName, signatureData: body.signatureData || null, signedAt: new Date() },
+      data: { status: 'SIGNED', signedByName: String(body.signedByName).slice(0, 200), signatureData, signedAt: new Date() },
     });
     return { message: 'Signed', drNumber: dr.drNumber };
   }
