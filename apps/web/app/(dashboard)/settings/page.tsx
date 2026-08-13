@@ -783,6 +783,102 @@ function LaborRateConfig() {
 }
 
 // ============================================================
+// Roles & Permissions (RBAC matrix)
+// ============================================================
+
+const ACTIONS: Array<{ key: 'canView' | 'canCreate' | 'canEdit' | 'canDelete'; label: string }> = [
+  { key: 'canView', label: 'View' },
+  { key: 'canCreate', label: 'Create' },
+  { key: 'canEdit', label: 'Edit' },
+  { key: 'canDelete', label: 'Delete' },
+]
+const roleLabel = (r: string) => r.replaceAll('_', ' ').toLowerCase().replaceAll(/\b\w/g, (c) => c.toUpperCase())
+
+function RolesPermissionsConfig() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [selectedRole, setSelectedRole] = useState('')
+  // matrix keyed by `${role}|${module}` -> {canView,...}
+  const [matrix, setMatrix] = useState<Record<string, any>>({})
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['permissions-matrix'],
+    queryFn: async () => (await api.get('/permissions')).data,
+  })
+
+  const roles: string[] = data?.roles ?? []
+  const modules: Array<{ key: string; label: string }> = data?.modules ?? []
+
+  // Seed local state once data arrives
+  if (data && Object.keys(matrix).length === 0 && data.permissions?.length) {
+    const seed: Record<string, any> = {}
+    for (const p of data.permissions) seed[`${p.role}|${p.module}`] = { canView: p.canView, canCreate: p.canCreate, canEdit: p.canEdit, canDelete: p.canDelete }
+    setMatrix(seed)
+    if (!selectedRole && roles.length) setSelectedRole(roles[0])
+  }
+
+  const cell = (role: string, module: string) => matrix[`${role}|${module}`] ?? { canView: true, canCreate: false, canEdit: false, canDelete: false }
+  const toggle = (role: string, module: string, action: string) => {
+    const key = `${role}|${module}`
+    setMatrix((m) => ({ ...m, [key]: { ...cell(role, module), [action]: !cell(role, module)[action] } }))
+  }
+
+  const saveMut = useMutation({
+    mutationFn: () => {
+      const items = Object.entries(matrix).map(([k, v]) => { const [role, module] = k.split('|'); return { role, module, ...v } })
+      return api.put('/permissions', { items })
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['permissions-matrix'] }); queryClient.invalidateQueries({ queryKey: ['permissions-mine'] }); toast({ title: 'Permissions saved' }) },
+    onError: () => toast({ title: 'Failed to save permissions', variant: 'destructive' }),
+  })
+
+  if (isLoading) return <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-muted-foreground">Role:</span>
+        {roles.map((r) => (
+          <button key={r} type="button" onClick={() => setSelectedRole(r)}
+            className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', selectedRole === r ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+            {roleLabel(r)}
+          </button>
+        ))}
+        <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="ml-auto bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
+          {saveMut.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Save
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">SUPERADMIN and ADMIN always have full access and aren&apos;t listed here. Set what <b>{selectedRole ? roleLabel(selectedRole) : 'each role'}</b> can do per module.</p>
+
+      <Card>
+        <CardContent className="p-0">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Module</th>
+                {ACTIONS.map((a) => <th key={a.key} className="text-center px-3 py-2.5 font-medium text-muted-foreground">{a.label}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {modules.map((m) => (
+                <tr key={m.key} className="hover:bg-accent/30 transition-colors">
+                  <td className="px-4 py-2.5 font-medium">{m.label}</td>
+                  {ACTIONS.map((a) => (
+                    <td key={a.key} className="px-3 py-2.5 text-center">
+                      <input type="checkbox" className="h-4 w-4 rounded border-input" checked={!!cell(selectedRole, m.key)[a.key]} onChange={() => toggle(selectedRole, m.key, a.key)} disabled={!selectedRole} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ============================================================
 // Company Config (Multi-Company CRUD)
 // ============================================================
 
@@ -2319,6 +2415,7 @@ export default function SettingsPage() {
           <TabsTrigger value="origins" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Origins</TabsTrigger>
           <TabsTrigger value="units" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Units of Measure</TabsTrigger>
           <TabsTrigger value="labor" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Labor Cost</TabsTrigger>
+          <TabsTrigger value="roles" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Roles &amp; Permissions</TabsTrigger>
           <TabsTrigger value="currencies" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Currencies</TabsTrigger>
           <TabsTrigger value="taxes" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Taxes</TabsTrigger>
           <TabsTrigger value="purchase-terms" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2.5 text-sm">Purchase Terms</TabsTrigger>
@@ -2509,6 +2606,11 @@ export default function SettingsPage() {
         {/* Labor Cost Tab */}
         <TabsContent value="labor" className="mt-5">
           <LaborRateConfig />
+        </TabsContent>
+
+        {/* Roles & Permissions Tab */}
+        <TabsContent value="roles" className="mt-5">
+          <RolesPermissionsConfig />
         </TabsContent>
 
         {/* Currencies Tab */}

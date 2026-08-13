@@ -15,6 +15,8 @@ import { UnitsOfMeasureModule } from './modules/units-of-measure/units-of-measur
 import { StockLotsModule } from './modules/stock-lots/stock-lots.module';
 import { ReplenishmentModule } from './modules/replenishment/replenishment.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { StaffModule } from './modules/staff/staff.module';
+import { PermissionsModule } from './modules/permissions/permissions.module';
 import { LaborRatesModule } from './modules/labor-rates/labor-rates.module';
 import { GoodsReceiptsModule } from './modules/goods-receipts/goods-receipts.module';
 import { StockTransfersModule } from './modules/stock-transfers/stock-transfers.module';
@@ -62,6 +64,8 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     StockLotsModule,
     ReplenishmentModule,
     CustomersModule,
+    StaffModule,
+    PermissionsModule,
     LaborRatesModule,
     GoodsReceiptsModule,
     StockTransfersModule,

@@ -176,6 +176,8 @@ model Tenant {
   categories         Category[]
   vendors            Vendor[]
   customers          Customer[]
+  staff              Staff[]
+  rolePermissions    RolePermission[]
   products           Product[]
   warehouses         Warehouse[]
   productComponents  ProductComponent[]
@@ -242,6 +244,7 @@ model User {
   notifications    Notification[]
   auditLogs        AuditLog[]
   comments         Comment[]
+  staff            Staff?
 
   @@unique([tenantId, username])
   @@unique([tenantId, email])
@@ -292,10 +295,53 @@ model Department {
   parent            Department?        @relation("DepartmentHierarchy", fields: [parentId], references: [id])
   children          Department[]       @relation("DepartmentHierarchy")
   users             User[]
+  staff             Staff[]
   purchaseRequests  PurchaseRequest[]
   budgetAllocations BudgetAllocation[]
 
   @@unique([tenantId, code])
+}
+
+model Staff {
+  id           String    @id @default(cuid())
+  tenantId     String
+  employeeId   String // unique per tenant
+  firstName    String
+  lastName     String
+  position     String?
+  departmentId String?
+  email        String?
+  phone        String?
+  userId       String?   @unique // optional link to a login account
+  hireDate     DateTime?
+  isActive     Boolean   @default(true)
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, employeeId])
+}
+
+// Configurable per-role, per-module permissions (RBAC matrix)
+model RolePermission {
+  id        String   @id @default(cuid())
+  tenantId  String
+  role      String // matches the Role enum value
+  module    String // "purchase-orders", "products", ...
+  canView   Boolean  @default(true)
+  canCreate Boolean  @default(false)
+  canEdit   Boolean  @default(false)
+  canDelete Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, role, module])
 }
 
 model Category {

@@ -26,6 +26,7 @@ import {
   PackageCheck,
   MoveRight,
   Send,
+  Contact,
   Wallet,
   TrendingUp,
   BarChart3,
@@ -101,6 +102,7 @@ const navigation: NavSection[] = [
     title: 'SETTINGS',
     items: [
       { label: 'Users', href: '/users', icon: Users },
+      { label: 'Staff', href: '/staff', icon: Contact },
       { label: 'Supplier Scoring', href: '/supplier-scoring', icon: BarChart3 },
       { label: 'Workflows', href: '/workflows', icon: GitBranch },
       { label: 'Settings', href: '/settings', icon: Settings },
