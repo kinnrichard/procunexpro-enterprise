@@ -17,6 +17,9 @@ export class BudgetsController {
     @Query('search') search?: string,
     @Query('status') status?: string,
     @Query('fiscalYear') fiscalYear?: string,
+    @Query('period') period?: string,
+    @Query('createdDateFrom') createdDateFrom?: string,
+    @Query('createdDateTo') createdDateTo?: string,
   ) {
     return this.budgetsService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
@@ -24,6 +27,9 @@ export class BudgetsController {
       search,
       status,
       fiscalYear: fiscalYear ? Number.parseInt(fiscalYear) : undefined,
+      period,
+      createdDateFrom,
+      createdDateTo,
     });
   }
 

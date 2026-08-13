@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,9 +53,29 @@ export default function BudgetsPage() {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [detailBudget, setDetailBudget] = useState<any>(null);
 
+  // Advanced filters
+  const [filterFiscalYear, setFilterFiscalYear] = useState('');
+  const [filterPeriod, setFilterPeriod] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterFiscalYear, filterPeriod, filterCreatedFrom, filterCreatedTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterFiscalYear(''); setFilterPeriod('');
+    setFilterCreatedFrom(undefined); setFilterCreatedTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['budgets', page, search, statusFilter],
-    queryFn: () => api.get('/budgets', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }) } }),
+    queryKey: ['budgets', page, search, statusFilter, filterFiscalYear, filterPeriod, filterCreatedFrom, filterCreatedTo],
+    queryFn: () => api.get('/budgets', { params: {
+      page, limit: 10, search,
+      ...(statusFilter && { status: statusFilter }),
+      ...(filterFiscalYear && { fiscalYear: filterFiscalYear }),
+      ...(filterPeriod && { period: filterPeriod }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+    } }),
   });
 
   const { data: detailData } = useQuery({
@@ -202,13 +223,35 @@ export default function BudgetsPage() {
         emptyMessage="No budgets found"
         onRowClick={(row: any) => setDetailBudget(row)}
         toolbar={
-          <div className="flex items-center gap-1.5">
-            {statusFilters.map(s => (
-              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-                {statusLabels[s]}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Fiscal Year">
+                <Input type="number" value={filterFiscalYear} onChange={(e) => { setFilterFiscalYear(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="e.g. 2026" />
+              </FilterField>
+              <FilterField label="Period">
+                <Select value={filterPeriod || 'ALL'} onValueChange={(v) => { setFilterPeriod(v === 'ALL' ? '' : v); setPage(1); }}>
+                  <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All periods" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All periods</SelectItem>
+                    {['MONTHLY', 'QUARTERLY', 'YEARLY'].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Date Created">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {statusFilters.map(s => (
+                <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+                  {statusLabels[s]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />

@@ -16,12 +16,20 @@ export class VendorsController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('status') status?: string,
+    @Query('country') country?: string,
+    @Query('paymentTerms') paymentTerms?: string,
+    @Query('createdDateFrom') createdDateFrom?: string,
+    @Query('createdDateTo') createdDateTo?: string,
   ) {
     return this.vendorsService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
       limit: limit ? Number.parseInt(limit) : undefined,
       search,
       status,
+      country,
+      paymentTerms,
+      createdDateFrom,
+      createdDateTo,
     });
   }
 

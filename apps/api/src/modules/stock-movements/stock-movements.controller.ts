@@ -16,12 +16,20 @@ export class StockMovementsController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('type') type?: string,
+    @Query('productId') productId?: string,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('createdDateFrom') createdDateFrom?: string,
+    @Query('createdDateTo') createdDateTo?: string,
   ) {
     return this.stockMovementsService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
       limit: limit ? Number.parseInt(limit) : undefined,
       search,
       type,
+      productId,
+      warehouseId,
+      createdDateFrom,
+      createdDateTo,
     });
   }
 

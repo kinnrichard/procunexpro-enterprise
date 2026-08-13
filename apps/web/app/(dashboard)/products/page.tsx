@@ -14,7 +14,10 @@ import { StatCard } from '@/components/stat-card'
 import { StatusBadge } from '@/components/status-badge'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ProductCompositionDialog } from '@/components/product-composition-dialog'
+import { FilterPopover, FilterField } from '@/components/filter-popover'
 import { SearchableSelect } from '@/components/ui/searchable-select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -155,6 +158,23 @@ export default function ProductsPage() {
   const [compositionTarget, setCompositionTarget] = useState<Product | null>(null)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
 
+  // Advanced filters
+  const [filterInventoryType, setFilterInventoryType] = useState('')
+  const [filterCategoryId, setFilterCategoryId] = useState('')
+  const [filterManufacturerId, setFilterManufacturerId] = useState('')
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>()
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>()
+  const activeFilterCount = [filterInventoryType, filterCategoryId, filterManufacturerId, filterCreatedFrom, filterCreatedTo].filter(Boolean).length
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '')
+  function clearFilters() {
+    setFilterInventoryType('')
+    setFilterCategoryId('')
+    setFilterManufacturerId('')
+    setFilterCreatedFrom(undefined)
+    setFilterCreatedTo(undefined)
+    setPage(1)
+  }
+
   // --- Form ---
 
   const defaultValues: ProductFormData = {
@@ -182,13 +202,18 @@ export default function ProductsPage() {
   // --- Queries ---
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ['products', page, search, statusFilter],
+    queryKey: ['products', page, search, statusFilter, filterInventoryType, filterCategoryId, filterManufacturerId, filterCreatedFrom, filterCreatedTo],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) })
       if (search) params.set('search', search)
       if (statusFilter === 'ACTIVE' || statusFilter === 'INACTIVE') {
         params.set('status', statusFilter)
       }
+      if (filterInventoryType) params.set('inventoryType', filterInventoryType)
+      if (filterCategoryId) params.set('categoryId', filterCategoryId)
+      if (filterManufacturerId) params.set('manufacturerId', filterManufacturerId)
+      if (filterCreatedFrom) params.set('createdDateFrom', toDateStr(filterCreatedFrom))
+      if (filterCreatedTo) params.set('createdDateTo', toDateStr(filterCreatedTo))
       return (await api.get<PaginatedResponse>(`/products?${params}`)).data
     },
   })
@@ -516,21 +541,46 @@ export default function ProductsPage() {
         emptyMessage="No products found. Add your first product to get started."
         emptyIcon={<Package className="h-12 w-12 text-muted-foreground/40 mb-3" />}
         toolbar={
-          <div className="flex items-center gap-1.5">
-            {STATUS_CHIPS.map((chip) => (
-              <button
-                key={chip.id}
-                onClick={() => handleStatusFilter(chip.id)}
-                className={cn(
-                  'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                  statusFilter === chip.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-accent'
-                )}
-              >
-                {chip.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Inventory Type">
+                <Select value={filterInventoryType || 'ALL'} onValueChange={(v) => { setFilterInventoryType(v === 'ALL' ? '' : v); setPage(1) }}>
+                  <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All types" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All types</SelectItem>
+                    {inventoryTypeOptions.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Category">
+                <SearchableSelect options={categoryOptions} value={filterCategoryId} onChange={(v) => { setFilterCategoryId(v); setPage(1) }} placeholder="All categories" />
+              </FilterField>
+              <FilterField label="Manufacturer">
+                <SearchableSelect options={manufacturerOptions} value={filterManufacturerId} onChange={(v) => { setFilterManufacturerId(v); setPage(1) }} placeholder="All manufacturers" />
+              </FilterField>
+              <FilterField label="Date Created">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1) }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1) }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {STATUS_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  onClick={() => handleStatusFilter(chip.id)}
+                  className={cn(
+                    'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    statusFilter === chip.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-accent'
+                  )}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />

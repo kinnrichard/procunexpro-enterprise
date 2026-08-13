@@ -19,7 +19,16 @@ export class StockMovementsService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; search?: string; type?: string },
+    params: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      type?: string;
+      productId?: string;
+      warehouseId?: string;
+      createdDateFrom?: string;
+      createdDateTo?: string;
+    },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -29,10 +38,30 @@ export class StockMovementsService {
 
     if (params.type) where.type = params.type;
 
+    if (params.productId) where.productId = params.productId;
+
     if (params.search) {
       where.OR = [
         { referenceNumber: { contains: params.search, mode: 'insensitive' } },
       ];
+    }
+
+    if (params.warehouseId) {
+      const warehouseOr = [
+        { fromWarehouseId: params.warehouseId },
+        { toWarehouseId: params.warehouseId },
+      ];
+      if (where.OR) {
+        where.AND = [{ OR: warehouseOr }];
+      } else {
+        where.OR = warehouseOr;
+      }
+    }
+
+    if (params.createdDateFrom || params.createdDateTo) {
+      where.createdAt = {};
+      if (params.createdDateFrom) where.createdAt.gte = new Date(params.createdDateFrom);
+      if (params.createdDateTo) where.createdAt.lte = new Date(`${params.createdDateTo}T23:59:59.999Z`);
     }
 
     const [data, total] = await Promise.all([

@@ -10,6 +10,7 @@ import { formatDateTime, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeftRight, Plus, ArrowDownRight, ArrowUpRight, RefreshCw, Package } from 'lucide-react';
 
@@ -54,9 +56,29 @@ export default function StockMovementsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Advanced filters
+  const [filterProductId, setFilterProductId] = useState('');
+  const [filterWarehouseId, setFilterWarehouseId] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterProductId, filterWarehouseId, filterCreatedFrom, filterCreatedTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterProductId(''); setFilterWarehouseId('');
+    setFilterCreatedFrom(undefined); setFilterCreatedTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['stock-movements', page, search, typeFilter],
-    queryFn: () => api.get('/stock-movements', { params: { page, limit: 10, search, ...(typeFilter && { type: typeFilter }) } }),
+    queryKey: ['stock-movements', page, search, typeFilter, filterProductId, filterWarehouseId, filterCreatedFrom, filterCreatedTo],
+    queryFn: () => api.get('/stock-movements', { params: {
+      page, limit: 10, search,
+      ...(typeFilter && { type: typeFilter }),
+      ...(filterProductId && { productId: filterProductId }),
+      ...(filterWarehouseId && { warehouseId: filterWarehouseId }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+    } }),
   });
 
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
@@ -146,13 +168,29 @@ export default function StockMovementsPage() {
         isLoading={isLoading}
         emptyMessage="No stock movements found"
         toolbar={
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {typeFilters.map(t => (
-              <button key={t} onClick={() => { setTypeFilter(t); setPage(1); }}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', typeFilter === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-                {typeLabels[t]}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Date">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+              <FilterField label="Product">
+                <SearchableSelect options={products} value={filterProductId} onChange={(v) => { setFilterProductId(v); setPage(1); }} placeholder="All products" />
+              </FilterField>
+              <FilterField label="Warehouse">
+                <SearchableSelect options={warehouses} value={filterWarehouseId} onChange={(v) => { setFilterWarehouseId(v); setPage(1); }} placeholder="All warehouses" />
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {typeFilters.map(t => (
+                <button key={t} onClick={() => { setTypeFilter(t); setPage(1); }}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', typeFilter === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+                  {typeLabels[t]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />

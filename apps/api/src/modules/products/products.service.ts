@@ -26,7 +26,17 @@ export class ProductsService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; search?: string },
+    params: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+      inventoryType?: string;
+      categoryId?: string;
+      manufacturerId?: string;
+      createdDateFrom?: string;
+      createdDateTo?: string;
+    },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -41,6 +51,19 @@ export class ProductsService {
         { modelNumber: { contains: params.search, mode: 'insensitive' } },
         { manufacturer: { name: { contains: params.search, mode: 'insensitive' } } },
       ];
+    }
+
+    if (params.status === 'ACTIVE') where.isActive = true;
+    if (params.status === 'INACTIVE') where.isActive = false;
+
+    if (params.inventoryType) where.inventoryType = params.inventoryType;
+    if (params.categoryId) where.categoryId = params.categoryId;
+    if (params.manufacturerId) where.manufacturerId = params.manufacturerId;
+
+    if (params.createdDateFrom || params.createdDateTo) {
+      where.createdAt = {};
+      if (params.createdDateFrom) where.createdAt.gte = new Date(params.createdDateFrom);
+      if (params.createdDateTo) where.createdAt.lte = new Date(`${params.createdDateTo}T23:59:59.999Z`);
     }
 
     const [data, total] = await Promise.all([

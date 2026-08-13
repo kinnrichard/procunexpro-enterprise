@@ -20,11 +20,23 @@ export class ProductsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('inventoryType') inventoryType?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('manufacturerId') manufacturerId?: string,
+    @Query('createdDateFrom') createdDateFrom?: string,
+    @Query('createdDateTo') createdDateTo?: string,
   ) {
     return this.productsService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
       limit: limit ? Number.parseInt(limit) : undefined,
       search,
+      status,
+      inventoryType,
+      categoryId,
+      manufacturerId,
+      createdDateFrom,
+      createdDateTo,
     });
   }
 

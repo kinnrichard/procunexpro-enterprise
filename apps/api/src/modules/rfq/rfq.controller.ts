@@ -16,12 +16,18 @@ export class RfqController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('status') status?: string,
+    @Query('vendorId') vendorId?: string,
+    @Query('createdDateFrom') createdDateFrom?: string,
+    @Query('createdDateTo') createdDateTo?: string,
   ) {
     return this.rfqService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
       limit: limit ? Number.parseInt(limit) : undefined,
       search,
       status,
+      vendorId,
+      createdDateFrom,
+      createdDateTo,
     });
   }
 

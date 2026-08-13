@@ -12,9 +12,11 @@ import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
 import { StatusBadge } from '@/components/status-badge'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { FilterPopover, FilterField } from '@/components/filter-popover'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
@@ -97,6 +99,22 @@ export default function VendorsPage() {
   const [editing, setEditing] = useState<Vendor | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null)
 
+  // --- Advanced filters ---
+
+  const [filterCountry, setFilterCountry] = useState('')
+  const [filterPaymentTerms, setFilterPaymentTerms] = useState('')
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>()
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>()
+  const activeFilterCount = [filterCountry, filterPaymentTerms, filterCreatedFrom, filterCreatedTo].filter(Boolean).length
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '')
+  function clearFilters() {
+    setFilterCountry('')
+    setFilterPaymentTerms('')
+    setFilterCreatedFrom(undefined)
+    setFilterCreatedTo(undefined)
+    setPage(1)
+  }
+
   // --- Form ---
 
   const {
@@ -117,11 +135,15 @@ export default function VendorsPage() {
   // --- Query ---
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ['vendors', page, search, statusFilter],
+    queryKey: ['vendors', page, search, statusFilter, filterCountry, filterPaymentTerms, filterCreatedFrom, filterCreatedTo],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) })
       if (search) params.set('search', search)
       if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (filterCountry) params.set('country', filterCountry)
+      if (filterPaymentTerms) params.set('paymentTerms', filterPaymentTerms)
+      if (filterCreatedFrom) params.set('createdDateFrom', toDateStr(filterCreatedFrom))
+      if (filterCreatedTo) params.set('createdDateTo', toDateStr(filterCreatedTo))
       return (await api.get<PaginatedResponse>(`/vendors?${params}`)).data
     },
   })
@@ -333,21 +355,47 @@ export default function VendorsPage() {
         emptyMessage="No vendors found. Add your first vendor to get started."
         emptyIcon={<Truck className="h-12 w-12 text-muted-foreground/40 mb-3" />}
         toolbar={
-          <div className="flex items-center gap-1.5">
-            {STATUS_CHIPS.map((chip) => (
-              <button
-                key={chip.id}
-                onClick={() => handleStatusFilter(chip.id)}
-                className={cn(
-                  'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-                  statusFilter === chip.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-accent'
-                )}
-              >
-                {chip.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Country">
+                <Input
+                  value={filterCountry}
+                  onChange={(e) => { setFilterCountry(e.target.value); setPage(1) }}
+                  className="h-9 rounded-lg"
+                  placeholder="e.g. Philippines"
+                />
+              </FilterField>
+              <FilterField label="Payment Terms">
+                <Input
+                  value={filterPaymentTerms}
+                  onChange={(e) => { setFilterPaymentTerms(e.target.value); setPage(1) }}
+                  className="h-9 rounded-lg"
+                  placeholder="e.g. Net 30"
+                />
+              </FilterField>
+              <FilterField label="Date Created">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1) }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1) }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {STATUS_CHIPS.map((chip) => (
+                <button
+                  key={chip.id}
+                  onClick={() => handleStatusFilter(chip.id)}
+                  className={cn(
+                    'shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    statusFilter === chip.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-accent'
+                  )}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />

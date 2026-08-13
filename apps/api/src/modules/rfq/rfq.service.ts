@@ -19,7 +19,10 @@ export class RfqService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; search?: string; status?: string },
+    params: {
+      page?: number; limit?: number; search?: string; status?: string;
+      vendorId?: string; createdDateFrom?: string; createdDateTo?: string;
+    },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -29,6 +32,14 @@ export class RfqService {
 
     if (params.status) {
       where.status = params.status;
+    }
+
+    if (params.vendorId) where.vendorId = params.vendorId;
+
+    if (params.createdDateFrom || params.createdDateTo) {
+      where.createdAt = {};
+      if (params.createdDateFrom) where.createdAt.gte = new Date(params.createdDateFrom);
+      if (params.createdDateTo) where.createdAt.lte = new Date(`${params.createdDateTo}T23:59:59.999Z`);
     }
 
     if (params.search) {

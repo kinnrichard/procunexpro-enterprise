@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,9 +53,32 @@ export default function ContractsPage() {
   const [editing, setEditing] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
+  // Advanced filters
+  const [filterVendorId, setFilterVendorId] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const [filterValueMin, setFilterValueMin] = useState('');
+  const [filterValueMax, setFilterValueMax] = useState('');
+  const activeFilterCount = [filterVendorId, filterCreatedFrom, filterCreatedTo, filterValueMin, filterValueMax].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterVendorId('');
+    setFilterCreatedFrom(undefined); setFilterCreatedTo(undefined);
+    setFilterValueMin(''); setFilterValueMax('');
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['contracts', page, search, statusFilter],
-    queryFn: () => api.get('/contracts', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }) } }),
+    queryKey: ['contracts', page, search, statusFilter, filterVendorId, filterCreatedFrom, filterCreatedTo, filterValueMin, filterValueMax],
+    queryFn: () => api.get('/contracts', { params: {
+      page, limit: 10, search,
+      ...(statusFilter && { status: statusFilter }),
+      ...(filterVendorId && { vendorId: filterVendorId }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+      ...(filterValueMin && { valueMin: filterValueMin }),
+      ...(filterValueMax && { valueMax: filterValueMax }),
+    } }),
   });
 
   const { data: expiringData } = useQuery({
@@ -193,13 +217,32 @@ export default function ContractsPage() {
         onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search contracts..."
         isLoading={isLoading} emptyMessage="No contracts found"
         toolbar={
-          <div className="flex items-center gap-1.5">
-            {statusFilters.map(s => (
-              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-                {statusLabels[s]}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Vendor">
+                <SearchableSelect options={vendors} value={filterVendorId} onChange={(v) => { setFilterVendorId(v); setPage(1); }} placeholder="All vendors" />
+              </FilterField>
+              <FilterField label="Date Created">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+              <FilterField label="Total Value">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input type="number" value={filterValueMin} onChange={(e) => { setFilterValueMin(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="Min" />
+                  <Input type="number" value={filterValueMax} onChange={(e) => { setFilterValueMax(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="Max" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {statusFilters.map(s => (
+                <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+                  {statusLabels[s]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
