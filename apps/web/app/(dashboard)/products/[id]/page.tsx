@@ -1282,7 +1282,7 @@ export default function ProductDetailPage() {
         <Package className="h-12 w-12 mb-3 opacity-30" />
         <p>Product not found.</p>
         <Button variant="ghost" className="mt-3" onClick={() => router.push('/products')}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Products
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Items
         </Button>
       </div>
     )
@@ -1292,7 +1292,7 @@ export default function ProductDetailPage() {
     <div>
       {/* Back button */}
       <button onClick={() => router.push('/products')} className="mb-4 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="h-4 w-4" /> Back to Products
+        <ArrowLeft className="h-4 w-4" /> Back to Items
       </button>
 
       <HeroBanner product={product} />

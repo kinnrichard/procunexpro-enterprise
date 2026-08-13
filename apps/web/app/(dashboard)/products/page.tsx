@@ -277,7 +277,7 @@ export default function ProductsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       closeModal()
-      toast({ title: 'Product created', description: 'The product has been added successfully.' })
+      toast({ title: 'Item created', description: 'The item has been added successfully.' })
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to create product. Please try again.', variant: 'destructive' })
@@ -289,7 +289,7 @@ export default function ProductsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       closeModal()
-      toast({ title: 'Product updated', description: 'Changes have been saved.' })
+      toast({ title: 'Item updated', description: 'Changes have been saved.' })
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to update product. Please try again.', variant: 'destructive' })
@@ -301,7 +301,7 @@ export default function ProductsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       setDeleteTarget(null)
-      toast({ title: 'Product deleted', description: 'The product has been removed.' })
+      toast({ title: 'Item deleted', description: 'The item has been removed.' })
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to delete product. Please try again.', variant: 'destructive' })
@@ -385,7 +385,7 @@ export default function ProductsPage() {
   const columns: Column<Product>[] = [
     {
       key: 'name',
-      label: 'Product',
+      label: 'Item',
       sortable: true,
       render: (_value: any, row: Product) => (
         <div className="flex items-center gap-3">
@@ -509,10 +509,10 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader title="Products" description="Manage your product catalog and inventory items">
+      <PageHeader title="Items" description="Manage your items catalog and inventory">
         {can('products', 'create') && (
           <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
-            <Plus className="h-4 w-4 mr-2" /> New Product
+            <Plus className="h-4 w-4 mr-2" /> New Item
           </Button>
         )}
       </PageHeader>
@@ -520,7 +520,7 @@ export default function ProductsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard
-          title="Total Products"
+          title="Total Items"
           value={total}
           icon={<Package className="h-5 w-5" />}
         />
@@ -548,7 +548,7 @@ export default function ProductsPage() {
         searchPlaceholder="Search by name, SKU, manufacturer, model..."
         onRowClick={(row: any) => router.push(`/products/${row.sku}`)}
         isLoading={isLoading}
-        emptyMessage="No products found. Add your first product to get started."
+        emptyMessage="No items found. Add your first item to get started."
         emptyIcon={<Package className="h-12 w-12 text-muted-foreground/40 mb-3" />}
         toolbar={
           <div className="flex items-center gap-3 flex-wrap">
@@ -601,7 +601,7 @@ export default function ProductsPage() {
           {/* Header */}
           <div className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
             <DialogTitle>
-              {editing ? 'Edit Product' : 'Add New Product'}
+              {editing ? 'Edit Item' : 'Add New Item'}
             </DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground mt-1">
               {editing ? 'Update the product information below.' : 'Fill in the details to create a new product.'}
@@ -832,7 +832,7 @@ export default function ProductsPage() {
               className="bg-gradient-primary text-white"
             >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editing ? 'Save Changes' : 'Create Product'}
+              {editing ? 'Save Changes' : 'Create Item'}
             </Button>
           </div>
         </DialogContent>
@@ -849,7 +849,7 @@ export default function ProductsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete Product"
+        title="Delete Item"
         description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
         confirmLabel="Delete"
         variant="destructive"
