@@ -78,6 +78,7 @@ export default function ProductionsPage() {
   });
 
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
+  const { data: typesRes } = useQuery({ queryKey: ['inventory-types-active'], queryFn: () => api.get('/inventory-types/active') });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
   const { data: laborData } = useQuery({ queryKey: ['labor-rates-active'], queryFn: () => api.get('/labor-rates/active') });
 
@@ -90,8 +91,13 @@ export default function ProductionsPage() {
 
   const items = response?.data?.data || [];
   const total = response?.data?.total || 0;
-  // Only Finished Goods and Components can be produced (raw materials/consumables/packaging are bought, not made)
-  const producibleTypes = new Set(['product', 'component']);
+  // Producible = inventory types flagged "has composition" (falls back to the built-ins)
+  const typeRows: any[] = Array.isArray(typesRes?.data?.data) ? typesRes.data.data : [];
+  const producibleTypes = new Set(
+    typeRows.length > 0
+      ? typeRows.filter((t) => t.hasComposition).map((t) => t.key)
+      : ['product', 'component'],
+  );
   const products = (prodData?.data?.data || [])
     .filter((p: any) => producibleTypes.has(p.inventoryType))
     .map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));

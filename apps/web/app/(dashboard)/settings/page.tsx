@@ -959,6 +959,131 @@ function RolesPermissionsConfig() {
 }
 
 // ============================================================
+// Inventory Types Config (configurable item types + composition flag)
+// ============================================================
+
+function InventoryTypesConfig() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<any>(null)
+  const [deleteTarget, setDeleteTarget] = useState<any>(null)
+  const [form, setForm] = useState({ label: '', description: '', hasComposition: false })
+
+  const { data, isLoading } = useQuery({ queryKey: ['inventory-types'], queryFn: async () => (await api.get('/inventory-types')).data })
+  const types: any[] = Array.isArray(data?.data) ? data.data : []
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['inventory-types'] })
+    queryClient.invalidateQueries({ queryKey: ['inventory-types-active'] })
+  }
+  const saveMut = useMutation({
+    mutationFn: () => (editing ? api.put(`/inventory-types/${editing.id}`, form) : api.post('/inventory-types', form)),
+    onSuccess: () => { invalidate(); setModalOpen(false); toast({ title: editing ? 'Type updated' : 'Type created' }) },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to save', variant: 'destructive' }),
+  })
+  const toggleMut = useMutation({
+    mutationFn: ({ id, hasComposition }: { id: string; hasComposition: boolean }) => api.put(`/inventory-types/${id}`, { hasComposition }),
+    onSuccess: invalidate,
+    onError: () => toast({ title: 'Failed to update', variant: 'destructive' }),
+  })
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => api.delete(`/inventory-types/${id}`),
+    onSuccess: () => { invalidate(); setDeleteTarget(null); toast({ title: 'Type deleted' }) },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to delete', variant: 'destructive' }),
+  })
+
+  const openAdd = () => { setEditing(null); setForm({ label: '', description: '', hasComposition: false }); setModalOpen(true) }
+  const openEdit = (t: any) => { setEditing(t); setForm({ label: t.label, description: t.description || '', hasComposition: t.hasComposition }); setModalOpen(true) }
+  const keyPreview = form.label.trim().toLowerCase().replaceAll(/[^a-z0-9]+/g, '_').replaceAll(/^_+|_+$/g, '')
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">Item types available when creating an item, and whether each can have a composition (BOM).</p>
+        <Button size="sm" onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90 shrink-0"><Plus className="h-4 w-4 mr-1.5" /> New Type</Button>
+      </div>
+      <Card><CardContent className="p-0">
+        {isLoading ? (
+          <div className="py-10 text-center"><Loader2 className="h-5 w-5 animate-spin inline text-muted-foreground" /></div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <th className="text-left px-4 py-3">Type</th>
+                <th className="text-left px-4 py-3">Key</th>
+                <th className="text-center px-4 py-3">Has Composition</th>
+                <th className="px-4 py-3 w-[90px]"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {types.map((t) => (
+                <tr key={t.id} className="hover:bg-accent/30 transition-colors">
+                  <td className="px-4 py-2.5">
+                    <p className="font-medium flex items-center gap-1.5">{t.isSystem && <Lock className="h-3 w-3 text-muted-foreground" />}{t.label}</p>
+                    {t.description && <p className="text-xs text-muted-foreground">{t.description}</p>}
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{t.key}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    <Switch checked={t.hasComposition} onCheckedChange={(v) => toggleMut.mutate({ id: t.id, hasComposition: v })} />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-0.5 justify-end">
+                      <button onClick={() => openEdit(t)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
+                      {!t.isSystem && <button onClick={() => setDeleteTarget(t)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent></Card>
+
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-w-md p-0 gap-0">
+          <div className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
+            <DialogTitle>{editing ? 'Edit Inventory Type' : 'New Inventory Type'}</DialogTitle>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Name <span className="text-red-500">*</span></Label>
+              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} className="h-9 rounded-lg" placeholder="e.g., Ingredient" />
+              {!editing && <p className="text-[11px] text-muted-foreground">Stored as <span className="font-mono">{keyPreview || 'key'}</span></p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Description</Label>
+              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="h-9 rounded-lg" placeholder="Optional" />
+            </div>
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <span className="text-[13px]">Has composition (BOM)<span className="block text-[11px] text-muted-foreground font-normal">Items of this type can be produced from a recipe</span></span>
+              <Switch checked={form.hasComposition} onCheckedChange={(v) => setForm({ ...form, hasComposition: v })} />
+            </label>
+          </div>
+          <div className="px-6 py-4 border-t border-border flex justify-between">
+            <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={() => saveMut.mutate()} className="bg-gradient-primary text-white" disabled={saveMut.isPending || !form.label.trim()}>
+              {saveMut.isPending ? 'Saving…' : editing ? 'Save' : 'Create'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title="Delete Inventory Type"
+        description={`Delete "${deleteTarget?.label}"? Items using it must be reassigned first. This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+        isLoading={deleteMut.isPending}
+      />
+    </div>
+  )
+}
+
+// ============================================================
 // Company Config (Multi-Company CRUD)
 // ============================================================
 
@@ -2492,6 +2617,7 @@ export default function SettingsPage() {
           <TabsTrigger value="company" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Company</TabsTrigger>
           <TabsTrigger value="departments" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Departments</TabsTrigger>
           <TabsTrigger value="warehouses" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Warehouses</TabsTrigger>
+          <TabsTrigger value="inventory-types" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Inventory Types</TabsTrigger>
           <TabsTrigger value="categories" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Categories</TabsTrigger>
           <TabsTrigger value="manufacturers" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Manufacturers</TabsTrigger>
           <TabsTrigger value="origins" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Origins</TabsTrigger>
@@ -2670,6 +2796,10 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Categories Tab */}
+        <TabsContent value="inventory-types" className="mt-0">
+          <InventoryTypesConfig />
+        </TabsContent>
+
         <TabsContent value="categories" className="mt-0">
           <CategoriesConfig />
         </TabsContent>

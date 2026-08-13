@@ -60,24 +60,26 @@ const productSchema = z.object({
 
 type ProductFormData = z.infer<typeof productSchema>
 
-const inventoryTypeOptions = [
-  { value: 'product', label: 'Product (Finished Good)' },
-  { value: 'raw_material', label: 'Raw Material' },
-  { value: 'component', label: 'Component / Sub-Assembly' },
-  { value: 'consumable', label: 'Consumable / Supplies' },
-  { value: 'packaging', label: 'Packaging' },
+// Fallback used only if the tenant's inventory types haven't loaded/seeded yet.
+const FALLBACK_INVENTORY_TYPES = [
+  { key: 'product', label: 'Product (Finished Good)', hasComposition: true },
+  { key: 'raw_material', label: 'Raw Material', hasComposition: false },
+  { key: 'component', label: 'Component / Sub-Assembly', hasComposition: true },
+  { key: 'consumable', label: 'Consumable / Supplies', hasComposition: false },
+  { key: 'packaging', label: 'Packaging', hasComposition: false },
 ]
 
-const inventoryTypeLabel = (v: string) =>
-  inventoryTypeOptions.find((o) => o.value === v)?.label ?? 'Product (Finished Good)'
-
-const inventoryTypeBadge: Record<string, { label: string; className: string }> = {
-  product: { label: 'Finished Good', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  raw_material: { label: 'Raw Material', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-  component: { label: 'Component', className: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' },
-  consumable: { label: 'Consumable', className: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400' },
-  packaging: { label: 'Packaging', className: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' },
+// Badge colors keyed by type key; custom types get a neutral default.
+const INVENTORY_TYPE_COLORS: Record<string, string> = {
+  product: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  raw_material: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  component: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+  consumable: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+  packaging: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
 }
+const DEFAULT_TYPE_COLOR = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+
+type InvType = { key: string; label: string; hasComposition: boolean }
 
 type Product = {
   id: string
@@ -251,6 +253,11 @@ export default function ProductsPage() {
     enabled: !!selectedCategoryId,
   })
 
+  const { data: typesRes } = useQuery({
+    queryKey: ['inventory-types-active'],
+    queryFn: async () => (await api.get<{ data: InvType[] }>('/inventory-types/active')).data,
+  })
+
   const { data: uomRes } = useQuery({
     queryKey: ['uom-active'],
     queryFn: async () => (await api.get<{ data: { code: string; name: string }[] }>('/units-of-measure/active')).data,
@@ -264,6 +271,14 @@ export default function ProductsPage() {
   const stockUnitOptions = uomOptions.length > 0 ? uomOptions : UOM_OPTIONS
   const categoryOptions = asArray<DropdownItem>(rootCategoriesRes?.data).map((c) => ({ value: c.id, label: c.name }))
   const subCategoryOptions = asArray<DropdownItem>(subCategoriesRes?.data).map((c) => ({ value: c.id, label: c.name }))
+
+  // Configurable inventory types (falls back to the built-in list until loaded)
+  const inventoryTypesList = asArray<InvType>(typesRes?.data)
+  const inventoryTypes: InvType[] = inventoryTypesList.length > 0 ? inventoryTypesList : FALLBACK_INVENTORY_TYPES
+  const inventoryTypeOptions = inventoryTypes.map((t) => ({ value: t.key, label: t.label }))
+  const typeByKey: Record<string, InvType> = Object.fromEntries(inventoryTypes.map((t) => [t.key, t]))
+  const canCompose = (key: string) => typeByKey[key]?.hasComposition ?? false
+  const typeLabel = (key: string) => typeByKey[key]?.label ?? key
 
   // --- Stats ---
 
@@ -404,10 +419,10 @@ export default function ProductsPage() {
       label: 'Type',
       sortable: true,
       render: (value: any) => {
-        const badge = inventoryTypeBadge[value as string] ?? inventoryTypeBadge.product
+        const key = value as string
         return (
-          <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', badge.className)}>
-            {badge.label}
+          <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', INVENTORY_TYPE_COLORS[key] || DEFAULT_TYPE_COLOR)}>
+            {typeLabel(key)}
           </span>
         )
       },
@@ -474,7 +489,7 @@ export default function ProductsPage() {
       className: 'w-[80px]',
       render: (_value: any, row: Product) => (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          {can('products', 'edit') && ['product', 'component'].includes(row.inventoryType) && (
+          {can('products', 'edit') && canCompose(row.inventoryType) && (
             <button
               onClick={() => setCompositionTarget(row)}
               title="Composition"

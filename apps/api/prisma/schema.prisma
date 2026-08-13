@@ -204,6 +204,26 @@ model Tenant {
   deliveryTerms      DeliveryTerm[]
   deliveryTypes      DeliveryType[]
   roles              Role[]
+  inventoryTypes     InventoryType[]
+}
+
+// Tenant-scoped inventory types (Product.inventoryType stores the `key`).
+// 5 built-ins seeded as isSystem=true. hasComposition = items of this type can have a BOM.
+model InventoryType {
+  id             String   @id @default(cuid())
+  tenantId       String
+  key            String
+  label          String
+  description    String?
+  hasComposition Boolean  @default(false)
+  isSystem       Boolean  @default(false)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
 }
 
 // Tenant-scoped roles. The 7 built-ins are seeded as isSystem=true; admins can
