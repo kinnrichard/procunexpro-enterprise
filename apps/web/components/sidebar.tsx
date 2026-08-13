@@ -73,7 +73,7 @@ const navigation: NavSection[] = [
   {
     title: 'INVENTORY',
     items: [
-      { label: 'Products', href: '/products', icon: Package },
+      { label: 'Items', href: '/products', icon: Package },
       { label: 'Inventory Balance', href: '/inventory-balance', icon: Scale },
       { label: 'Goods Receipts', href: '/goods-receipts', icon: PackageCheck },
       { label: 'Stock Movements', href: '/stock-movements', icon: ArrowLeftRight },
