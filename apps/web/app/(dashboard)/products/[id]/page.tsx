@@ -559,9 +559,21 @@ const LOT_QC_CLASS: Record<string, string> = {
 }
 
 function StockTab({ product }: Readonly<{ product: any }>) {
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [fromWh, setFromWh] = useState('')
+  const [toWh, setToWh] = useState('')
+  const [qty, setQty] = useState<number>(0)
+  const [notes, setNotes] = useState('')
+
   const { data, isLoading } = useQuery({
     queryKey: ['product-stock-lots', product.id],
     queryFn: () => api.get('/stock-lots', { params: { productId: product.id, limit: 1000 } }),
+  })
+  const { data: whData } = useQuery({
+    queryKey: ['warehouses-all'],
+    queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }),
   })
 
   const lots: any[] = data?.data?.data || []
@@ -571,14 +583,44 @@ function StockTab({ product }: Readonly<{ product: any }>) {
   const reorderPoint = product.reorderPoint ?? product.minStock ?? 0
   const isLow = reorderPoint > 0 && (product.currentStock ?? onHand) <= reorderPoint
 
-  const warehouseMap: Record<string, { name: string; quantity: number; lots: number }> = {}
+  const warehouseMap: Record<string, { id: string | null; name: string; quantity: number; lots: number }> = {}
   for (const l of activeLots) {
     const key = l.warehouseId || 'none'
-    if (!warehouseMap[key]) warehouseMap[key] = { name: l.warehouse?.name || 'Unassigned', quantity: 0, lots: 0 }
+    if (!warehouseMap[key]) warehouseMap[key] = { id: l.warehouseId || null, name: l.warehouse?.name || 'Unassigned', quantity: 0, lots: 0 }
     warehouseMap[key].quantity += l.quantity || 0
     warehouseMap[key].lots += 1
   }
   const byWarehouse = Object.values(warehouseMap).sort((a, b) => b.quantity - a.quantity)
+
+  const allWarehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }))
+  // Prefer warehouses that actually hold stock as the source
+  const fromOptions = byWarehouse.filter((w) => w.id).map((w) => ({ value: w.id as string, label: `${w.name} (${w.quantity.toLocaleString()} ${unit})` }))
+  const availableAtFrom = warehouseMap[fromWh]?.quantity ?? 0
+
+  const transferMut = useMutation({
+    mutationFn: () => api.post('/stock-transfers', {
+      fromWarehouseId: fromWh,
+      toWarehouseId: toWh,
+      notes: notes || undefined,
+      items: [{ productId: product.id, quantity: qty }],
+    }),
+    onSuccess: (res: any) => {
+      queryClient.invalidateQueries({ queryKey: ['product-stock-lots', product.id] })
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      setTransferOpen(false)
+      toast({ title: `Transfer ${res?.data?.transferNumber || ''} completed` })
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Transfer failed', variant: 'destructive' }),
+  })
+
+  const openTransfer = () => {
+    setFromWh(byWarehouse.find((w) => w.id)?.id || '')
+    setToWh('')
+    setQty(0)
+    setNotes('')
+    setTransferOpen(true)
+  }
+  const canTransfer = !!fromWh && !!toWh && fromWh !== toWh && qty > 0 && qty <= availableAtFrom
 
   if (isLoading) {
     return (
@@ -615,9 +657,14 @@ function StockTab({ product }: Readonly<{ product: any }>) {
 
       {/* By warehouse */}
       <Card>
-        <div className="px-4 py-3 border-b flex items-center gap-2">
-          <Warehouse className="h-4 w-4 text-muted-foreground" />
-          <p className="text-sm font-semibold">Stock by warehouse</p>
+        <div className="px-4 py-3 border-b flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Warehouse className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-semibold">Stock by warehouse</p>
+          </div>
+          <Button size="sm" onClick={openTransfer} disabled={fromOptions.length === 0 || allWarehouses.length < 2} className="bg-gradient-primary text-white hover:opacity-90">
+            <MoveHorizontal className="h-4 w-4 mr-2" /> Transfer stock
+          </Button>
         </div>
         <CardContent className="p-0">
           {byWarehouse.length === 0 ? (
@@ -686,6 +733,44 @@ function StockTab({ product }: Readonly<{ product: any }>) {
           )}
         </CardContent>
       </Card>
+
+      {/* Quick transfer modal */}
+      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+        <DialogContent className="max-w-lg p-0 gap-0">
+          <div className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
+            <DialogTitle>Transfer stock — {product.name}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground mt-1">Move on-hand stock from one warehouse to another.</DialogDescription>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">From warehouse <span className="text-red-500">*</span></Label>
+                <SearchableSelect options={fromOptions} value={fromWh} onChange={setFromWh} placeholder="Source" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">To warehouse <span className="text-red-500">*</span></Label>
+                <SearchableSelect options={allWarehouses.filter((w: any) => w.value !== fromWh)} value={toWh} onChange={setToWh} placeholder="Destination" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
+              <Input type="number" step="any" min={0} value={qty || ''} onChange={(e) => setQty(Number.parseFloat(e.target.value) || 0)} className="h-9 rounded-lg" placeholder={`e.g., 10 ${unit}`} />
+              <p className="text-xs text-muted-foreground">Available at source: <span className="font-mono font-medium text-foreground">{availableAtFrom.toLocaleString()} {unit}</span></p>
+              {qty > availableAtFrom && qty > 0 && <p className="text-xs text-red-500">Exceeds available stock at the source warehouse.</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Notes</Label>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-lg" rows={2} placeholder="Optional reason for this transfer..." />
+            </div>
+          </div>
+          <div className="px-6 py-4 border-t border-border flex justify-between">
+            <Button type="button" variant="ghost" onClick={() => setTransferOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={() => transferMut.mutate()} className="bg-gradient-primary text-white" disabled={!canTransfer || transferMut.isPending}>
+              {transferMut.isPending ? 'Transferring…' : 'Transfer'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
