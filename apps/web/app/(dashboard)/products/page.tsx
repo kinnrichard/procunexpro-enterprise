@@ -260,6 +260,8 @@ export default function ProductsPage() {
   const manufacturerOptions = asArray<DropdownItem>(manufacturersRes?.data).map((m) => ({ value: m.id, label: m.name }))
   const originOptions = asArray<DropdownItem>(originsRes?.data).map((o) => ({ value: o.id, label: o.name }))
   const uomOptions = asArray<{ code: string; name: string }>(uomRes?.data).map((u) => ({ value: u.code, label: `${u.code} — ${u.name}` }))
+  // Prefer configured Units of Measure; fall back to the standard list so the picker is never empty
+  const stockUnitOptions = uomOptions.length > 0 ? uomOptions : UOM_OPTIONS
   const categoryOptions = asArray<DropdownItem>(rootCategoriesRes?.data).map((c) => ({ value: c.id, label: c.name }))
   const subCategoryOptions = asArray<DropdownItem>(subCategoriesRes?.data).map((c) => ({ value: c.id, label: c.name }))
 
@@ -773,7 +775,7 @@ export default function ProductsPage() {
                     name="unit"
                     render={({ field }) => (
                       <SearchableSelect
-                        options={uomOptions}
+                        options={stockUnitOptions}
                         value={field.value || 'pcs'}
                         onChange={(val) => field.onChange(val)}
                         placeholder="Select unit"
