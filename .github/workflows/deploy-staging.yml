@@ -77,7 +77,6 @@ jobs:
           script: |
             set -e
             cd /root/procunex-staging
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u kinnrichard --password-stdin
             docker compose -f docker-compose.prod.yml --env-file .env pull
             docker compose -f docker-compose.prod.yml --env-file .env run --rm api npx prisma db push --skip-generate || true
             docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
