@@ -7,12 +7,14 @@ import { formatDate, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { Send, Plus, Trash2, Link2, XCircle, CheckCircle2 } from 'lucide-react';
 
@@ -37,9 +39,27 @@ export default function DeliveriesPage() {
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
 
+  // Advanced filters
+  const [filterCustomerId, setFilterCustomerId] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterCustomerId, filterCreatedFrom, filterCreatedTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterCustomerId('');
+    setFilterCreatedFrom(undefined); setFilterCreatedTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['delivery-receipts', page, search, statusFilter],
-    queryFn: () => api.get('/delivery-receipts', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }) } }),
+    queryKey: ['delivery-receipts', page, search, statusFilter, filterCustomerId, filterCreatedFrom, filterCreatedTo],
+    queryFn: () => api.get('/delivery-receipts', { params: {
+      page, limit: 10, search,
+      ...(statusFilter && { status: statusFilter }),
+      ...(filterCustomerId && { customerId: filterCustomerId }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+    } }),
   });
   const { data: custData } = useQuery({ queryKey: ['customers-active'], queryFn: () => api.get('/customers/active') });
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
@@ -116,13 +136,26 @@ export default function DeliveriesPage() {
 
       <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search deliveries..." isLoading={isLoading} emptyMessage="No deliveries yet"
         toolbar={
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {statusFilters.map((s) => (
-              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-                {statusLabels[s]}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Customer">
+                <SearchableSelect options={customers} value={filterCustomerId} onChange={(v) => { setFilterCustomerId(v); setPage(1); }} placeholder="All customers" />
+              </FilterField>
+              <FilterField label="Date Created">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {statusFilters.map((s) => (
+                <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+                  {statusLabels[s]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />

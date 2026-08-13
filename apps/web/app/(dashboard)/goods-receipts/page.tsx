@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DatePicker } from '@/components/ui/date-picker';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
 import { PackageCheck, Plus, Truck } from 'lucide-react';
 
@@ -29,10 +31,33 @@ export default function GoodsReceiptsPage() {
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
 
+  // Advanced filters
+  const [filterPurchaseOrderId, setFilterPurchaseOrderId] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterPurchaseOrderId, filterDateFrom, filterDateTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterPurchaseOrderId('');
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['goods-receipts', page, search],
-    queryFn: () => api.get('/goods-receipts', { params: { page, limit: 10, search } }),
+    queryKey: ['goods-receipts', page, search, filterPurchaseOrderId, filterDateFrom, filterDateTo],
+    queryFn: () => api.get('/goods-receipts', { params: {
+      page, limit: 10, search,
+      ...(filterPurchaseOrderId && { purchaseOrderId: filterPurchaseOrderId }),
+      ...(filterDateFrom && { dateFrom: toDateStr(filterDateFrom) }),
+      ...(filterDateTo && { dateTo: toDateStr(filterDateTo) }),
+    } }),
   });
+  const { data: allPoData } = useQuery({
+    queryKey: ['purchase-orders-all'],
+    queryFn: () => api.get('/purchase-orders', { params: { limit: 1000 } }),
+  });
+  const purchaseOrderOptions = (allPoData?.data?.data || []).map((o: any) => ({ value: o.id, label: o.orderNumber }));
   const { data: poData } = useQuery({ queryKey: ['receivable-pos'], queryFn: () => api.get('/goods-receipts/receivable-pos'), enabled: modalOpen });
 
   const items = response?.data?.data || [];
@@ -86,7 +111,23 @@ export default function GoodsReceiptsPage() {
         <StatCard title="Total Receipts" value={total} icon={<PackageCheck className="h-5 w-5" />} />
       </div>
 
-      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search receipts..." isLoading={isLoading} emptyMessage="No goods receipts yet" />
+      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search receipts..." isLoading={isLoading} emptyMessage="No goods receipts yet"
+        toolbar={
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Purchase Order">
+                <SearchableSelect options={purchaseOrderOptions} value={filterPurchaseOrderId} onChange={(v) => { setFilterPurchaseOrderId(v); setPage(1); }} placeholder="All purchase orders" />
+              </FilterField>
+              <FilterField label="Receipt Date">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterDateFrom} onChange={(d) => { setFilterDateFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterDateTo} onChange={(d) => { setFilterDateTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+          </div>
+        }
+      />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-2xl p-0 gap-0">

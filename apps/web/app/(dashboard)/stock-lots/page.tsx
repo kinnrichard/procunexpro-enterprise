@@ -12,6 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
 import { Boxes, Plus, AlertTriangle, Clock, Pencil, Check, X } from 'lucide-react';
 
@@ -44,15 +47,38 @@ export default function StockLotsPage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' });
 
+  // Advanced filters
+  const [filterProductId, setFilterProductId] = useState('');
+  const [filterQcStatus, setFilterQcStatus] = useState('');
+  const [filterWarehouseId, setFilterWarehouseId] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterProductId, filterQcStatus, filterWarehouseId, filterDateFrom, filterDateTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterProductId(''); setFilterQcStatus(''); setFilterWarehouseId('');
+    setFilterDateFrom(undefined); setFilterDateTo(undefined);
+    setPage(1);
+  }
+
   const expiringMode = filter === 'expiring';
   const qcFilter = filter === 'PENDING_QC' ? 'PENDING' : undefined;
   const statusFilter = ['AVAILABLE', 'EXPIRED', 'DEPLETED'].includes(filter) ? filter : undefined;
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ['stock-lots', page, search, filter],
+    queryKey: ['stock-lots', page, search, filter, filterProductId, filterQcStatus, filterWarehouseId, filterDateFrom, filterDateTo],
     queryFn: () => expiringMode
       ? api.get('/stock-lots/expiring', { params: { days: 30 } })
-      : api.get('/stock-lots', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }), ...(qcFilter && { qcStatus: qcFilter }) } }),
+      : api.get('/stock-lots', { params: {
+          page, limit: 10, search,
+          ...(statusFilter && { status: statusFilter }),
+          ...(qcFilter && { qcStatus: qcFilter }),
+          ...(filterProductId && { productId: filterProductId }),
+          ...(filterQcStatus && { qcStatus: filterQcStatus }),
+          ...(filterWarehouseId && { warehouseId: filterWarehouseId }),
+          ...(filterDateFrom && { dateFrom: toDateStr(filterDateFrom) }),
+          ...(filterDateTo && { dateTo: toDateStr(filterDateTo) }),
+        } }),
   });
 
   const { data: expData } = useQuery({ queryKey: ['stock-lots-expiring'], queryFn: () => api.get('/stock-lots/expiring', { params: { days: 30 } }) });
@@ -159,13 +185,38 @@ export default function StockLotsPage() {
         isLoading={isLoading}
         emptyMessage="No lots found"
         toolbar={
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {filters.map(f => (
-              <button key={f} onClick={() => { setFilter(f); setPage(1); }}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', filter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-                {filterLabels[f]}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Product">
+                <SearchableSelect options={products} value={filterProductId} onChange={(v) => { setFilterProductId(v); setPage(1); }} placeholder="All products" />
+              </FilterField>
+              <FilterField label="QC Status">
+                <Select value={filterQcStatus || 'ALL'} onValueChange={(v) => { setFilterQcStatus(v === 'ALL' ? '' : v); setPage(1); }}>
+                  <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All QC statuses" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All QC statuses</SelectItem>
+                    {['PENDING', 'PASSED', 'FAILED', 'HOLD'].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Warehouse">
+                <SearchableSelect options={warehouses} value={filterWarehouseId} onChange={(v) => { setFilterWarehouseId(v); setPage(1); }} placeholder="All warehouses" />
+              </FilterField>
+              <FilterField label="Date Received">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterDateFrom} onChange={(d) => { setFilterDateFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterDateTo} onChange={(d) => { setFilterDateTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {filters.map(f => (
+                <button key={f} onClick={() => { setFilter(f); setPage(1); }}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', filter === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+                  {filterLabels[f]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />

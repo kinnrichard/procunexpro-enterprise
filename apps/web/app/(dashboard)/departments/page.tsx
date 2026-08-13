@@ -12,13 +12,16 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { Network, Plus, Pencil, Trash2, Users } from 'lucide-react';
 
@@ -39,9 +42,30 @@ export default function DepartmentsPage() {
   const [editing, setEditing] = useState<any>(null);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
 
+  // Advanced filters
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterParentId, setFilterParentId] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterStatus, filterParentId, filterCreatedFrom, filterCreatedTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterStatus('');
+    setFilterParentId('');
+    setFilterCreatedFrom(undefined);
+    setFilterCreatedTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['departments', page, search],
-    queryFn: () => api.get('/departments', { params: { page, limit: 10, search } }),
+    queryKey: ['departments', page, search, filterStatus, filterParentId, filterCreatedFrom, filterCreatedTo],
+    queryFn: () => api.get('/departments', { params: {
+      page, limit: 10, search,
+      ...(filterStatus && { status: filterStatus }),
+      ...(filterParentId && { parentId: filterParentId }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+    } }),
   });
 
   const { data: allDepts } = useQuery({
@@ -120,7 +144,31 @@ export default function DepartmentsPage() {
         <StatCard title="Top Level" value={items.filter((i: any) => !i.parentId).length} icon={<Network className="h-5 w-5" />} />
       </div>
 
-      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search departments..." isLoading={isLoading} emptyMessage="No departments found" />
+      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search departments..." isLoading={isLoading} emptyMessage="No departments found"
+        toolbar={
+          <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+            <FilterField label="Status">
+              <Select value={filterStatus || 'ALL'} onValueChange={(v) => { setFilterStatus(v === 'ALL' ? '' : v); setPage(1); }}>
+                <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All statuses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All statuses</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Parent Department">
+              <SearchableSelect options={deptOptions} value={filterParentId} onChange={(v) => { setFilterParentId(v); setPage(1); }} placeholder="All parents" />
+            </FilterField>
+            <FilterField label="Date Created">
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+              </div>
+            </FilterField>
+          </FilterPopover>
+        }
+      />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-lg p-0 gap-0">

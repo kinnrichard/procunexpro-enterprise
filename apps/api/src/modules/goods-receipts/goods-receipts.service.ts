@@ -12,12 +12,20 @@ export class GoodsReceiptsService {
     return `${p}-${String(count + 1).padStart(4, '0')}`;
   }
 
-  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string }) {
+  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string; purchaseOrderId?: string; dateFrom?: string; dateTo?: string }) {
     const page = params.page || 1;
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
     const where: any = { tenantId };
+    if (params.purchaseOrderId) where.purchaseOrderId = params.purchaseOrderId;
+
+    if (params.dateFrom || params.dateTo) {
+      where.receiptDate = {};
+      if (params.dateFrom) where.receiptDate.gte = new Date(params.dateFrom);
+      if (params.dateTo) where.receiptDate.lte = new Date(`${params.dateTo}T23:59:59.999Z`);
+    }
+
     if (params.search) {
       where.OR = [
         { receiptNumber: { contains: params.search, mode: 'insensitive' } },

@@ -26,12 +26,18 @@ export class SupplierScoringController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('period') period?: string,
+    @Query('vendorId') vendorId?: string,
+    @Query('createdDateFrom') createdDateFrom?: string,
+    @Query('createdDateTo') createdDateTo?: string,
   ) {
     return this.supplierScoringService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
       limit: limit ? Number.parseInt(limit) : undefined,
       search,
       period,
+      vendorId,
+      createdDateFrom,
+      createdDateTo,
     });
   }
 

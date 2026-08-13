@@ -8,7 +8,15 @@ export class UsersService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; search?: string },
+    params: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      role?: string;
+      status?: string;
+      createdDateFrom?: string;
+      createdDateTo?: string;
+    },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -23,6 +31,24 @@ export class UsersService {
         { firstName: { contains: params.search, mode: 'insensitive' } },
         { lastName: { contains: params.search, mode: 'insensitive' } },
       ];
+    }
+
+    if (params.role) {
+      where.role = params.role;
+    }
+
+    if (params.status) {
+      where.isActive = params.status === 'ACTIVE';
+    }
+
+    if (params.createdDateFrom || params.createdDateTo) {
+      where.createdAt = {};
+      if (params.createdDateFrom) {
+        where.createdAt.gte = new Date(params.createdDateFrom);
+      }
+      if (params.createdDateTo) {
+        where.createdAt.lte = new Date(`${params.createdDateTo}T23:59:59.999Z`);
+      }
     }
 
     const [data, total] = await Promise.all([

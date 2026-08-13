@@ -13,13 +13,19 @@ export class DeliveryReceiptsService {
     return `${WEB_BASE}/dr/sign/${token}`;
   }
 
-  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string; status?: string }) {
+  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string; status?: string; customerId?: string; createdDateFrom?: string; createdDateTo?: string }) {
     const page = params.page || 1;
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
     const where: any = { tenantId };
     if (params.status) where.status = params.status;
+    if (params.customerId) where.customerId = params.customerId;
+    if (params.createdDateFrom || params.createdDateTo) {
+      where.createdAt = {};
+      if (params.createdDateFrom) where.createdAt.gte = new Date(params.createdDateFrom);
+      if (params.createdDateTo) where.createdAt.lte = new Date(`${params.createdDateTo}T23:59:59.999Z`);
+    }
     if (params.search) {
       where.OR = [
         { drNumber: { contains: params.search, mode: 'insensitive' } },

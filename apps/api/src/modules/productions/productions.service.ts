@@ -55,7 +55,7 @@ export class ProductionsService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; search?: string; status?: string },
+    params: { page?: number; limit?: number; search?: string; status?: string; productId?: string; dateFrom?: string; dateTo?: string },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 10;
@@ -63,6 +63,12 @@ export class ProductionsService {
 
     const where: any = { tenantId };
     if (params.status) where.status = params.status;
+    if (params.productId) where.productId = params.productId;
+    if (params.dateFrom || params.dateTo) {
+      where.createdAt = {};
+      if (params.dateFrom) where.createdAt.gte = new Date(params.dateFrom);
+      if (params.dateTo) where.createdAt.lte = new Date(`${params.dateTo}T23:59:59.999Z`);
+    }
     if (params.search) {
       where.OR = [
         { referenceNumber: { contains: params.search, mode: 'insensitive' } },

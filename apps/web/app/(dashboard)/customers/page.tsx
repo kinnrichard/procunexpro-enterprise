@@ -8,11 +8,14 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { Users, Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -28,9 +31,30 @@ export default function CustomersPage() {
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [form, setForm] = useState({ ...blank });
 
+  // Advanced filters
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterStatus, filterCity, filterCreatedFrom, filterCreatedTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterStatus('');
+    setFilterCity('');
+    setFilterCreatedFrom(undefined);
+    setFilterCreatedTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['customers', page, search],
-    queryFn: () => api.get('/customers', { params: { page, limit: 10, search } }),
+    queryKey: ['customers', page, search, filterStatus, filterCity, filterCreatedFrom, filterCreatedTo],
+    queryFn: () => api.get('/customers', { params: {
+      page, limit: 10, search,
+      ...(filterStatus && { status: filterStatus }),
+      ...(filterCity && { city: filterCity }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+    } }),
   });
 
   const items = response?.data?.data || [];
@@ -95,6 +119,29 @@ export default function CustomersPage() {
         searchPlaceholder="Search customers..."
         isLoading={isLoading}
         emptyMessage="No customers yet"
+        toolbar={
+          <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+            <FilterField label="Status">
+              <Select value={filterStatus || 'ALL'} onValueChange={(v) => { setFilterStatus(v === 'ALL' ? '' : v); setPage(1); }}>
+                <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All statuses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All statuses</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="City">
+              <Input value={filterCity} onChange={(e) => { setFilterCity(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="City" />
+            </FilterField>
+            <FilterField label="Date Created">
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+              </div>
+            </FilterField>
+          </FilterPopover>
+        }
       />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

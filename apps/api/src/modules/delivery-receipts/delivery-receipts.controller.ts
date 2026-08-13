@@ -10,12 +10,24 @@ export class DeliveryReceiptsController {
   constructor(private readonly service: DeliveryReceiptsService) {}
 
   @Get()
-  findAll(@Req() req: any, @Query('page') page?: string, @Query('limit') limit?: string, @Query('search') search?: string, @Query('status') status?: string) {
+  findAll(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('customerId') customerId?: string,
+    @Query('createdDateFrom') createdDateFrom?: string,
+    @Query('createdDateTo') createdDateTo?: string,
+  ) {
     return this.service.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
       limit: limit ? Number.parseInt(limit) : undefined,
       search,
       status,
+      customerId,
+      createdDateFrom,
+      createdDateTo,
     });
   }
 

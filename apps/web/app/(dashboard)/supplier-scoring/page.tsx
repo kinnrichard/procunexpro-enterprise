@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DatePicker } from '@/components/ui/date-picker';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
@@ -72,9 +74,28 @@ export default function SupplierScoringPage() {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [tab, setTab] = useState('scores');
 
+  // Advanced filters
+  const [filterVendorId, setFilterVendorId] = useState('');
+  const [filterPeriod, setFilterPeriod] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterVendorId, filterPeriod, filterCreatedFrom, filterCreatedTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterVendorId(''); setFilterPeriod('');
+    setFilterCreatedFrom(undefined); setFilterCreatedTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['supplier-scores', page, search],
-    queryFn: () => api.get('/supplier-scoring', { params: { page, limit: 10, search } }),
+    queryKey: ['supplier-scores', page, search, filterVendorId, filterPeriod, filterCreatedFrom, filterCreatedTo],
+    queryFn: () => api.get('/supplier-scoring', { params: {
+      page, limit: 10, search,
+      ...(filterVendorId && { vendorId: filterVendorId }),
+      ...(filterPeriod && { period: filterPeriod }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+    } }),
   });
 
   const { data: leaderboardData } = useQuery({
@@ -189,7 +210,24 @@ export default function SupplierScoringPage() {
         </TabsList>
 
         <TabsContent value="scores" className="mt-4">
-          <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search scores..." isLoading={isLoading} emptyMessage="No scores yet" />
+          <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search scores..." isLoading={isLoading} emptyMessage="No scores yet"
+            toolbar={
+              <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+                <FilterField label="Vendor">
+                  <SearchableSelect options={vendors} value={filterVendorId} onChange={(v) => { setFilterVendorId(v); setPage(1); }} placeholder="All vendors" />
+                </FilterField>
+                <FilterField label="Period">
+                  <Input value={filterPeriod} onChange={(e) => { setFilterPeriod(e.target.value); setPage(1); }} className="h-9 rounded-lg" placeholder="e.g. 2026-Q1" />
+                </FilterField>
+                <FilterField label="Date Created">
+                  <div className="grid grid-cols-2 gap-2">
+                    <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                    <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                  </div>
+                </FilterField>
+              </FilterPopover>
+            }
+          />
         </TabsContent>
 
         <TabsContent value="leaderboard" className="mt-4">

@@ -7,7 +7,7 @@ const EDITABLE_FIELDS = ['name', 'code', 'contactPerson', 'email', 'phone', 'add
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string }) {
+  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string; status?: string; city?: string; createdDateFrom?: string; createdDateTo?: string }) {
     const page = params.page || 1;
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
@@ -19,6 +19,14 @@ export class CustomersService {
         { code: { contains: params.search, mode: 'insensitive' } },
         { contactPerson: { contains: params.search, mode: 'insensitive' } },
       ];
+    }
+    if (params.status === 'ACTIVE') where.isActive = true;
+    else if (params.status === 'INACTIVE') where.isActive = false;
+    if (params.city) where.city = { contains: params.city, mode: 'insensitive' };
+    if (params.createdDateFrom || params.createdDateTo) {
+      where.createdAt = {};
+      if (params.createdDateFrom) where.createdAt.gte = new Date(params.createdDateFrom);
+      if (params.createdDateTo) where.createdAt.lte = new Date(`${params.createdDateTo}T23:59:59.999Z`);
     }
 
     const [data, total] = await Promise.all([

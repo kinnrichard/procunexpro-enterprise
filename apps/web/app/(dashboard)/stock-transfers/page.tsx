@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DatePicker } from '@/components/ui/date-picker';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeftRight, Plus, Trash2, MoveRight } from 'lucide-react';
 
@@ -29,9 +31,28 @@ export default function StockTransfersPage() {
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
 
+  // Advanced filters
+  const [filterFromWh, setFilterFromWh] = useState('');
+  const [filterToWh, setFilterToWh] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterFromWh, filterToWh, filterDateFrom, filterDateTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterFromWh(''); setFilterToWh('');
+    setFilterDateFrom(undefined); setFilterDateTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['stock-transfers', page, search],
-    queryFn: () => api.get('/stock-transfers', { params: { page, limit: 10, search } }),
+    queryKey: ['stock-transfers', page, search, filterFromWh, filterToWh, filterDateFrom, filterDateTo],
+    queryFn: () => api.get('/stock-transfers', { params: {
+      page, limit: 10, search,
+      ...(filterFromWh && { fromWarehouseId: filterFromWh }),
+      ...(filterToWh && { toWarehouseId: filterToWh }),
+      ...(filterDateFrom && { dateFrom: toDateStr(filterDateFrom) }),
+      ...(filterDateTo && { dateTo: toDateStr(filterDateTo) }),
+    } }),
   });
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
@@ -79,7 +100,36 @@ export default function StockTransfersPage() {
         <StatCard title="Total Transfers" value={total} icon={<ArrowLeftRight className="h-5 w-5" />} />
       </div>
 
-      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search transfers..." isLoading={isLoading} emptyMessage="No transfers yet" />
+      <DataTable
+        columns={columns}
+        data={items}
+        total={total}
+        page={page}
+        limit={10}
+        onPageChange={setPage}
+        onSearch={setSearch}
+        searchPlaceholder="Search transfers..."
+        isLoading={isLoading}
+        emptyMessage="No transfers yet"
+        toolbar={
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Transfer Date">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterDateFrom} onChange={(d) => { setFilterDateFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterDateTo} onChange={(d) => { setFilterDateTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+              <FilterField label="From Warehouse">
+                <SearchableSelect options={warehouses} value={filterFromWh} onChange={(v) => { setFilterFromWh(v); setPage(1); }} placeholder="All warehouses" />
+              </FilterField>
+              <FilterField label="To Warehouse">
+                <SearchableSelect options={warehouses} value={filterToWh} onChange={(v) => { setFilterToWh(v); setPage(1); }} placeholder="All warehouses" />
+              </FilterField>
+            </FilterPopover>
+          </div>
+        }
+      />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-2xl p-0 gap-0">

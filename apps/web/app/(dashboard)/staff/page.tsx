@@ -8,12 +8,15 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { Contact, Plus, Pencil, Trash2, KeyRound } from 'lucide-react';
 
@@ -29,9 +32,28 @@ export default function StaffPage() {
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [form, setForm] = useState({ ...blank });
 
+  // Advanced filters
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterDepartmentId, setFilterDepartmentId] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterStatus, filterDepartmentId, filterCreatedFrom, filterCreatedTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterStatus(''); setFilterDepartmentId('');
+    setFilterCreatedFrom(undefined); setFilterCreatedTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['staff', page, search],
-    queryFn: () => api.get('/staff', { params: { page, limit: 10, search } }),
+    queryKey: ['staff', page, search, filterStatus, filterDepartmentId, filterCreatedFrom, filterCreatedTo],
+    queryFn: () => api.get('/staff', { params: {
+      page, limit: 10, search,
+      ...(filterStatus && { status: filterStatus }),
+      ...(filterDepartmentId && { departmentId: filterDepartmentId }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+    } }),
   });
   const { data: deptData } = useQuery({ queryKey: ['departments-all'], queryFn: () => api.get('/departments', { params: { limit: 1000 } }) });
   const { data: userData } = useQuery({ queryKey: ['staff-available-users'], queryFn: () => api.get('/staff/available-users'), enabled: modalOpen });
@@ -95,7 +117,31 @@ export default function StaffPage() {
         <StatCard title="With login" value={items.filter((s: any) => s.user).length} icon={<KeyRound className="h-5 w-5" />} />
       </div>
 
-      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search staff..." isLoading={isLoading} emptyMessage="No staff yet" />
+      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search staff..." isLoading={isLoading} emptyMessage="No staff yet"
+        toolbar={
+          <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+            <FilterField label="Status">
+              <Select value={filterStatus || 'ALL'} onValueChange={(v) => { setFilterStatus(v === 'ALL' ? '' : v); setPage(1); }}>
+                <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All statuses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All statuses</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Department">
+              <SearchableSelect options={departments} value={filterDepartmentId} onChange={(v) => { setFilterDepartmentId(v); setPage(1); }} placeholder="All departments" />
+            </FilterField>
+            <FilterField label="Date Created">
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+              </div>
+            </FilterField>
+          </FilterPopover>
+        }
+      />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-lg p-0 gap-0">

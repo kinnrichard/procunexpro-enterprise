@@ -7,13 +7,27 @@ const round = (n: number) => Math.round(n * 1e6) / 1e6;
 export class StockTransfersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string }) {
+  async findAll(
+    tenantId: string,
+    params: {
+      page?: number; limit?: number; search?: string;
+      fromWarehouseId?: string; toWarehouseId?: string; dateFrom?: string; dateTo?: string;
+    },
+  ) {
     const page = params.page || 1;
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
     const where: any = { tenantId };
     if (params.search) where.transferNumber = { contains: params.search, mode: 'insensitive' };
+    if (params.fromWarehouseId) where.fromWarehouseId = params.fromWarehouseId;
+    if (params.toWarehouseId) where.toWarehouseId = params.toWarehouseId;
+
+    if (params.dateFrom || params.dateTo) {
+      where.transferDate = {};
+      if (params.dateFrom) where.transferDate.gte = new Date(params.dateFrom);
+      if (params.dateTo) where.transferDate.lte = new Date(`${params.dateTo}T23:59:59.999Z`);
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.stockTransfer.findMany({

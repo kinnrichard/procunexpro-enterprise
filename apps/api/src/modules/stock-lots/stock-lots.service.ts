@@ -14,7 +14,7 @@ export class StockLotsService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; productId?: string; status?: string; qcStatus?: string; search?: string },
+    params: { page?: number; limit?: number; productId?: string; status?: string; qcStatus?: string; warehouseId?: string; dateFrom?: string; dateTo?: string; search?: string },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -24,6 +24,12 @@ export class StockLotsService {
     if (params.productId) where.productId = params.productId;
     if (params.status) where.status = params.status;
     if (params.qcStatus) where.qcStatus = params.qcStatus;
+    if (params.warehouseId) where.warehouseId = params.warehouseId;
+    if (params.dateFrom || params.dateTo) {
+      where.receivedAt = {};
+      if (params.dateFrom) where.receivedAt.gte = new Date(params.dateFrom);
+      if (params.dateTo) where.receivedAt.lte = new Date(`${params.dateTo}T23:59:59.999Z`);
+    }
     if (params.search) {
       where.OR = [
         { lotNumber: { contains: params.search, mode: 'insensitive' } },

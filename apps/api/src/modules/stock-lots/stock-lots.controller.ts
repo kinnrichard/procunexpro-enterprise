@@ -22,6 +22,9 @@ export class StockLotsController {
     @Query('productId') productId?: string,
     @Query('status') status?: string,
     @Query('qcStatus') qcStatus?: string,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
     @Query('search') search?: string,
   ) {
     return this.service.findAll(req.user.tenantId, {
@@ -30,6 +33,9 @@ export class StockLotsController {
       productId,
       status,
       qcStatus,
+      warehouseId,
+      dateFrom,
+      dateTo,
       search,
     });
   }

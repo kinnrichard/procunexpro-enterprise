@@ -9,12 +9,14 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { Factory, Plus, CheckCircle2, FileEdit, XCircle, AlertTriangle } from 'lucide-react';
 
@@ -40,6 +42,19 @@ export default function ProductionsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ row: any; action: 'complete' | 'cancel' } | null>(null);
 
+  // Advanced filters
+  const [filterProductId, setFilterProductId] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState<Date | undefined>();
+  const [filterDateTo, setFilterDateTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterProductId, filterDateFrom, filterDateTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterProductId('');
+    setFilterDateFrom(undefined);
+    setFilterDateTo(undefined);
+    setPage(1);
+  }
+
   // Create form state
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -50,8 +65,14 @@ export default function ProductionsPage() {
   const [overheadCost, setOverheadCost] = useState(0);
 
   const { data: response, isLoading } = useQuery({
-    queryKey: ['productions', page, search, statusFilter],
-    queryFn: () => api.get('/productions', { params: { page, limit: 10, search, ...(statusFilter && { status: statusFilter }) } }),
+    queryKey: ['productions', page, search, statusFilter, filterProductId, filterDateFrom, filterDateTo],
+    queryFn: () => api.get('/productions', { params: {
+      page, limit: 10, search,
+      ...(statusFilter && { status: statusFilter }),
+      ...(filterProductId && { productId: filterProductId }),
+      ...(filterDateFrom && { dateFrom: toDateStr(filterDateFrom) }),
+      ...(filterDateTo && { dateTo: toDateStr(filterDateTo) }),
+    } }),
   });
 
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
@@ -202,13 +223,26 @@ export default function ProductionsPage() {
         isLoading={isLoading}
         emptyMessage="No production runs found"
         toolbar={
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {statusFilters.map(s => (
-              <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-                {statusLabels[s]}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+              <FilterField label="Product">
+                <SearchableSelect options={products} value={filterProductId} onChange={(v) => { setFilterProductId(v); setPage(1); }} placeholder="All products" />
+              </FilterField>
+              <FilterField label="Date">
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePicker value={filterDateFrom} onChange={(d) => { setFilterDateFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                  <DatePicker value={filterDateTo} onChange={(d) => { setFilterDateTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+                </div>
+              </FilterField>
+            </FilterPopover>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {statusFilters.map(s => (
+                <button key={s} onClick={() => { setStatusFilter(s); setPage(1); }}
+                  className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors', statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
+                  {statusLabels[s]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />

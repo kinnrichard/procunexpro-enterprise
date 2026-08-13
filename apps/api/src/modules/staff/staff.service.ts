@@ -12,12 +12,28 @@ export class StaffService {
     user: { select: { id: true, username: true, role: true } },
   };
 
-  async findAll(tenantId: string, params: { page?: number; limit?: number; search?: string }) {
+  async findAll(
+    tenantId: string,
+    params: {
+      page?: number; limit?: number; search?: string; status?: string;
+      departmentId?: string; createdDateFrom?: string; createdDateTo?: string;
+    },
+  ) {
     const page = params.page || 1;
     const limit = params.limit || 10;
     const skip = (page - 1) * limit;
 
     const where: any = { tenantId };
+
+    if (params.status) where.isActive = params.status === 'ACTIVE';
+    if (params.departmentId) where.departmentId = params.departmentId;
+
+    if (params.createdDateFrom || params.createdDateTo) {
+      where.createdAt = {};
+      if (params.createdDateFrom) where.createdAt.gte = new Date(params.createdDateFrom);
+      if (params.createdDateTo) where.createdAt.lte = new Date(`${params.createdDateTo}T23:59:59.999Z`);
+    }
+
     if (params.search) {
       where.OR = [
         { firstName: { contains: params.search, mode: 'insensitive' } },
