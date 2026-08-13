@@ -101,7 +101,7 @@ export default function GoodsReceiptsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Supplier DR / Invoice #</Label>
-                <Input value={supplierDrRef} onChange={(e) => setSupplierDrRef(e.target.value)} className="h-9 rounded-lg" />
+                <Input value={supplierDrRef} onChange={(e) => setSupplierDrRef(e.target.value)} className="h-9 rounded-lg" placeholder="e.g., supplier's DR / invoice #" />
               </div>
             </div>
 
@@ -135,7 +135,7 @@ export default function GoodsReceiptsPage() {
 
             <div className="space-y-1.5">
               <Label className="text-[13px]">Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-lg" rows={2} />
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-lg" rows={2} placeholder="Optional notes about this receipt..." />
             </div>
           </div>
           <div className="px-6 py-4 border-t border-border flex justify-between">

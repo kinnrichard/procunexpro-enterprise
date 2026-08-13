@@ -202,27 +202,27 @@ export default function UsersPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">First Name <span className="text-red-500">*</span></Label>
-                <Input {...form.register('firstName')} className={cn('h-9 rounded-lg', form.formState.errors.firstName && 'border-red-300')} />
+                <Input {...form.register('firstName')} className={cn('h-9 rounded-lg', form.formState.errors.firstName && 'border-red-300')} placeholder="e.g., Maria" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Last Name <span className="text-red-500">*</span></Label>
-                <Input {...form.register('lastName')} className={cn('h-9 rounded-lg', form.formState.errors.lastName && 'border-red-300')} />
+                <Input {...form.register('lastName')} className={cn('h-9 rounded-lg', form.formState.errors.lastName && 'border-red-300')} placeholder="e.g., Santos" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Username <span className="text-red-500">*</span></Label>
-                <Input {...form.register('username')} className={cn('h-9 rounded-lg', form.formState.errors.username && 'border-red-300')} />
+                <Input {...form.register('username')} className={cn('h-9 rounded-lg', form.formState.errors.username && 'border-red-300')} placeholder="e.g., maria.santos" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Email <span className="text-red-500">*</span></Label>
-                <Input {...form.register('email')} className={cn('h-9 rounded-lg', form.formState.errors.email && 'border-red-300')} />
+                <Input {...form.register('email')} className={cn('h-9 rounded-lg', form.formState.errors.email && 'border-red-300')} placeholder="user@email.com" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Password {!editing && <span className="text-red-500">*</span>}</Label>
-                <Input type="password" {...form.register('password')} className="h-9 rounded-lg" placeholder={editing ? 'Leave blank to keep' : ''} />
+                <Input type="password" {...form.register('password')} className="h-9 rounded-lg" placeholder={editing ? 'Leave blank to keep current' : 'Set a password'} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Role <span className="text-red-500">*</span></Label>
@@ -245,7 +245,7 @@ export default function UsersPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Phone</Label>
-                <Input {...form.register('phone')} className="h-9 rounded-lg" />
+                <Input {...form.register('phone')} className="h-9 rounded-lg" placeholder="+1 234 567 8900" />
               </div>
             </div>
             <div className="flex items-center gap-3">

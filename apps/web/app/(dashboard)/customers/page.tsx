@@ -106,45 +106,45 @@ export default function CustomersPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Name <span className="text-red-500">*</span></Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-9 rounded-lg" placeholder="e.g., TBMC" />
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-9 rounded-lg" placeholder="e.g., Acme Retail Inc." />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Code <span className="text-red-500">*</span></Label>
-                <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="h-9 rounded-lg" placeholder="e.g., TBMC" />
+                <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} className="h-9 rounded-lg" placeholder="e.g., CUST-001" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Contact Person</Label>
-                <Input value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} className="h-9 rounded-lg" placeholder="Full name" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Tax ID</Label>
-                <Input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} className="h-9 rounded-lg" placeholder="Tax identification number" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Email</Label>
-                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-9 rounded-lg" placeholder="customer@email.com" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Phone</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="h-9 rounded-lg" placeholder="+1 234 567 8900" />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Address</Label>
-              <Textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="rounded-lg" rows={2} />
+              <Textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="rounded-lg" rows={2} placeholder="Street address, building, etc." />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">City</Label>
-                <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="h-9 rounded-lg" placeholder="City" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Country</Label>
-                <Input value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} className="h-9 rounded-lg" placeholder="Country" />
               </div>
             </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer">

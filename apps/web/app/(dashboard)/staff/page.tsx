@@ -116,11 +116,11 @@ export default function StaffPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">First Name <span className="text-red-500">*</span></Label>
-                <Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="h-9 rounded-lg" placeholder="e.g., Maria" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Last Name <span className="text-red-500">*</span></Label>
-                <Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="h-9 rounded-lg" placeholder="e.g., Santos" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -136,11 +136,11 @@ export default function StaffPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Email</Label>
-                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-9 rounded-lg" placeholder="staff@email.com" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Phone</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="h-9 rounded-lg" />
+                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="h-9 rounded-lg" placeholder="+1 234 567 8900" />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -149,7 +149,7 @@ export default function StaffPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Notes</Label>
-              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="rounded-lg" rows={2} />
+              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="rounded-lg" rows={2} placeholder="Optional notes about this staff member..." />
             </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="h-4 w-4 rounded border-input" />

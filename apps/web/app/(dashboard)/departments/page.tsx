@@ -131,16 +131,16 @@ export default function DepartmentsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Name <span className="text-red-500">*</span></Label>
-                <Input {...form.register('name')} className={cn('h-9 rounded-lg', form.formState.errors.name && 'border-red-300')} />
+                <Input {...form.register('name')} className={cn('h-9 rounded-lg', form.formState.errors.name && 'border-red-300')} placeholder="e.g., Production" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Code <span className="text-red-500">*</span></Label>
-                <Input {...form.register('code')} className={cn('h-9 rounded-lg', form.formState.errors.code && 'border-red-300')} />
+                <Input {...form.register('code')} className={cn('h-9 rounded-lg', form.formState.errors.code && 'border-red-300')} placeholder="e.g., PROD" />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Description</Label>
-              <Textarea {...form.register('description')} className="rounded-lg" rows={2} />
+              <Textarea {...form.register('description')} className="rounded-lg" rows={2} placeholder="What this department is responsible for..." />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Parent Department</Label>

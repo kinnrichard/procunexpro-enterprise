@@ -317,7 +317,7 @@ export default function ProductionsPage() {
 
             <div className="space-y-1.5">
               <Label className="text-[13px]">Notes</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-lg" rows={2} />
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-lg" rows={2} placeholder="Optional notes about this production run..." />
             </div>
           </div>
           <div className="px-6 py-4 border-t border-border flex justify-between">

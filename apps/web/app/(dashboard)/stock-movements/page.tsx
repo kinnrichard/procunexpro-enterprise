@@ -206,11 +206,11 @@ export default function StockMovementsPage() {
             )}
             <div className="space-y-1.5">
               <Label className="text-[13px]">Reason</Label>
-              <Input {...form.register('reason')} className="h-9 rounded-lg" />
+              <Input {...form.register('reason')} className="h-9 rounded-lg" placeholder="e.g., Stock count adjustment" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Notes</Label>
-              <Textarea {...form.register('notes')} className="rounded-lg" rows={2} />
+              <Textarea {...form.register('notes')} className="rounded-lg" rows={2} placeholder="Optional notes..." />
             </div>
           </form>
           <div className="px-6 py-4 border-t border-border flex justify-between">
