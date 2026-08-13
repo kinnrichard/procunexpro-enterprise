@@ -8,7 +8,8 @@ import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Scale, AlertTriangle, Coins, Package } from 'lucide-react';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
+import { AlertTriangle, Coins, Package } from 'lucide-react';
 
 export default function InventoryBalancePage() {
   const [page, setPage] = useState(1);
@@ -27,6 +28,7 @@ export default function InventoryBalancePage() {
   const total = response?.data?.total || 0;
   const summary = summaryRes?.data?.data || { totalSkus: 0, totalValue: 0, lowStock: 0 };
   const warehouses = [{ value: '', label: 'All warehouses' }, ...(whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }))];
+  const activeFilterCount = [warehouseId, lowStock].filter(Boolean).length;
 
   const columns = [
     { key: 'name', label: 'Product', render: (_: any, row: any) => <div><p className="font-medium">{row.name}</p><p className="text-xs text-muted-foreground font-mono">{row.sku}</p></div> },
@@ -67,12 +69,20 @@ export default function InventoryBalancePage() {
         isLoading={isLoading}
         emptyMessage="No products found"
         toolbar={
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="w-48"><SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setPage(1); }} placeholder="All warehouses" /></div>
-            <button onClick={() => { setLowStock(!lowStock); setPage(1); }}
-              className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5', lowStock ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent')}>
-              <Scale className="h-3.5 w-3.5" /> Low stock only
-            </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterPopover
+              activeCount={activeFilterCount}
+              onClear={() => { setWarehouseId(''); setLowStock(false); setPage(1); }}
+            >
+              <FilterField label="Warehouse">
+                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setPage(1); }} placeholder="All warehouses" />
+              </FilterField>
+              <FilterField label="Availability">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="checkbox" checked={lowStock} onChange={(e) => { setLowStock(e.target.checked); setPage(1); }} className="h-4 w-4 rounded border-input" /> Low stock only
+                </label>
+              </FilterField>
+            </FilterPopover>
           </div>
         }
       />

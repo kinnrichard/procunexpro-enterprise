@@ -8,6 +8,7 @@ import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { ScrollText, Plus, Pencil, Trash2, LogIn, LogOut, RefreshCw, Activity } from 'lucide-react';
 
 const actionColors: Record<string, string> = {
@@ -54,6 +55,9 @@ export default function AuditTrailPage() {
   const items = response?.data?.data || [];
   const total = response?.data?.total || 0;
   const stats = statsData?.data || {};
+
+  const activeFilterCount = [entityFilter, actionFilter].filter(Boolean).length;
+  const onClear = () => { setEntityFilter(''); setActionFilter(''); setPage(1); };
 
   const columns = [
     {
@@ -115,26 +119,30 @@ export default function AuditTrailPage() {
         isLoading={isLoading}
         emptyMessage="No audit events found"
         toolbar={
-          <div className="flex items-center gap-2">
-            <Select value={entityFilter} onValueChange={(v) => { setEntityFilter(v === 'ALL' ? '' : v); setPage(1); }}>
-              <SelectTrigger className="h-8 w-40 rounded-lg text-xs">
-                <SelectValue placeholder="Entity type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Entities</SelectItem>
-                {entityTypes.filter(Boolean).map(t => <SelectItem key={t} value={t}>{t.replaceAll('-', ' ')}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v === 'ALL' ? '' : v); setPage(1); }}>
-              <SelectTrigger className="h-8 w-36 rounded-lg text-xs">
-                <SelectValue placeholder="Action" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Actions</SelectItem>
-                {actions.filter(Boolean).map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          <FilterPopover activeCount={activeFilterCount} onClear={onClear}>
+            <FilterField label="Entity Type">
+              <Select value={entityFilter} onValueChange={(v) => { setEntityFilter(v === 'ALL' ? '' : v); setPage(1); }}>
+                <SelectTrigger className="h-9 w-full rounded-lg">
+                  <SelectValue placeholder="Entity type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Entities</SelectItem>
+                  {entityTypes.filter(Boolean).map(t => <SelectItem key={t} value={t}>{t.replaceAll('-', ' ')}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Action">
+              <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v === 'ALL' ? '' : v); setPage(1); }}>
+                <SelectTrigger className="h-9 w-full rounded-lg">
+                  <SelectValue placeholder="Action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Actions</SelectItem>
+                  {actions.filter(Boolean).map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+          </FilterPopover>
         }
       />
     </div>

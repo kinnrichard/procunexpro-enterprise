@@ -19,6 +19,8 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { DatePicker } from '@/components/ui/date-picker';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
 
 import { useToast } from '@/components/ui/use-toast';
 import { GitBranch, Plus, Pencil, Trash2, Eye, X, ArrowDown, CheckCircle, XCircle } from 'lucide-react';
@@ -58,9 +60,27 @@ export default function WorkflowsPage() {
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [detailWorkflow, setDetailWorkflow] = useState<any>(null);
 
+  // Advanced filters
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterCreatedFrom, setFilterCreatedFrom] = useState<Date | undefined>();
+  const [filterCreatedTo, setFilterCreatedTo] = useState<Date | undefined>();
+  const activeFilterCount = [filterStatus, filterCreatedFrom, filterCreatedTo].filter(Boolean).length;
+  const toDateStr = (d?: Date) => (d ? d.toISOString().split('T')[0] : '');
+  function clearFilters() {
+    setFilterStatus('');
+    setFilterCreatedFrom(undefined);
+    setFilterCreatedTo(undefined);
+    setPage(1);
+  }
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['workflows', page, search],
-    queryFn: () => api.get('/workflows', { params: { page, limit: 10, search } }),
+    queryKey: ['workflows', page, search, filterStatus, filterCreatedFrom, filterCreatedTo],
+    queryFn: () => api.get('/workflows', { params: {
+      page, limit: 10, search,
+      ...(filterStatus && { status: filterStatus }),
+      ...(filterCreatedFrom && { createdDateFrom: toDateStr(filterCreatedFrom) }),
+      ...(filterCreatedTo && { createdDateTo: toDateStr(filterCreatedTo) }),
+    } }),
   });
 
   const { data: detailData } = useQuery({
@@ -175,7 +195,38 @@ export default function WorkflowsPage() {
         <StatCard title="For POs" value={items.filter((i: any) => i.entityType === 'PURCHASE_ORDER').length} icon={<GitBranch className="h-5 w-5" />} />
       </div>
 
-      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search workflows..." isLoading={isLoading} emptyMessage="No workflows configured" />
+      <DataTable
+        columns={columns}
+        data={items}
+        total={total}
+        page={page}
+        limit={10}
+        onPageChange={setPage}
+        onSearch={setSearch}
+        searchPlaceholder="Search workflows..."
+        isLoading={isLoading}
+        emptyMessage="No workflows configured"
+        toolbar={
+          <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
+            <FilterField label="Status">
+              <Select value={filterStatus || 'ALL'} onValueChange={(v) => { setFilterStatus(v === 'ALL' ? '' : v); setPage(1); }}>
+                <SelectTrigger className="h-9 rounded-lg"><SelectValue placeholder="All statuses" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All statuses</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="INACTIVE">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Date Created">
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker value={filterCreatedFrom} onChange={(d) => { setFilterCreatedFrom(d); setPage(1); }} placeholder="From" className="text-xs" />
+                <DatePicker value={filterCreatedTo} onChange={(d) => { setFilterCreatedTo(d); setPage(1); }} placeholder="To" className="text-xs" />
+              </div>
+            </FilterField>
+          </FilterPopover>
+        }
+      />
 
       {/* Create/Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

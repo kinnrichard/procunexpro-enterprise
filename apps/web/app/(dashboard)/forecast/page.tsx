@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -8,7 +9,9 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Factory, Loader2, PackageCheck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
+import { TrendingUp, Factory, Loader2, PackageCheck, Search } from 'lucide-react';
 
 interface ForecastRow {
   productId: string;
@@ -22,6 +25,8 @@ interface ForecastRow {
 
 export default function ForecastPage() {
   const router = useRouter();
+  const [search, setSearch] = useState('');
+  const [buildableOnly, setBuildableOnly] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ['production-forecast'],
     queryFn: () => api.get('/productions/forecast'),
@@ -29,6 +34,14 @@ export default function ForecastPage() {
 
   const rows: ForecastRow[] = data?.data?.data || [];
   const buildable = rows.filter((r) => r.maxBuildable > 0).length;
+
+  const filtered = rows.filter((r) => {
+    const q = search.toLowerCase();
+    const matchesSearch =
+      r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q);
+    if (buildableOnly && r.maxBuildable <= 0) return false;
+    return matchesSearch;
+  });
 
   return (
     <div className="space-y-6">
@@ -40,12 +53,36 @@ export default function ForecastPage() {
         <StatCard title="Blocked (0 buildable)" value={rows.length - buildable} icon={<TrendingUp className="h-5 w-5" />} />
       </div>
 
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <FilterPopover activeCount={buildableOnly ? 1 : 0} onClear={() => setBuildableOnly(false)}>
+          <FilterField label="Availability">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={buildableOnly}
+                onChange={(e) => setBuildableOnly(e.target.checked)}
+              />
+              Buildable only (can produce ≥1)
+            </label>
+          </FilterField>
+        </FilterPopover>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : rows.length === 0 ? (
-            <div className="text-center py-10 text-sm text-muted-foreground">No products have a composition yet. Define a BOM to forecast production.</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-10 text-sm text-muted-foreground">{rows.length === 0 ? 'No products have a composition yet. Define a BOM to forecast production.' : 'No products match your search or filter.'}</div>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -58,7 +95,7 @@ export default function ForecastPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {rows.map((r) => {
+                {filtered.map((r) => {
                   const limiting = r.components.find((c) => c.material === r.limitingMaterial);
                   return (
                     <tr key={r.productId} className="hover:bg-accent/30 transition-colors">

@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { PackagePlus, AlertTriangle, ShoppingCart, Loader2 } from 'lucide-react';
+import { FilterPopover, FilterField } from '@/components/filter-popover';
+import { PackagePlus, AlertTriangle, ShoppingCart, Loader2, Search } from 'lucide-react';
 
 interface Suggestion {
   productId: string;
@@ -33,6 +34,8 @@ export default function ReplenishmentPage() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [qty, setQty] = useState<Record<string, number>>({});
+  const [search, setSearch] = useState('');
+  const [onlyWithVendor, setOnlyWithVendor] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['replenishment-suggestions'],
@@ -42,13 +45,20 @@ export default function ReplenishmentPage() {
   const suggestions: Suggestion[] = data?.data?.data || [];
   const qtyFor = (s: Suggestion) => qty[s.productId] ?? s.suggestedQty;
 
+  const filtered = suggestions.filter((s) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || s.name.toLowerCase().includes(q) || s.sku.toLowerCase().includes(q);
+    const matchesVendor = !onlyWithVendor || !!s.vendorName;
+    return matchesSearch && matchesVendor;
+  });
+
   const toggle = (id: string) => setSelected((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const allSelected = suggestions.length > 0 && selected.size === suggestions.length;
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(suggestions.map((s) => s.productId)));
+  const allSelected = filtered.length > 0 && filtered.every((s) => selected.has(s.productId));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(filtered.map((s) => s.productId)));
 
   const selectedItems = suggestions.filter((s) => selected.has(s.productId));
   const selectedCost = selectedItems.reduce((sum, s) => sum + qtyFor(s) * (s.costPrice || 0), 0);
@@ -80,12 +90,27 @@ export default function ReplenishmentPage() {
         <StatCard title="Est. selected cost" value={formatCurrency(selectedCost)} icon={<ShoppingCart className="h-5 w-5" />} />
       </div>
 
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search materials..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <FilterPopover activeCount={onlyWithVendor ? 1 : 0} onClear={() => setOnlyWithVendor(false)}>
+          <FilterField label="Vendor">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={onlyWithVendor} onChange={(e) => setOnlyWithVendor(e.target.checked)} className="h-4 w-4" />
+              Only items with a preferred vendor
+            </label>
+          </FilterField>
+        </FilterPopover>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-          ) : suggestions.length === 0 ? (
-            <div className="text-center py-10 text-sm text-muted-foreground">Nothing to reorder — all stock is above its reorder point. 🎉</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-10 text-sm text-muted-foreground">{suggestions.length === 0 ? 'Nothing to reorder — all stock is above its reorder point. 🎉' : 'No materials match your search or filter.'}</div>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -100,7 +125,7 @@ export default function ReplenishmentPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {suggestions.map((s) => (
+                {filtered.map((s) => (
                   <tr key={s.productId} className={cn('hover:bg-accent/30 transition-colors', selected.has(s.productId) && 'bg-primary/5')}>
                     <td className="px-4 py-2.5"><input type="checkbox" checked={selected.has(s.productId)} onChange={() => toggle(s.productId)} className="h-4 w-4" /></td>
                     <td className="px-4 py-2.5"><p className="font-medium">{s.name}</p><p className="text-xs text-muted-foreground font-mono">{s.sku}</p></td>

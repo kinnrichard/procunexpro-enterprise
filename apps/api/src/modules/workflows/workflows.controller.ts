@@ -16,12 +16,18 @@ export class WorkflowsController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('entityType') entityType?: string,
+    @Query('status') status?: string,
+    @Query('createdDateFrom') createdDateFrom?: string,
+    @Query('createdDateTo') createdDateTo?: string,
   ) {
     return this.workflowsService.findAll(req.user.tenantId, {
       page: page ? Number.parseInt(page) : undefined,
       limit: limit ? Number.parseInt(limit) : undefined,
       search,
       entityType,
+      status,
+      createdDateFrom,
+      createdDateTo,
     });
   }
 
