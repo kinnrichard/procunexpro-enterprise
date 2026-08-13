@@ -73,6 +73,7 @@ services:
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-api.tls=true"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-api.tls.certresolver=letsencrypt"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME:-procunex}-api.loadbalancer.server.port=3004"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-api.middlewares=security-headers@file"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/uploads`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.entrypoints=websecure"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.tls=true"
@@ -104,6 +105,7 @@ services:
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-web.tls=true"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-web.tls.certresolver=letsencrypt"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME:-procunex}-web.loadbalancer.server.port=3005"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-web.middlewares=security-headers@file"
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3005/login',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
       interval: 30s
