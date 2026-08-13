@@ -127,7 +127,7 @@ export default function ContractsPage() {
     { key: 'contractNumber', label: 'Contract #', sortable: true, render: (v: string) => <span className="font-medium font-mono text-primary">{v}</span> },
     { key: 'title', label: 'Title', sortable: true },
     { key: 'vendor', label: 'Vendor', render: (_: any, row: any) => row.vendor?.name || '—' },
-    { key: 'totalValue', label: 'Value', sortable: true, render: (v: number) => formatCurrency(v) },
+    { key: 'totalValue', label: 'Value', sortable: true, className: 'text-right', render: (v: number) => <span className="font-mono font-medium">{formatCurrency(v)}</span> },
     { key: 'startDate', label: 'Start', render: (v: string) => formatDate(v) },
     { key: 'endDate', label: 'End', render: (v: string) => formatDate(v) },
     { key: 'autoRenew', label: 'Renew', render: (v: boolean) => v ? <Badge variant="outline" className="text-xs">Auto</Badge> : '—' },

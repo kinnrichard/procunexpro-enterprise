@@ -287,7 +287,7 @@ export default function DashboardPage() {
                   { header: 'Reference', render: (m) => <span className="font-mono text-xs">{m.referenceNumber}</span> },
                   { header: 'Product', render: (m) => <span className="font-medium">{m.product?.name || '—'}</span> },
                   { header: 'Type', render: (m) => <MoveBadge type={m.type} /> },
-                  { header: 'Qty', className: 'text-right', render: (m) => <span className={cn('font-semibold', IN_TYPES.has(m.type) ? 'text-green-600' : 'text-red-600')}>{IN_TYPES.has(m.type) ? '+' : '-'}{m.quantity}</span> },
+                  { header: 'Qty', className: 'text-right', render: (m) => <span className={cn('font-mono font-semibold', IN_TYPES.has(m.type) ? 'text-green-600' : 'text-red-600')}>{IN_TYPES.has(m.type) ? '+' : '-'}{m.quantity}</span> },
                   { header: 'Date', className: 'text-right', render: (m) => <span className="text-muted-foreground">{formatDate(m.createdAt)}</span> },
                 ]} />
               </TabsContent>
@@ -297,7 +297,7 @@ export default function DashboardPage() {
                   { header: 'PR #', render: (p) => <span className="font-mono text-xs font-semibold">{p.requestNumber}</span> },
                   { header: 'Title', render: (p) => <span className="font-medium">{p.title}</span> },
                   { header: 'Status', render: (p) => <StatusBadge status={p.status} /> },
-                  { header: 'Amount', className: 'text-right', render: (p) => <span className="font-semibold tabular-nums">{formatCurrency(p.totalAmount)}</span> },
+                  { header: 'Amount', className: 'text-right', render: (p) => <span className="font-mono font-medium">{formatCurrency(p.totalAmount)}</span> },
                   { header: 'Date', className: 'text-right', render: (p) => <span className="text-muted-foreground">{formatDate(p.createdAt)}</span> },
                 ]} />
               </TabsContent>
@@ -307,7 +307,7 @@ export default function DashboardPage() {
                   { header: 'PO #', render: (o) => <span className="font-mono text-xs font-semibold">{o.orderNumber}</span> },
                   { header: 'Vendor', render: (o) => <span className="font-medium">{o.vendor?.name || '—'}</span> },
                   { header: 'Status', render: (o) => <StatusBadge status={o.status} /> },
-                  { header: 'Amount', className: 'text-right', render: (o) => <span className="font-semibold tabular-nums">{formatCurrency(o.totalAmount)}</span> },
+                  { header: 'Amount', className: 'text-right', render: (o) => <span className="font-mono font-medium">{formatCurrency(o.totalAmount)}</span> },
                   { header: 'Date', className: 'text-right', render: (o) => <span className="text-muted-foreground">{formatDate(o.createdAt)}</span> },
                 ]} />
               </TabsContent>

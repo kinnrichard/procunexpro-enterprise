@@ -63,7 +63,7 @@ export default function StockTransfersPage() {
   const columns = [
     { key: 'transferNumber', label: 'Transfer #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
     { key: 'fromWarehouse', label: 'From → To', render: (_: any, row: any) => <span className="flex items-center gap-1.5">{row.fromWarehouse?.name} <MoveRight className="h-3.5 w-3.5 text-muted-foreground" /> {row.toWarehouse?.name}</span> },
-    { key: '_count', label: 'Items', render: (v: any) => v?.items ?? 0 },
+    { key: '_count', label: 'Items', className: 'text-center', render: (v: any) => <span className="font-mono text-sm">{v?.items ?? 0}</span> },
     { key: 'transferDate', label: 'Date', render: (v: string) => formatDate(v) },
   ];
 

@@ -130,7 +130,7 @@ export default function BudgetsPage() {
     { key: 'name', label: 'Name', sortable: true, render: (v: string) => <span className="font-medium">{v}</span> },
     { key: 'fiscalYear', label: 'Year', sortable: true },
     { key: 'period', label: 'Period', render: (v: string) => <span className="text-xs font-medium text-muted-foreground">{v}</span> },
-    { key: 'totalAmount', label: 'Budget', sortable: true, render: (v: number) => formatCurrency(v) },
+    { key: 'totalAmount', label: 'Budget', sortable: true, className: 'text-right', render: (v: number) => <span className="font-mono font-medium">{formatCurrency(v)}</span> },
     {
       key: 'spentAmount', label: 'Spent', render: (v: number, row: any) => {
         const pct = row.totalAmount > 0 ? (v / row.totalAmount) * 100 : 0;
@@ -140,8 +140,8 @@ export default function BudgetsPage() {
         return (
           <div className="space-y-1 min-w-[120px]">
             <div className="flex justify-between text-xs">
-              <span>{formatCurrency(v)}</span>
-              <span className={cn(pctClass)}>{pct.toFixed(0)}%</span>
+              <span className="font-mono font-medium">{formatCurrency(v)}</span>
+              <span className={cn('font-mono', pctClass)}>{pct.toFixed(0)}%</span>
             </div>
             <Progress value={pct} className="h-1.5" />
           </div>
@@ -350,9 +350,9 @@ export default function BudgetsPage() {
                               <tr key={a.id} className="border-t border-border/50">
                                 <td className="px-4 py-2.5">{a.department?.name || 'All'}</td>
                                 <td className="px-4 py-2.5">{a.category?.name || 'All'}</td>
-                                <td className="px-4 py-2.5 text-right">{formatCurrency(a.amount)}</td>
-                                <td className="px-4 py-2.5 text-right">{formatCurrency(a.spentAmount)}</td>
-                                <td className={cn('px-4 py-2.5 text-right font-medium', pctColor)}>{pct.toFixed(0)}%</td>
+                                <td className="px-4 py-2.5 text-right font-mono">{formatCurrency(a.amount)}</td>
+                                <td className="px-4 py-2.5 text-right font-mono">{formatCurrency(a.spentAmount)}</td>
+                                <td className={cn('px-4 py-2.5 text-right font-mono font-medium', pctColor)}>{pct.toFixed(0)}%</td>
                               </tr>
                             );
                           })}

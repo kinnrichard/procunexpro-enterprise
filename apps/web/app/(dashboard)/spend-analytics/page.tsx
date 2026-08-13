@@ -32,7 +32,7 @@ function SpendBar({ label, amount, max, count }: Readonly<{ label: string; amoun
         <span className="font-medium truncate mr-2">{label}</span>
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-xs text-muted-foreground">{count} orders</span>
-          <span className="font-semibold">{formatCurrency(amount)}</span>
+          <span className="font-mono font-semibold">{formatCurrency(amount)}</span>
         </div>
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">

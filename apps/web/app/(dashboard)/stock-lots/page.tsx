@@ -110,7 +110,7 @@ export default function StockLotsPage() {
   const columns = [
     { key: 'lotNumber', label: 'Lot #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
     { key: 'product', label: 'Product', render: (_: any, row: any) => row.product?.name || '—' },
-    { key: 'quantity', label: 'Qty', render: (v: number, row: any) => <span className="font-medium">{v} <span className="text-xs text-muted-foreground">{row.product?.unit}</span></span> },
+    { key: 'quantity', label: 'Qty', render: (v: number, row: any) => <span className="font-mono font-medium">{v} <span className="text-xs text-muted-foreground font-sans">{row.product?.unit}</span></span> },
     { key: 'expiryDate', label: 'Expiry', render: renderExpiry },
     { key: 'status', label: 'Status', render: (v: string) => <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', statusColors[v] || statusColors.DEPLETED)}>{v}</span> },
     { key: 'qcStatus', label: 'QC', render: (v: string) => <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', qcColors[v] || qcColors.PASSED)}>{v}</span> },

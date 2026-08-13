@@ -53,7 +53,7 @@ function ScoreBar({ label, value }: Readonly<{ label: string; value: number }>) 
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className={cn('font-semibold', scoreColor(value))}>{value.toFixed(1)}</span>
+        <span className={cn('font-mono font-semibold', scoreColor(value))}>{value.toFixed(1)}</span>
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div className={cn('h-full rounded-full transition-all', scoreBarColor(value))} style={{ width: `${(value / 10) * 100}%` }} />
@@ -138,10 +138,10 @@ export default function SupplierScoringPage() {
   const columns = [
     { key: 'vendor', label: 'Vendor', sortable: true, render: (_: any, row: any) => <span className="font-medium">{row.vendor?.name || '—'}</span> },
     { key: 'period', label: 'Period', render: (v: string) => <span className="font-mono text-sm">{v}</span> },
-    { key: 'quality', label: 'Quality', render: (v: number) => <span className={cn('font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
-    { key: 'delivery', label: 'Delivery', render: (v: number) => <span className={cn('font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
-    { key: 'pricing', label: 'Pricing', render: (v: number) => <span className={cn('font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
-    { key: 'service', label: 'Service', render: (v: number) => <span className={cn('font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
+    { key: 'quality', label: 'Quality', render: (v: number) => <span className={cn('font-mono font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
+    { key: 'delivery', label: 'Delivery', render: (v: number) => <span className={cn('font-mono font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
+    { key: 'pricing', label: 'Pricing', render: (v: number) => <span className={cn('font-mono font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
+    { key: 'service', label: 'Service', render: (v: number) => <span className={cn('font-mono font-semibold', scoreColor(v))}>{v.toFixed(1)}</span> },
     {
       key: 'overall', label: 'Overall', sortable: true, render: (v: number) => {
         let starClass = 'text-gray-300';
@@ -150,7 +150,7 @@ export default function SupplierScoringPage() {
         return (
           <div className="flex items-center gap-1.5">
             <Star className={cn('h-4 w-4', starClass)} />
-            <span className={cn('font-bold', scoreColor(v))}>{v.toFixed(1)}</span>
+            <span className={cn('font-mono font-bold', scoreColor(v))}>{v.toFixed(1)}</span>
           </div>
         );
       },

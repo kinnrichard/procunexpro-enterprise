@@ -79,7 +79,7 @@ export default function DeliveriesPage() {
   const columns = [
     { key: 'drNumber', label: 'DR #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
     { key: 'customer', label: 'Customer', render: (_: any, row: any) => row.customer?.name || '—' },
-    { key: '_count', label: 'Items', render: (v: any) => v?.items ?? 0 },
+    { key: '_count', label: 'Items', className: 'text-center', render: (v: any) => <span className="font-mono text-sm">{v?.items ?? 0}</span> },
     { key: 'status', label: 'Status', render: (v: string, row: any) => (
       <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium', statusColors[v] || statusColors.DRAFT)}>
         {v === 'SIGNED' && <CheckCircle2 className="h-3 w-3" />}{v}{row.signedByName ? ` · ${row.signedByName}` : ''}

@@ -106,7 +106,7 @@ export default function StockMovementsPage() {
     },
     {
       key: 'quantity', label: 'Quantity', render: (v: number, row: any) => (
-        <span className={cn('font-medium', inTypes.has(row.type) ? 'text-green-600' : 'text-red-600')}>
+        <span className={cn('font-mono font-semibold', inTypes.has(row.type) ? 'text-green-600' : 'text-red-600')}>
           {inTypes.has(row.type) ? '+' : '-'}{v}
         </span>
       ),

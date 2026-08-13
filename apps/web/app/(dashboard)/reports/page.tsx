@@ -295,8 +295,8 @@ export default function ReportsPage() {
                           <span className="font-medium">{v.vendorName}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">{v.totalOrders}</td>
-                      <td className="px-4 py-3 text-right font-medium">{formatCurrency(v.totalSpend)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{v.totalOrders}</td>
+                      <td className="px-4 py-3 text-right font-mono font-medium">{formatCurrency(v.totalSpend)}</td>
                       <td className="px-4 py-3 text-right">{v.avgLeadTimeDays ? `${v.avgLeadTimeDays} days` : '—'}</td>
                       <td className="px-4 py-3 text-right">
                         <span className={cn('font-medium', onTimeClass(v.onTimePercent || 0))}>
@@ -349,9 +349,9 @@ export default function ReportsPage() {
                       <td className="px-4 py-3 font-medium">{item.name}</td>
                       <td className="px-4 py-3 font-mono text-xs">{item.sku}</td>
                       <td className="px-4 py-3 text-muted-foreground">{item.category || '—'}</td>
-                      <td className="px-4 py-3 text-right">{item.currentStock}</td>
-                      <td className="px-4 py-3 text-right">{formatCurrency(item.costPrice)}</td>
-                      <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.totalValue)}</td>
+                      <td className="px-4 py-3 text-right font-mono">{item.currentStock}</td>
+                      <td className="px-4 py-3 text-right font-mono">{formatCurrency(item.costPrice)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-medium">{formatCurrency(item.totalValue)}</td>
                       <td className="px-4 py-3 text-center">
                         <Badge variant={stockBadgeVariant(item.stockStatus)} className="text-[10px]">
                           {item.stockStatus}

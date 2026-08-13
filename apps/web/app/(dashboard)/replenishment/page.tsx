@@ -89,14 +89,14 @@ export default function ReplenishmentPage() {
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/50 text-muted-foreground">
-                  <th className="px-4 py-2.5 w-[40px]"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4" /></th>
-                  <th className="text-left px-4 py-2.5 font-medium">Material</th>
-                  <th className="text-right px-4 py-2.5 font-medium">In Stock</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Reorder Pt</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Order Qty</th>
-                  <th className="text-left px-4 py-2.5 font-medium">Vendor</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Est. Cost</th>
+                <tr className="border-b bg-muted/50 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3 w-[40px]"><input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4" /></th>
+                  <th className="text-left px-4 py-3">Material</th>
+                  <th className="text-right px-4 py-3">In Stock</th>
+                  <th className="text-right px-4 py-3">Reorder Pt</th>
+                  <th className="text-right px-4 py-3">Order Qty</th>
+                  <th className="text-left px-4 py-3">Vendor</th>
+                  <th className="text-right px-4 py-3">Est. Cost</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -104,13 +104,13 @@ export default function ReplenishmentPage() {
                   <tr key={s.productId} className={cn('hover:bg-accent/30 transition-colors', selected.has(s.productId) && 'bg-primary/5')}>
                     <td className="px-4 py-2.5"><input type="checkbox" checked={selected.has(s.productId)} onChange={() => toggle(s.productId)} className="h-4 w-4" /></td>
                     <td className="px-4 py-2.5"><p className="font-medium">{s.name}</p><p className="text-xs text-muted-foreground font-mono">{s.sku}</p></td>
-                    <td className="px-4 py-2.5 text-right"><span className="text-red-600 font-medium">{s.currentStock}</span> <span className="text-xs text-muted-foreground">{s.unit}</span></td>
-                    <td className="px-4 py-2.5 text-right text-muted-foreground">{s.reorderPoint}</td>
+                    <td className="px-4 py-2.5 text-right"><span className="font-mono font-semibold text-red-600">{s.currentStock}</span> <span className="text-xs text-muted-foreground">{s.unit}</span></td>
+                    <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{s.reorderPoint}</td>
                     <td className="px-4 py-2.5 text-right">
                       <Input type="number" step="any" value={qtyFor(s)} onChange={(e) => setQty({ ...qty, [s.productId]: Number.parseFloat(e.target.value) || 0 })} className="h-8 w-24 rounded-lg text-right ml-auto" />
                     </td>
                     <td className="px-4 py-2.5">{s.vendorName || <span className="text-muted-foreground text-xs">— none —</span>}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(qtyFor(s) * (s.costPrice || 0))}</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-medium">{formatCurrency(qtyFor(s) * (s.costPrice || 0))}</td>
                   </tr>
                 ))}
               </tbody>

@@ -288,7 +288,7 @@ export default function ProductionsPage() {
               <div className="rounded-lg border bg-muted/40 px-4 py-3 space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Materials cost</span>
-                  <span className="tabular-nums font-medium">{formatCurrency(materialsCost)}</span>
+                  <span className="font-mono font-medium">{formatCurrency(materialsCost)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
@@ -302,7 +302,7 @@ export default function ProductionsPage() {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Labor cost {selectedRate ? `(${selectedRate.ratePerHour}/hr × ${laborHours}h)` : ''}</span>
-                  <span className="tabular-nums font-medium">{formatCurrency(laborCost)}</span>
+                  <span className="font-mono font-medium">{formatCurrency(laborCost)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <Label className="text-[13px] text-muted-foreground">Overhead cost</Label>
@@ -310,7 +310,7 @@ export default function ProductionsPage() {
                 </div>
                 <div className="flex items-center justify-between border-t pt-2 text-sm">
                   <span className="font-medium">Batch total / unit cost</span>
-                  <span className="tabular-nums font-semibold">{formatCurrency(batchCost)} <span className="text-muted-foreground font-normal">/ {formatCurrency(unitCost)} ea</span></span>
+                  <span className="font-mono font-semibold">{formatCurrency(batchCost)} <span className="text-muted-foreground font-normal">/ {formatCurrency(unitCost)} ea</span></span>
                 </div>
               </div>
             )}

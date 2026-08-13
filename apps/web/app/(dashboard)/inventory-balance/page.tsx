@@ -39,10 +39,10 @@ export default function InventoryBalancePage() {
       </div>
     ) },
     { key: 'warehouses', label: 'By location', render: (v: Array<{ warehouse: string; quantity: number }>) => v.length
-      ? <div className="flex flex-wrap gap-1">{v.map((w) => <span key={w.warehouse} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs"><span className="text-muted-foreground">{w.warehouse}:</span> <span className="font-medium">{w.quantity}</span></span>)}</div>
+      ? <div className="flex flex-wrap gap-1">{v.map((w) => <span key={w.warehouse} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs"><span className="text-muted-foreground">{w.warehouse}:</span> <span className="font-mono font-medium">{w.quantity}</span></span>)}</div>
       : <span className="text-xs text-muted-foreground">—</span> },
-    { key: 'unitCost', label: 'Unit Cost', render: (v: number) => formatCurrency(v) },
-    { key: 'stockValue', label: 'Stock Value', render: (v: number) => <span className="font-medium tabular-nums">{formatCurrency(v)}</span> },
+    { key: 'unitCost', label: 'Unit Cost', className: 'text-right', render: (v: number) => <span className="font-mono text-sm">{formatCurrency(v)}</span> },
+    { key: 'stockValue', label: 'Stock Value', className: 'text-right', render: (v: number) => <span className="font-mono font-medium">{formatCurrency(v)}</span> },
   ];
 
   return (

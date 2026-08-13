@@ -355,7 +355,7 @@ export default function PurchaseOrdersPage() {
     { key: 'vendor', label: 'Vendor', render: (_: any, row: any) => row.vendor?.name || '—' },
     { key: 'purchaseRequest', label: 'PR Ref', render: (_: any, row: any) => row.purchaseRequest?.requestNumber || <span className="text-muted-foreground text-xs">Direct</span> },
     { key: 'priority', label: 'Priority', render: (v: string) => <span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', priorityColors[v])}>{v}</span> },
-    { key: 'totalAmount', label: 'Amount', sortable: true, render: (v: number) => formatCurrency(v) },
+    { key: 'totalAmount', label: 'Amount', sortable: true, className: 'text-right', render: (v: number) => <span className="font-mono font-medium">{formatCurrency(v)}</span> },
     { key: 'status', label: 'Status', render: (v: string) => <StatusBadge status={v} /> },
     { key: 'orderDate', label: 'Date', sortable: true, render: (v: string) => formatDate(v) },
     {

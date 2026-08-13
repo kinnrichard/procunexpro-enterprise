@@ -70,7 +70,7 @@ export default function GoodsReceiptsPage() {
     { key: 'receiptNumber', label: 'Receipt #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
     { key: 'purchaseOrder', label: 'PO', render: (_: any, row: any) => row.purchaseOrder?.orderNumber || '—' },
     { key: 'supplierDrRef', label: 'Supplier DR', render: (v: string) => v || <span className="text-muted-foreground">—</span> },
-    { key: '_count', label: 'Items', render: (v: any) => v?.items ?? 0 },
+    { key: '_count', label: 'Items', className: 'text-center', render: (v: any) => <span className="font-mono text-sm">{v?.items ?? 0}</span> },
     { key: 'receiptDate', label: 'Date', render: (v: string) => formatDate(v) },
   ];
 
