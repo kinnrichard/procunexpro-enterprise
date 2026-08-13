@@ -71,13 +71,12 @@ jobs:
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          host: 167.71.214.238
+          username: root
+          key: ${{ secrets.DENTRO_SSH_KEY }}
           script: |
             set -e
-            cd ${{ secrets.DEPLOY_PATH }}
+            cd /root/procunex-production
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u kinnrichard --password-stdin
             docker compose -f docker-compose.prod.yml --env-file .env pull
             docker compose -f docker-compose.prod.yml --env-file .env run --rm api npx prisma db push --skip-generate || true

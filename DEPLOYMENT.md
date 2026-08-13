@@ -15,19 +15,19 @@ generate on PRs and pushes.
 
 ## 1. GitHub configuration
 
-Create three **Environments** (repo → Settings → Environments): `development`,
-`staging`, `production`. In each, set:
+Deploys reuse the same DigitalOcean droplet (`167.71.214.238`, root) and repo
+secrets as dentro. Host + deploy path are hardcoded in the workflow files;
+`DEPLOY_PATH` per env is `/root/procunex-<env>`.
 
-**Secrets**
-- `VPS_HOST` — server IP / hostname
-- `VPS_USER` — SSH user (e.g. `root`)
-- `VPS_PORT` — SSH port (optional, default 22)
-- `VPS_SSH_KEY` — private SSH key whose public key is in the server's `authorized_keys`
-- `DEPLOY_PATH` — directory on the server holding `docker-compose.prod.yml` + `.env`
-- `GHCR_TOKEN` — a PAT (classic) with `read:packages`, so the server can `docker login ghcr.io`
+**Repo secrets** (already present, shared with dentro):
+- `DENTRO_SSH_KEY` — private SSH key for the droplet
+- `GHCR_TOKEN` — PAT with `read:packages` for `docker login ghcr.io` on the server
 
-**Variables**
-- `NEXT_PUBLIC_API_URL` — public API URL for that env (baked into the web image at build time). With the Traefik setup this is `https://<APP_DOMAIN>/api`, e.g. `https://staging.procunex.example.com/api`
+**Environment variables** (repo → Settings → Environments → `development`/`staging`/`production`):
+- `NEXT_PUBLIC_API_URL` — public API URL, baked into the web image. Set:
+  - staging → `https://staging.procunexpro.com/api`
+  - production → `https://app.procunexpro.com/api`
+  - development → (set when a dev domain exists)
 
 > Protect the **production** environment with **required reviewers** to gate prod deploys.
 
@@ -38,20 +38,23 @@ shared **Traefik** proxy — the compose attaches to the external `traefik_netwo
 and Traefik issues Let's Encrypt certs from the container labels. No host ports,
 no nginx.
 
+Traefik already runs on the droplet (external `traefik_network`, `websecure`
+entrypoint, `letsencrypt` resolver). Per env, create `/root/procunex-<env>`:
+
 ```bash
-# Prereqs on the droplet (already present if Traefik/dentro run there):
-#   - Docker + compose plugin
-#   - a running Traefik with: external network `traefik_network`,
-#     `websecure` entrypoint, and a `letsencrypt` certresolver
-mkdir -p /srv/procunex-staging && cd /srv/procunex-staging      # = DEPLOY_PATH
+# STAGING example
+mkdir -p /root/procunex-staging && cd /root/procunex-staging
 cp <repo>/docker/docker-compose.prod.yml .
-cp <repo>/docker/.env.example .env       # fill per-env values:
-#   COMPOSE_PROJECT_NAME (procunex-staging), IMAGE_TAG (staging),
-#   APP_DOMAIN (staging.procunex...), POSTGRES_PASSWORD, JWT_SECRET
+cp <repo>/docker/.env.example .env      # then edit:
+#   COMPOSE_PROJECT_NAME=procunex-staging
+#   IMAGE_TAG=staging
+#   APP_DOMAIN=staging.procunexpro.com
+#   POSTGRES_PASSWORD=... JWT_SECRET=...
+# PRODUCTION: /root/procunex-production, IMAGE_TAG=production, APP_DOMAIN=app.procunexpro.com
 ```
 
-Point the env's DNS **A-record** (`APP_DOMAIN`) at the droplet — Traefik does
-the cert + routing (web at `/`, api at `/api`, uploads at `/uploads`).
+DNS: `staging.procunexpro.com` and `app.procunexpro.com` A-records → the droplet.
+Traefik handles the cert + routing (web at `/`, api at `/api`, uploads at `/uploads`).
 
 ## 3. First deploy
 
