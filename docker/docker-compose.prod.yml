@@ -1,5 +1,7 @@
-# Server-side compose used by all environments (dev/staging/prod).
-# Per-environment values come from an .env file next to it (see docker/.env.example).
+# Server-side compose for all environments (dev/staging/prod), matching the
+# dentro DigitalOcean setup: Traefik reverse proxy + auto Let's Encrypt TLS via
+# labels on the shared external `traefik_network`. No host ports are published —
+# Traefik routes by domain. Per-env values come from an .env file (see .env.example).
 #   docker compose -f docker-compose.prod.yml --env-file .env pull
 #   docker compose -f docker-compose.prod.yml --env-file .env up -d
 name: ${COMPOSE_PROJECT_NAME:-procunex}
@@ -7,57 +9,117 @@ name: ${COMPOSE_PROJECT_NAME:-procunex}
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-procunex}_postgres
     restart: unless-stopped
+    mem_limit: 256m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-procunexpro_enterprise}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-procunexpro_enterprise}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - internal
 
   redis:
     image: redis:7-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-procunex}_redis
     restart: unless-stopped
+    mem_limit: 64m
+    command: redis-server --maxmemory 32mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    networks:
+      - internal
 
   api:
     image: ghcr.io/kinnrichard/procunexpro-enterprise/api:${IMAGE_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-procunex}_api
     restart: unless-stopped
+    mem_limit: 384m
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: 3004
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-procunexpro_enterprise}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-procunexpro_enterprise}
       JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
-      FRONTEND_URL: ${FRONTEND_URL}
+      FRONTEND_URL: https://${APP_DOMAIN}
+      WEB_URL: https://${APP_DOMAIN}
       REDIS_URL: redis://redis:6379
       SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
-    ports:
-      - "${API_PORT:-3004}:3004"
+    volumes:
+      - api_uploads:/app/uploads
+    networks:
+      - internal
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_network"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-api.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-api.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-api.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME:-procunex}-api.loadbalancer.server.port=3004"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.rule=Host(`${APP_DOMAIN}`) && PathPrefix(`/uploads`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.service=${COMPOSE_PROJECT_NAME:-procunex}-api"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-uploads.priority=100"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3004/api/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   web:
     image: ghcr.io/kinnrichard/procunexpro-enterprise/web:${IMAGE_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-procunex}_web
     restart: unless-stopped
+    mem_limit: 384m
     depends_on:
       - api
-    environment:
-      PORT: 3005
-    ports:
-      - "${WEB_PORT:-3005}:3005"
+    networks:
+      - internal
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_network"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-web.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-web.entrypoints=websecure"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-web.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME:-procunex}-web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME:-procunex}-web.loadbalancer.server.port=3005"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3005/login',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+  api_uploads:
+    driver: local
+
+networks:
+  internal:
+    driver: bridge
+  traefik_network:
+    external: true

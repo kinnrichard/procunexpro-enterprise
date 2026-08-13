@@ -27,23 +27,31 @@ Create three **Environments** (repo → Settings → Environments): `development
 - `GHCR_TOKEN` — a PAT (classic) with `read:packages`, so the server can `docker login ghcr.io`
 
 **Variables**
-- `NEXT_PUBLIC_API_URL` — public API URL for that env (baked into the web image at build time), e.g. `https://staging-api.procunex.example.com/api`
+- `NEXT_PUBLIC_API_URL` — public API URL for that env (baked into the web image at build time). With the Traefik setup this is `https://<APP_DOMAIN>/api`, e.g. `https://staging.procunex.example.com/api`
 
 > Protect the **production** environment with **required reviewers** to gate prod deploys.
 
 ## 2. Server prep (once per environment)
 
+Same droplet as the other apps (dentro etc.). Ingress + TLS are handled by the
+shared **Traefik** proxy — the compose attaches to the external `traefik_network`
+and Traefik issues Let's Encrypt certs from the container labels. No host ports,
+no nginx.
+
 ```bash
-# Docker + compose plugin installed
+# Prereqs on the droplet (already present if Traefik/dentro run there):
+#   - Docker + compose plugin
+#   - a running Traefik with: external network `traefik_network`,
+#     `websecure` entrypoint, and a `letsencrypt` certresolver
 mkdir -p /srv/procunex-staging && cd /srv/procunex-staging      # = DEPLOY_PATH
-# copy the compose file from the repo (docker/docker-compose.prod.yml) here
-cp .env.example .env    # from docker/.env.example — fill in per-env values
-# COMPOSE_PROJECT_NAME, IMAGE_TAG (development|staging|production),
-# API_PORT / WEB_PORT (unique per env), POSTGRES_PASSWORD, JWT_SECRET, FRONTEND_URL
+cp <repo>/docker/docker-compose.prod.yml .
+cp <repo>/docker/.env.example .env       # fill per-env values:
+#   COMPOSE_PROJECT_NAME (procunex-staging), IMAGE_TAG (staging),
+#   APP_DOMAIN (staging.procunex...), POSTGRES_PASSWORD, JWT_SECRET
 ```
 
-Put a reverse proxy (nginx/Caddy) in front, routing each env's domain to its
-`WEB_PORT`, and the API domain to its `API_PORT`.
+Point the env's DNS **A-record** (`APP_DOMAIN`) at the droplet — Traefik does
+the cert + routing (web at `/`, api at `/api`, uploads at `/uploads`).
 
 ## 3. First deploy
 
@@ -60,7 +68,10 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T postgres \
 (Default dev seed = org `Demo` / `admin` / `admin123!`.)
 
 ## Notes
+- Mirrors the dentro DigitalOcean setup: **Traefik** reverse proxy + auto TLS via
+  container labels on the external `traefik_network`. Router names are prefixed with
+  `COMPOSE_PROJECT_NAME` so multiple envs/apps coexist on one droplet.
 - Postgres + Redis run inside each env's compose (isolated volumes per
   `COMPOSE_PROJECT_NAME`). Swap to a managed DB by editing the compose + `DATABASE_URL`.
-- Images are multi-arch-agnostic (built on `ubuntu-latest` = amd64). Ensure the VPS is amd64.
+- Images build on `ubuntu-latest` (amd64) — ensure the droplet is amd64.
 - Schema changes deploy via `prisma db push` (this project has no migration files).
