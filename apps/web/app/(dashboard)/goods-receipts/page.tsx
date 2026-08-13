@@ -16,12 +16,14 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
 import { PackageCheck, Plus, Truck } from 'lucide-react';
 
 interface Row { purchaseOrderItemId: string; productId: string; name: string; sku: string; uom: string; outstanding: number; quantity: number; lotNumber: string; expiryDate: string; }
 
 export default function GoodsReceiptsPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -104,7 +106,9 @@ export default function GoodsReceiptsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Goods Receipts" description="Receive goods against a purchase order, capturing lot # and expiry">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90"><Plus className="h-4 w-4 mr-2" /> New Receipt</Button>
+        {can('goods-receipts', 'create') && (
+          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90"><Plus className="h-4 w-4 mr-2" /> New Receipt</Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

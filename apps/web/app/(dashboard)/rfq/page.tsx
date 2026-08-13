@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
 import { formatDate, cn } from '@/lib/utils';
+import { usePermissions } from '@/lib/permissions';
 import { useCurrencyStore } from '@/lib/currency';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
@@ -48,6 +49,7 @@ function CreateFromPRs() {
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
   const formatCurrency = useCurrencyStore((s) => s.format);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rfqTitle, setRfqTitle] = useState('');
@@ -105,13 +107,15 @@ function CreateFromPRs() {
           <h3 className="text-sm font-semibold">Create RFQ from Approved PR Items</h3>
           <p className="text-xs text-muted-foreground mt-0.5">Select items from approved PRs to create a new RFQ</p>
         </div>
-        <Button
-          onClick={() => setConfirmOpen(true)}
-          disabled={selectedIds.size === 0}
-          className="bg-gradient-primary text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4 mr-1.5" /> Create RFQ ({selectedIds.size})
-        </Button>
+        {can('rfq', 'create') && (
+          <Button
+            onClick={() => setConfirmOpen(true)}
+            disabled={selectedIds.size === 0}
+            className="bg-gradient-primary text-white hover:opacity-90"
+          >
+            <Plus className="h-4 w-4 mr-1.5" /> Create RFQ ({selectedIds.size})
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
@@ -206,6 +210,7 @@ export default function RFQPage() {
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { can } = usePermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -316,8 +321,8 @@ export default function RFQPage() {
           {row.status === 'DRAFT' && (
             <>
               <button onClick={() => actionMut.mutate({ id: row.id, action: 'publish' })} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Publish"><Send className="h-3.5 w-3.5" /></button>
-              <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-              <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+              {can('rfq', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
+              {can('rfq', 'delete') && <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>}
             </>
           )}
           {row.status === 'PUBLISHED' && (
@@ -334,9 +339,11 @@ export default function RFQPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Request for Quotation" description="Create RFQs, collect and compare vendor quotes">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> New RFQ
-        </Button>
+        {can('rfq', 'create') && (
+          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> New RFQ
+          </Button>
+        )}
       </PageHeader>
 
       <Tabs defaultValue="rfqs" className="w-full">

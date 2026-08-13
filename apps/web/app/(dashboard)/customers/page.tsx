@@ -18,10 +18,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { Users, Plus, Pencil, Trash2 } from 'lucide-react';
+import { usePermissions } from '@/lib/permissions';
 
 const blank = { name: '', code: '', contactPerson: '', email: '', phone: '', address: '', city: '', country: '', taxId: '', notes: '', isActive: true };
 
 export default function CustomersPage() {
+  const { can } = usePermissions();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -89,8 +91,8 @@ export default function CustomersPage() {
     { key: 'isActive', label: 'Status', render: (v: boolean) => <StatusBadge status={v ? 'ACTIVE' : 'INACTIVE'} /> },
     { key: 'actions', label: '', render: (_: any, row: any) => (
       <div className="flex items-center gap-0.5 justify-end">
-        <button onClick={() => openEdit(row)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
-        <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+        {can('customers', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>}
+        {can('customers', 'delete') && <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>}
       </div>
     ) },
   ];
@@ -98,9 +100,11 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Customers" description="Clients you deliver finished goods to (used by Delivery Receipts)">
-        <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> Add Customer
-        </Button>
+        {can('customers', 'create') && (
+          <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> Add Customer
+          </Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

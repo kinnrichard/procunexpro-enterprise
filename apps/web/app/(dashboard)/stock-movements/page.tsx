@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
 import { ArrowLeftRight, Plus, ArrowDownRight, ArrowUpRight, RefreshCw, Package } from 'lucide-react';
 
 const movementSchema = z.object({
@@ -50,6 +51,7 @@ const inTypes = new Set(['PURCHASE', 'TRANSFER_IN', 'RETURN', 'PRODUCTION_IN']);
 
 export default function StockMovementsPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -144,9 +146,11 @@ export default function StockMovementsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Stock Movements" description="Track all inventory changes">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> New Movement
-        </Button>
+        {can('products', 'create') && (
+          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> New Movement
+          </Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

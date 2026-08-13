@@ -2,19 +2,25 @@ import {
   Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CustomersService } from './customers.service';
 
+const MODULE = 'customers';
+
 @Controller('customers')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class CustomersController {
   constructor(private readonly service: CustomersService) {}
 
   @Get('active')
+  @RequirePermission(MODULE, 'view')
   findActive(@Req() req: any) {
     return this.service.findAllActive(req.user.tenantId);
   }
 
   @Get()
+  @RequirePermission(MODULE, 'view')
   findAll(
     @Req() req: any,
     @Query('page') page?: string,
@@ -37,16 +43,19 @@ export class CustomersController {
   }
 
   @Post()
+  @RequirePermission(MODULE, 'create')
   create(@Req() req: any, @Body() body: any) {
     return this.service.create(req.user.tenantId, body);
   }
 
   @Put(':id')
+  @RequirePermission(MODULE, 'edit')
   update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     return this.service.update(req.user.tenantId, id, body);
   }
 
   @Delete(':id')
+  @RequirePermission(MODULE, 'delete')
   delete(@Req() req: any, @Param('id') id: string) {
     return this.service.delete(req.user.tenantId, id);
   }

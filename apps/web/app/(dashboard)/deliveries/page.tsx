@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
 import { Send, Plus, Trash2, Link2, XCircle, CheckCircle2 } from 'lucide-react';
 
 interface Row { productId: string; quantity: number; }
@@ -29,6 +30,7 @@ const statusColors: Record<string, string> = {
 
 export default function DeliveriesPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -110,7 +112,7 @@ export default function DeliveriesPage() {
     { key: 'actions', label: '', render: (_: any, row: any) => (
       <div className="flex items-center gap-0.5 justify-end">
         <button onClick={() => copyLink(row.signUrl)} title="Copy sign link" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Link2 className="h-3.5 w-3.5" /></button>
-        {row.status === 'RELEASED' && (
+        {row.status === 'RELEASED' && can('deliveries', 'edit') && (
           <button onClick={() => cancelMut.mutate(row.id)} title="Cancel" className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><XCircle className="h-3.5 w-3.5" /></button>
         )}
       </div>
@@ -125,7 +127,7 @@ export default function DeliveriesPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Deliveries" description="Release finished goods to a customer — creates a Delivery Receipt with an external sign link">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90"><Plus className="h-4 w-4 mr-2" /> Release / New DR</Button>
+        {can('deliveries', 'create') && <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90"><Plus className="h-4 w-4 mr-2" /> Release / New DR</Button>}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

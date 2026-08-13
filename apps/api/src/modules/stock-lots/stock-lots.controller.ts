@@ -2,19 +2,25 @@ import {
   Controller, Get, Post, Put, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { StockLotsService } from './stock-lots.service';
 
+const MODULE = 'products';
+
 @Controller('stock-lots')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class StockLotsController {
   constructor(private readonly service: StockLotsService) {}
 
   @Get('expiring')
+  @RequirePermission(MODULE, 'view')
   expiring(@Req() req: any, @Query('days') days?: string) {
     return this.service.expiring(req.user.tenantId, days ? Number.parseInt(days) : 30);
   }
 
   @Get()
+  @RequirePermission(MODULE, 'view')
   findAll(
     @Req() req: any,
     @Query('page') page?: string,
@@ -41,11 +47,13 @@ export class StockLotsController {
   }
 
   @Post()
+  @RequirePermission(MODULE, 'create')
   create(@Req() req: any, @Body() body: any) {
     return this.service.create(req.user.tenantId, body);
   }
 
   @Put(':id')
+  @RequirePermission(MODULE, 'edit')
   update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     return this.service.update(req.user.tenantId, id, body);
   }

@@ -16,12 +16,14 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
 import { ArrowLeftRight, Plus, Trash2, MoveRight } from 'lucide-react';
 
 interface Row { productId: string; quantity: number; }
 
 export default function StockTransfersPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -93,7 +95,9 @@ export default function StockTransfersPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Stock Transfers" description="Move stock between warehouse locations">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90"><Plus className="h-4 w-4 mr-2" /> New Transfer</Button>
+        {can('stock-transfers', 'create') && (
+          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90"><Plus className="h-4 w-4 mr-2" /> New Transfer</Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

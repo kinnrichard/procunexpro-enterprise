@@ -2,14 +2,19 @@ import {
   Controller, Get, Post, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { StockMovementsService } from './stock-movements.service';
 
+const MODULE = 'products';
+
 @Controller('stock-movements')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class StockMovementsController {
   constructor(private readonly stockMovementsService: StockMovementsService) {}
 
   @Get()
+  @RequirePermission(MODULE, 'view')
   findAll(
     @Req() req: any,
     @Query('page') page?: string,
@@ -34,11 +39,13 @@ export class StockMovementsController {
   }
 
   @Get(':id')
+  @RequirePermission(MODULE, 'view')
   findOne(@Req() req: any, @Param('id') id: string) {
     return this.stockMovementsService.findOne(req.user.tenantId, id);
   }
 
   @Post()
+  @RequirePermission(MODULE, 'create')
   create(@Req() req: any, @Body() body: any) {
     return this.stockMovementsService.create(req.user.tenantId, req.user.id, body);
   }

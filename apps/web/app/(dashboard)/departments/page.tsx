@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/lib/permissions';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -35,6 +36,7 @@ const deptSchema = z.object({
 
 export default function DepartmentsPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -123,8 +125,8 @@ export default function DepartmentsPage() {
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
         <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-          <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-          <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+          {can('departments', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
+          {can('departments', 'delete') && <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>}
         </div>
       ),
     },
@@ -133,9 +135,11 @@ export default function DepartmentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Departments" description="Manage organizational departments">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> Add Department
-        </Button>
+        {can('departments', 'create') && (
+          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> Add Department
+          </Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

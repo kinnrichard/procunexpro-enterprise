@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Package, Pencil, Trash2, AlertTriangle, Layers, Loader2, Plus } from 'lucide-react'
 import api from '@/lib/api'
+import { usePermissions } from '@/lib/permissions'
 import { DataTable, Column } from '@/components/data-table'
 import { PageHeader } from '@/components/page-header'
 import { StatCard } from '@/components/stat-card'
@@ -148,6 +149,7 @@ export default function ProductsPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const { can } = usePermissions()
 
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -470,7 +472,7 @@ export default function ProductsPage() {
       className: 'w-[80px]',
       render: (_value: any, row: Product) => (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          {['product', 'component'].includes(row.inventoryType) && (
+          {can('products', 'edit') && ['product', 'component'].includes(row.inventoryType) && (
             <button
               onClick={() => setCompositionTarget(row)}
               title="Composition"
@@ -479,18 +481,22 @@ export default function ProductsPage() {
               <Layers className="h-3.5 w-3.5" />
             </button>
           )}
-          <button
-            onClick={() => openEdit(row)}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setDeleteTarget(row)}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {can('products', 'edit') && (
+            <button
+              onClick={() => openEdit(row)}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {can('products', 'delete') && (
+            <button
+              onClick={() => setDeleteTarget(row)}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -502,9 +508,11 @@ export default function ProductsPage() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader title="Products" description="Manage your product catalog and inventory items">
-        <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> New Product
-        </Button>
+        {can('products', 'create') && (
+          <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> New Product
+          </Button>
+        )}
       </PageHeader>
 
       {/* Stats */}

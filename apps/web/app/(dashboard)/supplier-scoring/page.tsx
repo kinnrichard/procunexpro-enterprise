@@ -22,6 +22,7 @@ import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
 import { BarChart3, Plus, Pencil, Trash2, Trophy, Star, Users } from 'lucide-react';
 
 const scoreSchema = z.object({
@@ -66,6 +67,7 @@ function ScoreBar({ label, value }: Readonly<{ label: string; value: number }>) 
 
 export default function SupplierScoringPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -179,8 +181,8 @@ export default function SupplierScoringPage() {
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
         <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-          <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-          <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+          {can('supplier-scoring', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
+          {can('supplier-scoring', 'delete') && <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>}
         </div>
       ),
     },
@@ -191,9 +193,11 @@ export default function SupplierScoringPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Supplier Scoring" description="Evaluate and rank vendor performance">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> New Score
-        </Button>
+        {can('supplier-scoring', 'create') && (
+          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> New Score
+          </Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

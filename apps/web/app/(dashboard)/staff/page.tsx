@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { usePermissions } from '@/lib/permissions';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -24,6 +25,7 @@ const blank = { employeeId: '', firstName: '', lastName: '', position: '', depar
 
 export default function StaffPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -100,8 +102,8 @@ export default function StaffPage() {
     { key: 'isActive', label: 'Status', render: (v: boolean) => <StatusBadge status={v ? 'ACTIVE' : 'INACTIVE'} /> },
     { key: 'actions', label: '', render: (_: any, row: any) => (
       <div className="flex items-center gap-0.5 justify-end">
-        <button onClick={() => openEdit(row)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
-        <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+        {can('staff', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>}
+        {can('staff', 'delete') && <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>}
       </div>
     ) },
   ];
@@ -109,7 +111,9 @@ export default function StaffPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Staff" description="Employee records — optionally tied to a login account">
-        <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90"><Plus className="h-4 w-4 mr-2" /> Add Staff</Button>
+        {can('staff', 'create') && (
+          <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90"><Plus className="h-4 w-4 mr-2" /> Add Staff</Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

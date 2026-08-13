@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { StockTransfersController } from './stock-transfers.controller';
 import { StockTransfersService } from './stock-transfers.service';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
+  imports: [PermissionsModule],
   controllers: [StockTransfersController],
   providers: [StockTransfersService],
   exports: [StockTransfersService],

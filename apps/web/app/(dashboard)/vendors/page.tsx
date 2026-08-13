@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
+import { usePermissions } from '@/lib/permissions'
 
 // --- Schema ---
 
@@ -91,6 +92,7 @@ const STATUS_CHIPS = [
 export default function VendorsPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const { can } = usePermissions()
 
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -288,18 +290,22 @@ export default function VendorsPage() {
       className: 'w-[80px]',
       render: (_value: any, row: Vendor) => (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => openEdit(row)}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setDeleteTarget(row)}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {can('vendors', 'edit') && (
+            <button
+              onClick={() => openEdit(row)}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {can('vendors', 'delete') && (
+            <button
+              onClick={() => setDeleteTarget(row)}
+              className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -311,9 +317,11 @@ export default function VendorsPage() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader title="Vendors" description="Manage and view all registered vendors">
-        <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> New Vendor
-        </Button>
+        {can('vendors', 'create') && (
+          <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> New Vendor
+          </Button>
+        )}
       </PageHeader>
 
       {/* Stats */}

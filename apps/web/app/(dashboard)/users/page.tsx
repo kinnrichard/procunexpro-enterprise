@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
 import { Users, Plus, Pencil, Trash2, UserCheck, UserX, Shield } from 'lucide-react';
 const roleColors: Record<string, string> = {
   SUPERADMIN: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -47,6 +48,7 @@ const userSchema = z.object({
 
 export default function UsersPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -163,15 +165,15 @@ export default function UsersPage() {
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
         <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-          <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-          <button
+          {can('users', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>}
+          {can('users', 'edit') && <button
             onClick={() => toggleMut.mutate({ id: row.id, action: row.isActive ? 'deactivate' : 'activate' })}
             className={cn('p-1.5 rounded-md', row.isActive ? 'hover:bg-amber-50 dark:hover:bg-amber-900/20 text-amber-600' : 'hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600')}
             title={row.isActive ? 'Deactivate' : 'Activate'}
           >
             {row.isActive ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
-          </button>
-          <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+          </button>}
+          {can('users', 'delete') && <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>}
         </div>
       ),
     },
@@ -180,9 +182,11 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Users" description="Manage user accounts and permissions">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> Add User
-        </Button>
+        {can('users', 'create') && (
+          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> Add User
+          </Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
 import { Factory, Plus, CheckCircle2, FileEdit, XCircle, AlertTriangle } from 'lucide-react';
 
 interface PreviewRow {
@@ -35,6 +36,7 @@ interface PreviewRow {
 
 export default function ProductionsPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -179,7 +181,7 @@ export default function ProductionsPage() {
     { key: 'createdAt', label: 'Created', sortable: true, render: (v: string) => formatDateTime(v) },
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
-        row.status === 'DRAFT' ? (
+        row.status === 'DRAFT' && can('productions', 'edit') ? (
           <div className="flex items-center gap-1.5">
             <Button size="sm" variant="ghost" className="h-8 text-green-600 hover:text-green-700" onClick={() => setConfirmTarget({ row, action: 'complete' })} disabled={confirmLoading}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> Complete
@@ -199,9 +201,11 @@ export default function ProductionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Production" description="Consume materials and produce finished goods from a product's composition">
-        <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> New Production
-        </Button>
+        {can('productions', 'create') && (
+          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> New Production
+          </Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -11,6 +11,7 @@ import { downloadCsv } from '@/lib/export';
 import { formatCurrency, formatDate, getInitials, cn } from '@/lib/utils';
 import { useCurrencyStore } from '@/lib/currency';
 import { useTaxStore } from '@/lib/tax';
+import { usePermissions } from '@/lib/permissions';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -157,6 +158,7 @@ const priorityColors: Record<string, string> = {
 export default function PurchaseRequestsPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -406,8 +408,12 @@ export default function PurchaseRequestsPage() {
         <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
           {row.status === 'DRAFT' && (
             <>
-              <button onClick={() => submitMutation.mutate(row.id)} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Submit for Approval"><Send className="h-3.5 w-3.5" /></button>
-              <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="Edit"><Pencil className="h-3.5 w-3.5" /></button>
+              {can('purchase-requests', 'edit') && (
+                <button onClick={() => submitMutation.mutate(row.id)} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Submit for Approval"><Send className="h-3.5 w-3.5" /></button>
+              )}
+              {can('purchase-requests', 'edit') && (
+                <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="Edit"><Pencil className="h-3.5 w-3.5" /></button>
+              )}
             </>
           )}
         </div>
@@ -426,9 +432,11 @@ export default function PurchaseRequestsPage() {
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" /> Export
           </Button>
-          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
-            <Plus className="h-4 w-4 mr-2" /> New Request
-          </Button>
+          {can('purchase-requests', 'create') && (
+            <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
+              <Plus className="h-4 w-4 mr-2" /> New Request
+            </Button>
+          )}
         </div>
       </PageHeader>
 

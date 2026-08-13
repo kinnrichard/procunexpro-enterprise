@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
 import { Boxes, Plus, AlertTriangle, Clock, Pencil, Check, X } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
@@ -39,6 +40,7 @@ function daysUntil(date: string | null): number | null {
 
 export default function StockLotsPage() {
   const { toast } = useToast();
+  const { can } = usePermissions();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -145,13 +147,13 @@ export default function StockLotsPage() {
     { key: 'source', label: 'Source', render: (v: string) => <span className="text-xs text-muted-foreground">{v || '—'}</span> },
     { key: 'actions', label: '', render: (_: any, row: any) => (
       <div className="flex items-center gap-0.5 justify-end">
-        {['PENDING', 'HOLD'].includes(row.qcStatus) && (
+        {can('products', 'edit') && ['PENDING', 'HOLD'].includes(row.qcStatus) && (
           <>
             <button onClick={() => qcMut.mutate({ id: row.id, qcStatus: 'PASSED' })} title="Pass QC" className="p-1.5 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>
             <button onClick={() => qcMut.mutate({ id: row.id, qcStatus: 'FAILED' })} title="Fail QC" className="p-1.5 rounded text-red-600 hover:bg-red-50"><X className="h-3.5 w-3.5" /></button>
           </>
         )}
-        <button onClick={() => openEdit(row)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>
+        {can('products', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>}
       </div>
     ) },
   ];
@@ -162,9 +164,11 @@ export default function StockLotsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Stock Lots & Expiry" description="Batch/lot tracking with expiry dates and traceability">
-        <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" /> Add Lot
-        </Button>
+        {can('products', 'create') && (
+          <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
+            <Plus className="h-4 w-4 mr-2" /> Add Lot
+          </Button>
+        )}
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

@@ -2,14 +2,19 @@ import {
   Controller, Get, Post, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { DeliveryReceiptsService } from './delivery-receipts.service';
 
+const MODULE = 'deliveries';
+
 @Controller('delivery-receipts')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class DeliveryReceiptsController {
   constructor(private readonly service: DeliveryReceiptsService) {}
 
   @Get()
+  @RequirePermission(MODULE, 'view')
   findAll(
     @Req() req: any,
     @Query('page') page?: string,
@@ -32,16 +37,19 @@ export class DeliveryReceiptsController {
   }
 
   @Get(':id')
+  @RequirePermission(MODULE, 'view')
   findOne(@Req() req: any, @Param('id') id: string) {
     return this.service.findOne(req.user.tenantId, id);
   }
 
   @Post()
+  @RequirePermission(MODULE, 'create')
   create(@Req() req: any, @Body() body: any) {
     return this.service.create(req.user.tenantId, req.user.id, body);
   }
 
   @Post(':id/cancel')
+  @RequirePermission(MODULE, 'edit')
   cancel(@Req() req: any, @Param('id') id: string) {
     return this.service.cancel(req.user.tenantId, id);
   }
