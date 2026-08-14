@@ -229,7 +229,7 @@ export default function StockLotsPage() {
       />
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-lg p-0 gap-0">
+        <DialogContent className="max-w-2xl p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
             <DialogTitle>{editing ? 'Edit Lot' : 'Add Lot'}</DialogTitle>
           </DialogHeader>
