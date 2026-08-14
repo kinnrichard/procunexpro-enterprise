@@ -519,9 +519,10 @@ export default function PurchaseRequestDetailPage() {
 
   const taxRate = useTaxStore((s) => s.getDefaultRate)();
 
+  // Only approved vendors may be selected on a PR (same rule as PO).
   const { data: vendorsRes } = useQuery({
-    queryKey: ['vendors-all'],
-    queryFn: () => api.get('/vendors', { params: { limit: 1000 } }),
+    queryKey: ['vendors-approved'],
+    queryFn: () => api.get('/vendors', { params: { limit: 1000, status: 'APPROVED' } }),
   });
   const vendors: Vendor[] = vendorsRes?.data?.data || [];
 
