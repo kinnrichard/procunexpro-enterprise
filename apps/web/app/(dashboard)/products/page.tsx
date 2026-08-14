@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Package, Pencil, Trash2, AlertTriangle, Layers, Loader2, Plus } from 'lucide-react'
+import { Package, Pencil, Ban, RotateCcw, AlertTriangle, Layers, Loader2, Plus } from 'lucide-react'
 import api from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { DataTable, Column } from '@/components/data-table'
@@ -144,7 +144,7 @@ export default function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const [toggleTarget, setToggleTarget] = useState<Product | null>(null)
   const [compositionTarget, setCompositionTarget] = useState<Product | null>(null)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
 
@@ -297,15 +297,15 @@ export default function ProductsPage() {
     },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/products/${id}`),
-    onSuccess: () => {
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => api.put(`/products/${id}`, { isActive }),
+    onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
-      setDeleteTarget(null)
-      toast({ title: 'Item deleted', description: 'The item has been removed.' })
+      setToggleTarget(null)
+      toast({ title: vars.isActive ? 'Item activated' : 'Item deactivated' })
     },
     onError: () => {
-      toast({ title: 'Error', description: 'Failed to delete product. Please try again.', variant: 'destructive' })
+      toast({ title: 'Error', description: 'Failed to update item. Please try again.', variant: 'destructive' })
     },
   })
 
@@ -492,13 +492,24 @@ export default function ProductsPage() {
               <Pencil className="h-3.5 w-3.5" />
             </button>
           )}
-          {can('products', 'delete') && (
-            <button
-              onClick={() => setDeleteTarget(row)}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
+          {can('products', 'edit') && (
+            row.isActive ? (
+              <button
+                onClick={() => setToggleTarget(row)}
+                title="Deactivate"
+                className="p-1.5 rounded-md text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors"
+              >
+                <Ban className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setToggleTarget(row)}
+                title="Activate"
+                className="p-1.5 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            )
           )}
         </div>
       ),
@@ -848,14 +859,18 @@ export default function ProductsPage() {
       />
 
       <ConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete Item"
-        description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
-        confirmLabel="Delete"
-        variant="destructive"
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
-        isLoading={deleteMutation.isPending}
+        open={!!toggleTarget}
+        onOpenChange={(open) => !open && setToggleTarget(null)}
+        title={toggleTarget?.isActive ? 'Deactivate Item' : 'Activate Item'}
+        description={
+          toggleTarget?.isActive
+            ? `Mark "${toggleTarget?.name}" as inactive? It will be hidden from active lists and selection pickers, but its records are kept. You can reactivate it anytime.`
+            : `Reactivate "${toggleTarget?.name}"? It will appear in active lists and pickers again.`
+        }
+        confirmLabel={toggleTarget?.isActive ? 'Deactivate' : 'Activate'}
+        variant={toggleTarget?.isActive ? 'destructive' : 'default'}
+        onConfirm={() => toggleTarget && toggleActiveMutation.mutate({ id: toggleTarget.id, isActive: !toggleTarget.isActive })}
+        isLoading={toggleActiveMutation.isPending}
       />
     </div>
   )
