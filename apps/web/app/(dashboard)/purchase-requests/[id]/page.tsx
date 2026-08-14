@@ -901,12 +901,10 @@ export default function PurchaseRequestDetailPage() {
   if (!pr) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Purchase request not found</div>;
 
   const isApprovalStage = ['MANAGER_APPROVAL', 'FINANCE_APPROVAL', 'PROCUREMENT'].includes(pr?.status);
-  // PROCUREMENT is NOT manually "approved" to COMPLETED — the PR auto-completes
-  // once its items are converted to a PO. So no manual approve/complete button here.
-  const canApproveStage = ['MANAGER_APPROVAL', 'FINANCE_APPROVAL'].includes(pr?.status);
   const approvalStageLabel: Record<string, string> = {
     MANAGER_APPROVAL: 'Manager Approve',
     FINANCE_APPROVAL: 'Finance Approve',
+    PROCUREMENT: 'Procurement Approve',
   };
 
   function renderHeaderActions() {
@@ -925,11 +923,9 @@ export default function PurchaseRequestDetailPage() {
         )}
         {isApprovalStage && (
           <>
-            {canApproveStage && (
-              <Button onClick={() => setApproveConfirmOpen(true)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
-                <CheckCircle className="h-4 w-4 mr-2" /> {approvalStageLabel[pr.status] || 'Approve'}
-              </Button>
-            )}
+            <Button onClick={() => setApproveConfirmOpen(true)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+              <CheckCircle className="h-4 w-4 mr-2" /> {approvalStageLabel[pr.status] || 'Approve'}
+            </Button>
             <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}>
               <XCircle className="h-4 w-4 mr-2" /> Reject
             </Button>
