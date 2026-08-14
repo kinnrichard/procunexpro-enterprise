@@ -281,19 +281,17 @@ export default function StockLotsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[13px]">Expiry Date</Label>
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={form.noExpiry}
-                      onChange={(e) => setForm({ ...form, noExpiry: e.target.checked, expiryDate: e.target.checked ? '' : form.expiryDate })}
-                      className="h-3.5 w-3.5 rounded border-input accent-primary"
-                    />
-                    No expiry
-                  </label>
-                </div>
+                <Label className="text-[13px]">Expiry Date</Label>
                 <Input type="date" value={form.expiryDate} disabled={form.noExpiry} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="h-9 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" placeholder={form.noExpiry ? 'No expiry' : undefined} />
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none pt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={form.noExpiry}
+                    onChange={(e) => setForm({ ...form, noExpiry: e.target.checked, expiryDate: e.target.checked ? '' : form.expiryDate })}
+                    className="h-3.5 w-3.5 rounded border-input accent-primary"
+                  />
+                  No expiry
+                </label>
               </div>
               {editing && (
                 <div className="space-y-1.5">
