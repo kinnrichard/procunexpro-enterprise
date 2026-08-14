@@ -590,14 +590,10 @@ export class PurchaseRequestsService {
       throw new BadRequestException(`Invalid sub-status: ${subStatus}`);
     }
 
+    // Sub-status is informational only. The PR reaches COMPLETED solely when its
+    // items are converted to a PO (see PurchaseOrders.createFromPrItems) — never
+    // by setting the procurement sub-status here.
     const updateData: any = { procurementSubStatus: subStatus };
-
-    // When procurement sub-status is COMPLETED, move main status to COMPLETED
-    if (subStatus === 'COMPLETED') {
-      updateData.status = 'COMPLETED';
-      updateData.approvedAt = new Date();
-    }
-
     return this.prisma.purchaseRequest.update({
       where: { id },
       data: updateData,
