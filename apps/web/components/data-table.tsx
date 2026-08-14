@@ -223,7 +223,15 @@ export function DataTable<T extends Record<string, any>>({
                     )}
                     onClick={() => col.sortable && handleSort(col.key)}
                   >
-                    <div className="flex items-center gap-1">
+                    <div
+                      className={cn(
+                        'flex items-center gap-1',
+                        // flex ignores text-align, so mirror the column's alignment here
+                        // to keep the header label over its (right/center-aligned) values
+                        col.className?.includes('text-right') && 'justify-end',
+                        col.className?.includes('text-center') && 'justify-center'
+                      )}
+                    >
                       <span>{col.label}</span>
                       {col.sortable && (
                         <span className="inline-flex">
