@@ -128,10 +128,11 @@ export default function StockMovementsPage() {
   });
   const warehouseStock = Math.round((whStockData?.data?.data || []).reduce((s: number, l: any) => s + (l.quantity || 0), 0) * 1e6) / 1e6;
 
-  // Per-warehouse stock when a warehouse is chosen; otherwise the item's aggregate on-hand
+  // Per-warehouse stock when a warehouse is chosen; otherwise the item's aggregate on-hand.
+  // Only relevant for outbound movements (removing stock) — inbound adds stock.
   const currentStock: number = (needsWarehouse && activeWh) ? warehouseStock : (selectedProduct?.currentStock ?? 0);
-  const showStock = !!selectedProduct;
-  const overStock = isOut && showStock && !whStockLoading && (watchQty || 0) > currentStock;
+  const showStock = isOut && !!selectedProduct;
+  const overStock = showStock && !whStockLoading && (watchQty || 0) > currentStock;
 
   const createMut = useMutation({
     mutationFn: (data: MovementFormData) => api.post('/stock-movements', data),
