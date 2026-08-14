@@ -57,6 +57,7 @@ export default function StockMovementsPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [invType, setInvType] = useState('');
 
   // Advanced filters
   const [filterProductId, setFilterProductId] = useState('');
@@ -85,11 +86,14 @@ export default function StockMovementsPage() {
 
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
+  const { data: invTypeData } = useQuery({ queryKey: ['inventory-types-active'], queryFn: () => api.get('/inventory-types/active') });
 
   const items = response?.data?.data || [];
   const total = response?.data?.total || 0;
-  const products = (prodData?.data?.data || []).map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
+  const productList: any[] = prodData?.data?.data || [];
+  const products = productList.map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
   const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
+  const invTypeOptions = (invTypeData?.data?.data || []).map((t: any) => ({ value: t.key, label: t.label }));
 
   const form = useForm<MovementFormData>({
     resolver: zodResolver(movementSchema),
@@ -98,8 +102,26 @@ export default function StockMovementsPage() {
   });
 
   const watchType = form.watch('type');
+  const watchProductId = form.watch('productId');
+  const watchFromWh = form.watch('fromWarehouseId');
+  const watchToWh = form.watch('toWarehouseId');
+  const watchQty = form.watch('quantity');
   const showFrom = ['TRANSFER_OUT', 'SALE', 'WRITE_OFF'].includes(watchType);
   const showTo = ['PURCHASE', 'TRANSFER_IN', 'RETURN'].includes(watchType);
+
+  // Only items that currently hold stock, optionally filtered by inventory type
+  const itemOptions = productList
+    .filter((p) => (p.currentStock ?? 0) > 0 && (!invType || p.inventoryType === invType))
+    .map((p) => ({ value: p.id, label: `${p.name} (${p.sku}) — ${p.currentStock} ${p.unit || ''}`.trim() }));
+
+  const selectedProduct = productList.find((p) => p.id === watchProductId);
+  const currentStock: number = selectedProduct?.currentStock ?? 0;
+  const stockUnit: string = selectedProduct?.unit || '';
+  const isOut = !inTypes.has(watchType); // outbound types reduce stock
+  const needsWarehouse = showFrom || showTo;
+  const activeWh = showFrom ? watchFromWh : (showTo ? watchToWh : '');
+  const showStock = !!selectedProduct && (!needsWarehouse || !!activeWh);
+  const overStock = isOut && showStock && (watchQty || 0) > currentStock;
 
   const createMut = useMutation({
     mutationFn: (data: MovementFormData) => api.post('/stock-movements', data),
@@ -113,6 +135,7 @@ export default function StockMovementsPage() {
   });
 
   const openCreate = () => {
+    setInvType('');
     form.reset({ productId: '', type: 'PURCHASE', quantity: 1, fromWarehouseId: '', toWarehouseId: '', reason: '', notes: '' });
     setModalOpen(true);
   };
@@ -205,15 +228,13 @@ export default function StockMovementsPage() {
             <DialogTitle>New Stock Movement</DialogTitle>
           </DialogHeader>
           <form id="movement-form" onSubmit={form.handleSubmit((d) => createMut.mutate(d))} className="px-6 py-5 space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Product <span className="text-red-500">*</span></Label>
-              <Controller control={form.control} name="productId" render={({ field }) => (
-                <SearchableSelect options={products} value={field.value} onChange={field.onChange} placeholder="Select product" />
-              )} />
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Type <span className="text-red-500">*</span></Label>
+                <Label className="text-[13px]">Inventory Type</Label>
+                <SearchableSelect options={invTypeOptions} value={invType} onChange={(v) => { setInvType(v); form.setValue('productId', ''); }} placeholder="All types" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Movement Type <span className="text-red-500">*</span></Label>
                 <Controller control={form.control} name="type" render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
@@ -225,10 +246,13 @@ export default function StockMovementsPage() {
                   </Select>
                 )} />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
-                <Input type="number" min={0} step="any" {...form.register('quantity', { valueAsNumber: true })} className="h-9 rounded-lg" />
-              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Item <span className="text-red-500">*</span></Label>
+              <Controller control={form.control} name="productId" render={({ field }) => (
+                <SearchableSelect options={itemOptions} value={field.value} onChange={field.onChange} placeholder="Select item (with stock)" />
+              )} />
+              {itemOptions.length === 0 && <p className="text-xs text-muted-foreground">No items with stock{invType ? ' for this type' : ''}.</p>}
             </div>
             {showFrom && (
               <div className="space-y-1.5">
@@ -247,6 +271,28 @@ export default function StockMovementsPage() {
               </div>
             )}
             <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
+                {showStock && (
+                  <span className="text-xs text-muted-foreground">Current stock: <span className="font-mono font-medium text-foreground">{currentStock} {stockUnit}</span></span>
+                )}
+              </div>
+              <Controller control={form.control} name="quantity" render={({ field }) => (
+                <Input
+                  type="number" min={0} step="any"
+                  max={isOut && showStock ? currentStock : undefined}
+                  value={field.value ?? ''}
+                  onChange={(e) => {
+                    let v = e.target.value === '' ? 0 : (Number.parseFloat(e.target.value) || 0);
+                    if (isOut && showStock && v > currentStock) v = currentStock;
+                    field.onChange(v);
+                  }}
+                  className={cn('h-9 rounded-lg', overStock && 'border-red-300 focus-visible:ring-red-200')}
+                />
+              )} />
+              {overStock && <p className="text-xs text-red-500">Cannot exceed current stock ({currentStock} {stockUnit}).</p>}
+            </div>
+            <div className="space-y-1.5">
               <Label className="text-[13px]">Reason</Label>
               <Input {...form.register('reason')} className="h-9 rounded-lg" placeholder="e.g., Stock count adjustment" />
             </div>
@@ -257,7 +303,7 @@ export default function StockMovementsPage() {
           </form>
           <div className="px-6 py-4 border-t border-border flex justify-between">
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button type="submit" form="movement-form" className="bg-gradient-primary text-white" disabled={!form.formState.isValid || createMut.isPending}>
+            <Button type="submit" form="movement-form" className="bg-gradient-primary text-white" disabled={!form.formState.isValid || overStock || createMut.isPending}>
               {createMut.isPending ? 'Recording...' : 'Record Movement'}
             </Button>
           </div>
