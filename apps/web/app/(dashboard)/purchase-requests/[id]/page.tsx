@@ -1621,15 +1621,9 @@ export default function PurchaseRequestDetailPage() {
                 <Label className="text-[13px]">UOM <span className="text-red-500">*</span></Label>
                 <SearchableSelect
                   options={[
-                    { value: 'pcs', label: 'Pieces (pcs)' }, { value: 'box', label: 'Box' }, { value: 'pack', label: 'Pack' },
-                    { value: 'set', label: 'Set' }, { value: 'kg', label: 'Kilogram (kg)' }, { value: 'g', label: 'Gram (g)' },
-                    { value: 'l', label: 'Liter (L)' }, { value: 'ml', label: 'Milliliter (mL)' }, { value: 'm', label: 'Meter (m)' },
-                    { value: 'roll', label: 'Roll' }, { value: 'bag', label: 'Bag' }, { value: 'bottle', label: 'Bottle' },
-                    { value: 'can', label: 'Can' }, { value: 'pair', label: 'Pair' }, { value: 'ream', label: 'Ream' },
-                    { value: 'unit', label: 'Unit' }, { value: 'sheet', label: 'Sheet' }, { value: 'carton', label: 'Carton' },
-                    { value: 'drum', label: 'Drum' }, { value: 'pallet', label: 'Pallet' }, { value: 'dozen', label: 'Dozen' },
-                    { value: 'bundle', label: 'Bundle' }, { value: 'spool', label: 'Spool' }, { value: 'tube', label: 'Tube' },
-                  ]}
+                    'pcs', 'box', 'pack', 'set', 'kg', 'g', 'l', 'ml', 'm', 'roll', 'bag', 'bottle',
+                    'can', 'pair', 'ream', 'unit', 'sheet', 'carton', 'drum', 'pallet', 'dozen', 'bundle', 'spool', 'tube',
+                  ].map((c) => ({ value: c, label: c }))}
                   value={quickPriceUom}
                   onChange={setQuickPriceUom}
                   placeholder="Select UOM"
