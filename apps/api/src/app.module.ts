@@ -21,6 +21,7 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { InventoryTypesModule } from './modules/inventory-types/inventory-types.module';
 import { LocationsModule } from './modules/locations/locations.module';
+import { PublicItemsModule } from './modules/public-items/public-items.module';
 import { LaborRatesModule } from './modules/labor-rates/labor-rates.module';
 import { GoodsReceiptsModule } from './modules/goods-receipts/goods-receipts.module';
 import { StockTransfersModule } from './modules/stock-transfers/stock-transfers.module';
@@ -74,6 +75,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     RolesModule,
     InventoryTypesModule,
     LocationsModule,
+    PublicItemsModule,
     LaborRatesModule,
     GoodsReceiptsModule,
     StockTransfersModule,

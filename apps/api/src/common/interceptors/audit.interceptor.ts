@@ -18,7 +18,7 @@ const METHOD_ACTION_MAP: Record<string, AuditAction> = {
   DELETE: 'DELETE',
 };
 
-const SKIP_ROUTES = ['/api/auth', '/api/health', '/health', '/api/comments', '/api/audit', '/api/rfq-public', '/api/dr-public'];
+const SKIP_ROUTES = ['/api/auth', '/api/health', '/health', '/api/comments', '/api/audit', '/api/rfq-public', '/api/dr-public', '/api/public'];
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
