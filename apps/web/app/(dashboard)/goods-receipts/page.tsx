@@ -111,7 +111,7 @@ export default function GoodsReceiptsPage() {
     { key: 'receiptDate', label: 'Date', render: (v: string) => formatDate(v) },
   ];
 
-  const canSave = rows.length > 0 && rows.some((r) => r.quantity > 0);
+  const canSave = !!warehouseId && rows.length > 0 && rows.some((r) => r.quantity > 0);
 
   return (
     <div className="space-y-6">
@@ -159,8 +159,8 @@ export default function GoodsReceiptsPage() {
                 <Input value={supplierDrRef} onChange={(e) => setSupplierDrRef(e.target.value)} className="h-9 rounded-lg" placeholder="e.g., supplier's DR / invoice #" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Receive into Warehouse</Label>
-                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setAreaId(''); setLocationId(''); }} placeholder="Unassigned (optional)" />
+                <Label className="text-[13px]">Receive into Warehouse <span className="text-red-500">*</span></Label>
+                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setAreaId(''); setLocationId(''); }} placeholder="Select warehouse" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Area</Label>

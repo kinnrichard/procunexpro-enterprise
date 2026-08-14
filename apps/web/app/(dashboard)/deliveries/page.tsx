@@ -123,7 +123,7 @@ export default function DeliveriesPage() {
     ) },
   ];
 
-  const canSave = !!customerId && rows.some((r) => r.productId && r.quantity > 0);
+  const canSave = !!customerId && !!warehouseId && rows.some((r) => r.productId && r.quantity > 0);
 
   const statusFilters = ['', 'RELEASED', 'SIGNED', 'CANCELLED'];
   const statusLabels: Record<string, string> = { '': 'All', RELEASED: 'Awaiting sign', SIGNED: 'Signed', CANCELLED: 'Cancelled' };
@@ -178,8 +178,8 @@ export default function DeliveriesPage() {
                 <SearchableSelect options={customers} value={customerId} onChange={setCustomerId} placeholder="Select customer" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">From Warehouse</Label>
-                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setAreaId(''); setLocationId(''); }} placeholder="Any (optional)" />
+                <Label className="text-[13px]">From Warehouse <span className="text-red-500">*</span></Label>
+                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setAreaId(''); setLocationId(''); }} placeholder="Select warehouse" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">From Area</Label>

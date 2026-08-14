@@ -108,7 +108,7 @@ export default function ProductionsPage() {
   const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
   const preview: PreviewRow[] = previewData?.data || [];
   const hasShortage = preview.some((r) => !r.sufficient);
-  const canSubmit = !!productId && quantity > 0 && preview.length > 0 && !hasShortage;
+  const canSubmit = !!productId && !!warehouseId && quantity > 0 && preview.length > 0 && !hasShortage;
 
   const laborRates = (laborData?.data?.data || []);
   const laborRateOptions = laborRates.map((r: any) => ({ value: r.id, label: `${r.name} (${r.ratePerHour}/hr)` }));
@@ -281,8 +281,8 @@ export default function ProductionsPage() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Warehouse</Label>
-                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setAreaId(''); setLocationId(''); }} placeholder="Optional" />
+                <Label className="text-[13px]">Warehouse <span className="text-red-500">*</span></Label>
+                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setAreaId(''); setLocationId(''); }} placeholder="Select warehouse" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Area</Label>

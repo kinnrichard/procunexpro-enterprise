@@ -254,8 +254,8 @@ export default function StockLotsPage() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Warehouse</Label>
-                <SearchableSelect options={warehouses} value={form.warehouseId} onChange={(v) => setForm({ ...form, warehouseId: v, areaId: '', locationId: '' })} placeholder="Unassigned" />
+                <Label className="text-[13px]">Warehouse <span className="text-red-500">*</span></Label>
+                <SearchableSelect options={warehouses} value={form.warehouseId} onChange={(v) => setForm({ ...form, warehouseId: v, areaId: '', locationId: '' })} placeholder="Select warehouse" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Area</Label>
@@ -297,7 +297,7 @@ export default function StockLotsPage() {
           </div>
           <div className="px-6 py-4 border-t border-border flex justify-between">
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={() => saveMut.mutate()} className="bg-gradient-primary text-white" disabled={saveMut.isPending || (!editing && (!form.productId || !form.lotNumber)) || (!!editing && !form.lotNumber)}>
+            <Button type="button" onClick={() => saveMut.mutate()} className="bg-gradient-primary text-white" disabled={saveMut.isPending || !form.warehouseId || (!editing && (!form.productId || !form.lotNumber)) || (!!editing && !form.lotNumber)}>
               {saveMut.isPending ? 'Saving…' : editing ? 'Save' : 'Add Lot'}
             </Button>
           </div>
