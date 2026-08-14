@@ -29,7 +29,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  FileText, Plus, Pencil, Send, XCircle, Package,
+  FileText, Plus, Send, XCircle, Package,
   Clock, CheckCheck, FileX, Download, Filter, X,
 } from 'lucide-react';
 
@@ -302,22 +302,6 @@ export default function PurchaseRequestsPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (pr: any) => {
-    setEditing(pr);
-    form.reset({
-      title: pr.title,
-      description: pr.description || '',
-      companyId: pr.companyId || '',
-      departmentId: pr.departmentId || '',
-      priority: pr.priority,
-      requiredDate: pr.requiredDate ? new Date(pr.requiredDate) : undefined as any,
-      purchaseTerms: pr.purchaseTerms || '',
-      deliveryTerms: pr.deliveryTerms || '',
-      deliveryType: pr.deliveryType || '',
-      notes: pr.notes || '',
-    });
-    setModalOpen(true);
-  };
 
   const onSubmit = (data: PRFormData) => {
     const payload = {
@@ -406,15 +390,8 @@ export default function PurchaseRequestsPage() {
       key: 'actions', label: '',
       render: (_: any, row: any) => (
         <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-          {row.status === 'DRAFT' && (
-            <>
-              {can('purchase-requests', 'edit') && (
-                <button onClick={() => submitMutation.mutate(row.id)} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Submit for Approval"><Send className="h-3.5 w-3.5" /></button>
-              )}
-              {can('purchase-requests', 'edit') && (
-                <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground" title="Edit"><Pencil className="h-3.5 w-3.5" /></button>
-              )}
-            </>
+          {row.status === 'DRAFT' && can('purchase-requests', 'edit') && (
+            <button onClick={() => submitMutation.mutate(row.id)} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Submit for Approval"><Send className="h-3.5 w-3.5" /></button>
           )}
         </div>
       ),
