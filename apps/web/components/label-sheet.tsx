@@ -9,7 +9,8 @@ import { useLabelCodeType, LabelCodeType } from '@/lib/label-settings'
 export interface LabelItem {
   id: string
   name: string
-  code: string // encoded in the QR/barcode (the record's primary key)
+  code: string // barcode value + caption (SKU or lot number)
+  url?: string // QR value when set (e.g. the item URL); falls back to code
   sub?: string // small mono line under the name
   lines?: string[] // extra info lines (location, expiry, qty…)
 }
@@ -30,7 +31,7 @@ function LabelCard({ item, type }: { item: LabelItem; type: LabelCodeType }) {
       <div className="label-name">{item.name}</div>
       {item.sub && <div className="label-sub">{item.sub}</div>}
       <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0' }}>
-        {type === 'QR' ? <QRCodeSVG value={item.code} size={84} level="M" /> : <svg ref={bcRef} />}
+        {type === 'QR' ? <QRCodeSVG value={item.url || item.code} size={84} level="M" /> : <svg ref={bcRef} />}
       </div>
       {item.lines?.map((l) => (
         <div key={l} className="label-sub">{l}</div>

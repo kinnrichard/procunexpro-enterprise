@@ -162,7 +162,8 @@ export default function ProductsPage() {
   function handlePrintLabels() {
     const rows = selectedIds.size ? products.filter((p) => selectedIds.has(p.id)) : products
     if (rows.length === 0) return
-    setPrintItems(rows.map((p) => ({ id: p.id, name: p.name, code: p.sku, sub: p.sku })))
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    setPrintItems(rows.map((p) => ({ id: p.id, name: p.name, code: p.sku, url: `${origin}/products/${p.sku}`, sub: p.sku })))
   }
   const [compositionTarget, setCompositionTarget] = useState<Product | null>(null)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
