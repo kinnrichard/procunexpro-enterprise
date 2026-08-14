@@ -49,7 +49,7 @@ export default function StockLotsPage() {
   const [filter, setFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', areaId: '', locationId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' });
+  const [form, setForm] = useState({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', areaId: '', locationId: '', expiryDate: '', noExpiry: false, source: '', status: 'AVAILABLE', qcStatus: 'PASSED' });
 
   // Advanced filters
   const [filterProductId, setFilterProductId] = useState('');
@@ -120,8 +120,8 @@ export default function StockLotsPage() {
     onError: () => toast({ title: 'Failed to update QC', variant: 'destructive' }),
   });
 
-  const openAdd = () => { setEditing(null); setForm({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', areaId: '', locationId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' }); setModalOpen(true); };
-  const openEdit = (row: any) => { setEditing(row); setForm({ productId: row.productId, lotNumber: row.lotNumber, quantity: row.quantity, warehouseId: row.warehouseId || '', areaId: row.areaId || '', locationId: row.locationId || '', expiryDate: row.expiryDate ? row.expiryDate.slice(0, 10) : '', source: row.source || '', status: row.status, qcStatus: row.qcStatus }); setModalOpen(true); };
+  const openAdd = () => { setEditing(null); setForm({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', areaId: '', locationId: '', expiryDate: '', noExpiry: false, source: '', status: 'AVAILABLE', qcStatus: 'PASSED' }); setModalOpen(true); };
+  const openEdit = (row: any) => { setEditing(row); setForm({ productId: row.productId, lotNumber: row.lotNumber, quantity: row.quantity, warehouseId: row.warehouseId || '', areaId: row.areaId || '', locationId: row.locationId || '', expiryDate: row.expiryDate ? row.expiryDate.slice(0, 10) : '', noExpiry: !row.expiryDate, source: row.source || '', status: row.status, qcStatus: row.qcStatus }); setModalOpen(true); };
 
   const expiryClass = (d: number | null) => {
     if (d === null) return '';
@@ -268,8 +268,19 @@ export default function StockLotsPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Expiry Date</Label>
-                <Input type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="h-9 rounded-lg" />
+                <div className="flex items-center justify-between">
+                  <Label className="text-[13px]">Expiry Date</Label>
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={form.noExpiry}
+                      onChange={(e) => setForm({ ...form, noExpiry: e.target.checked, expiryDate: e.target.checked ? '' : form.expiryDate })}
+                      className="h-3.5 w-3.5 rounded border-input accent-primary"
+                    />
+                    No expiry
+                  </label>
+                </div>
+                <Input type="date" value={form.expiryDate} disabled={form.noExpiry} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="h-9 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" placeholder={form.noExpiry ? 'No expiry' : undefined} />
               </div>
               {editing && (
                 <div className="space-y-1.5">
