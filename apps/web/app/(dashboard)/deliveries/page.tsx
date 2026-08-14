@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { LocationSelect } from '@/components/location-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
@@ -38,6 +39,7 @@ export default function DeliveriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
 
@@ -80,7 +82,7 @@ export default function DeliveriesPage() {
   const updateRow = (i: number, patch: Partial<Row>) => setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
   const saveMut = useMutation({
-    mutationFn: () => api.post('/delivery-receipts', { customerId, warehouseId: warehouseId || undefined, notes: notes || undefined, items: rows.filter((r) => r.productId && r.quantity > 0) }),
+    mutationFn: () => api.post('/delivery-receipts', { customerId, warehouseId: warehouseId || undefined, locationId: locationId || undefined, notes: notes || undefined, items: rows.filter((r) => r.productId && r.quantity > 0) }),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['delivery-receipts'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -96,7 +98,7 @@ export default function DeliveriesPage() {
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to cancel', variant: 'destructive' }),
   });
 
-  const openCreate = () => { setCustomerId(''); setWarehouseId(''); setNotes(''); setRows([{ productId: '', quantity: 1 }]); setModalOpen(true); };
+  const openCreate = () => { setCustomerId(''); setWarehouseId(''); setLocationId(''); setNotes(''); setRows([{ productId: '', quantity: 1 }]); setModalOpen(true); };
   const copyLink = (url: string) => { globalThis.navigator?.clipboard?.writeText(url); toast({ title: 'Sign link copied' }); };
 
   const columns = [
@@ -175,7 +177,11 @@ export default function DeliveriesPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">From Warehouse</Label>
-                <SearchableSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Any (optional)" />
+                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setLocationId(''); }} placeholder="Any (optional)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">From Location</Label>
+                <LocationSelect warehouseId={warehouseId} value={locationId} onChange={setLocationId} placeholder="Any location" />
               </div>
             </div>
 

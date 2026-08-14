@@ -90,7 +90,12 @@ export class DeliveryReceiptsService {
 
       // Draw down finished-good lots FEFO (QC-passed), best-effort
       const lots = await this.prisma.stockLot.findMany({
-        where: { tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 }, ...(data.warehouseId ? { OR: [{ warehouseId: data.warehouseId }, { warehouseId: null }] } : {}) },
+        where: {
+          tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
+          ...(data.warehouseId ? { OR: [{ warehouseId: data.warehouseId }, { warehouseId: null }] } : {}),
+          // When a source location is given, pick only from that bin/shelf
+          ...(data.locationId ? { locationId: data.locationId } : {}),
+        },
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
       });
       let remaining = need;
@@ -104,7 +109,7 @@ export class DeliveryReceiptsService {
 
       ops.push(
         this.prisma.product.update({ where: { id: r.productId }, data: { currentStock: { decrement: need } } }),
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'SALE', quantity: need, fromWarehouseId: data.warehouseId || null, reason: `Released via ${drNumber} to ${customer.name}`, performedBy: userId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'SALE', quantity: need, fromWarehouseId: data.warehouseId || null, fromLocationId: data.locationId || null, reason: `Released via ${drNumber} to ${customer.name}`, performedBy: userId } }),
       );
     }
 

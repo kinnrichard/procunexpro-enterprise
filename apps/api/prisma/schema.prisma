@@ -1051,6 +1051,7 @@ model Production {
   laborCost       Float            @default(0) // laborRate.ratePerHour x laborHours
   overheadCost    Float            @default(0) // actual overhead cost for this batch
   warehouseId     String?
+  locationId      String? // bin/shelf where finished goods are placed
   status          ProductionStatus @default(DRAFT)
   notes           String?
   producedAt      DateTime?

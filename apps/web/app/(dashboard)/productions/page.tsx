@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { LocationSelect } from '@/components/location-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
@@ -61,6 +62,7 @@ export default function ProductionsPage() {
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [warehouseId, setWarehouseId] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [notes, setNotes] = useState('');
   const [laborRateId, setLaborRateId] = useState('');
   const [laborHours, setLaborHours] = useState(0);
@@ -115,7 +117,7 @@ export default function ProductionsPage() {
   const unitCost = quantity > 0 ? batchCost / quantity : 0;
 
   const createMut = useMutation({
-    mutationFn: () => api.post('/productions', { productId, quantity, warehouseId: warehouseId || undefined, notes: notes || undefined, laborRateId: laborRateId || undefined, laborHours, overheadCost }),
+    mutationFn: () => api.post('/productions', { productId, quantity, warehouseId: warehouseId || undefined, locationId: locationId || undefined, notes: notes || undefined, laborRateId: laborRateId || undefined, laborHours, overheadCost }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['productions'] });
       setModalOpen(false);
@@ -148,6 +150,7 @@ export default function ProductionsPage() {
     setProductId('');
     setQuantity(1);
     setWarehouseId('');
+    setLocationId('');
     setNotes('');
     setLaborRateId('');
     setLaborHours(0);
@@ -273,9 +276,15 @@ export default function ProductionsPage() {
                 <Input type="number" min={0} step="any" value={quantity || ''} placeholder="0" onChange={(e) => setQuantity(Number.parseFloat(e.target.value) || 0)} className="h-9 rounded-lg" />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Warehouse</Label>
-              <SearchableSelect options={warehouses} value={warehouseId} onChange={setWarehouseId} placeholder="Select warehouse (optional)" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Warehouse</Label>
+                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setLocationId(''); }} placeholder="Select warehouse (optional)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Location</Label>
+                <LocationSelect warehouseId={warehouseId} value={locationId} onChange={setLocationId} />
+              </div>
             </div>
 
             {/* BOM preview */}
