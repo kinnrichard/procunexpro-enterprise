@@ -9,6 +9,7 @@ import { z } from 'zod'
 import api from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { ItemCodes } from '@/components/item-codes'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -148,6 +149,7 @@ function ProfileTab({ product }: Readonly<{ product: any }>) {
         <Field label="Manufacturer" value={product.manufacturer?.name} icon={Factory} />
         <Field label="Model Number" value={product.modelNumber} mono icon={Hash} />
         <Field label="SKU" value={product.sku} mono icon={Hash} />
+        <Field label="Barcode" value={product.barcode} mono icon={Hash} />
         <Field label="Category" value={product.category?.name} icon={Layers} />
         <Field label="Sub Category" value={product.subCategory?.name} icon={Layers} />
         <Field label="Origin" value={product.origin?.name} icon={Globe} />
@@ -156,6 +158,8 @@ function ProfileTab({ product }: Readonly<{ product: any }>) {
         <Field label="Max Stock" value={product.maxStock} icon={ArrowDownUp} />
         <Field label="Reorder Qty" value={product.reorderQuantity} icon={ArrowDownUp} />
       </div>
+
+      <ItemCodes sku={product.sku} barcode={product.barcode} name={product.name} />
 
       <div className="relative my-2"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-border/60" /></div><div className="relative flex justify-start"><span className="bg-background pr-3 text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">Specifications & Gallery</span></div></div>
 
