@@ -98,7 +98,7 @@ export default function StockMovementsPage() {
   const form = useForm<MovementFormData>({
     resolver: zodResolver(movementSchema),
     mode: 'onChange',
-    defaultValues: { productId: '', type: 'PURCHASE', quantity: 1, fromWarehouseId: '', toWarehouseId: '', reason: '', notes: '' },
+    defaultValues: { productId: '', type: 'PURCHASE', quantity: undefined as unknown as number, fromWarehouseId: '', toWarehouseId: '', reason: '', notes: '' },
   });
 
   const watchType = form.watch('type');
@@ -136,7 +136,7 @@ export default function StockMovementsPage() {
 
   const openCreate = () => {
     setInvType('');
-    form.reset({ productId: '', type: 'PURCHASE', quantity: 1, fromWarehouseId: '', toWarehouseId: '', reason: '', notes: '' });
+    form.reset({ productId: '', type: 'PURCHASE', quantity: undefined as unknown as number, fromWarehouseId: '', toWarehouseId: '', reason: '', notes: '' });
     setModalOpen(true);
   };
 
@@ -277,9 +277,9 @@ export default function StockMovementsPage() {
               </div>
               <Controller control={form.control} name="quantity" render={({ field }) => (
                 <Input
-                  type="number" min={0} step="any"
+                  type="number" min={0} step="any" placeholder="0"
                   value={field.value ?? ''}
-                  onChange={(e) => field.onChange(e.target.value === '' ? 0 : (Number.parseFloat(e.target.value) || 0))}
+                  onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number.parseFloat(e.target.value))}
                   className={cn('h-9 rounded-lg', overStock && 'border-red-300 focus-visible:ring-red-200')}
                 />
               )} />
