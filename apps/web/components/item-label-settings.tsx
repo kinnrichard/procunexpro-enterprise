@@ -39,7 +39,7 @@ export function ItemLabelSettings() {
           <div className="p-2 rounded-lg bg-primary/10"><QrCode className="h-5 w-5 text-primary" /></div>
           <div>
             <CardTitle className="text-lg">Item Labels</CardTitle>
-            <CardDescription>Choose how item &amp; lot codes are generated. The code encodes the record&apos;s unique ID.</CardDescription>
+            <CardDescription>Choose how item &amp; lot codes are generated. Items encode the SKU; stock lots encode the lot number.</CardDescription>
           </div>
         </div>
       </CardHeader>

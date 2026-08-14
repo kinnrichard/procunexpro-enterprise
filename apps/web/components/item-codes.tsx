@@ -68,7 +68,7 @@ export function ItemCodes({ code, name, sub }: Readonly<ItemCodesProps>) {
         )}
         <div className="text-sm">
           {sub && <p className="font-mono">{sub}</p>}
-          <p className="text-xs text-muted-foreground mt-1">Encodes the item ID</p>
+          <p className="text-xs text-muted-foreground mt-1">Encodes the SKU</p>
         </div>
       </div>
     </div>

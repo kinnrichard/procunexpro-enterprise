@@ -60,7 +60,7 @@ export default function StockLotsPage() {
       `Qty ${row.quantity} ${row.product?.unit || ''}`.trim(),
       row.expiryDate ? `Exp ${String(row.expiryDate).slice(0, 10)}` : '',
     ].filter(Boolean) as string[];
-    setPrintItems([{ id: row.id, name: row.product?.name || '—', code: row.id, sub: row.lotNumber, lines }]);
+    setPrintItems([{ id: row.id, name: row.product?.name || '—', code: row.lotNumber, sub: row.lotNumber, lines }]);
   }
 
   // Advanced filters
