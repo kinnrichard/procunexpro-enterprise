@@ -167,6 +167,7 @@ export class PurchaseRequestsService {
       where: { id },
       include: {
         tenant: { select: { id: true, companyName: true } },
+        company: { select: { id: true, name: true } },
         requestedBy: {
           select: { id: true, firstName: true, lastName: true, username: true },
         },
