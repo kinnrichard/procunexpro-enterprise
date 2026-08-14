@@ -27,7 +27,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   ArrowLeft, Plus, Trash2, Loader2, Send, CheckCircle, XCircle, X, Filter,
-  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info, Package, FileSearch,
+  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info, Package, FileSearch, ShoppingCart,
 } from 'lucide-react';
 
 type Vendor = { id: string; name: string };
@@ -455,6 +455,7 @@ export default function PurchaseRequestDetailPage() {
   const [coaFormData, setCoaFormData] = useState({ glAccountId: '', debitAmount: 0, creditAmount: 0, accountRemarks: '' });
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [createRfqConfirmOpen, setCreateRfqConfirmOpen] = useState(false);
+  const [createPoConfirmOpen, setCreatePoConfirmOpen] = useState(false);
   const [rfqSummaryId, setRfqSummaryId] = useState<string | null>(null);
   const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
   const [rejectionNote, setRejectionNote] = useState('');
@@ -681,6 +682,21 @@ export default function PurchaseRequestDetailPage() {
       toast({ title: `${count} RFQ${count > 1 ? 's' : ''} created`, description: 'Sub-status updated to Waiting on Vendor Quotation' });
     },
     onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to create RFQ', variant: 'destructive' }),
+  });
+
+  const createPoMutation = useMutation({
+    mutationFn: () => api.post('/purchase-orders/from-pr-items', { itemIds: (pr?.items || []).map((i: any) => i.id) }),
+    onSuccess: (res) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      setCreatePoConfirmOpen(false);
+      const pos = res.data?.purchaseOrders || [];
+      const count = res.data?.created || 0;
+      toast({ title: `${count} Purchase Order${count === 1 ? '' : 's'} created`, description: 'Grouped by vendor from this request.' });
+      if (pos.length === 1) router.push(`/purchase-orders/${pos[0].id}`);
+      else router.push('/purchase-orders');
+    },
+    onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to create PO', variant: 'destructive' }),
   });
 
   const rejectMutation = useMutation({
@@ -994,17 +1010,28 @@ export default function PurchaseRequestDetailPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {!(pr.rfqs?.length > 0) && (
+              <div className="flex items-center gap-2">
+                {!(pr.rfqs?.length > 0) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCreateRfqConfirmOpen(true)}
+                    disabled={createRfqMutation.isPending || (pr.items?.length || 0) === 0}
+                  >
+                    {createRfqMutation.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <FileSearch className="h-3.5 w-3.5 mr-1.5" />}
+                    Create RFQ
+                  </Button>
+                )}
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => setCreateRfqConfirmOpen(true)}
-                  disabled={createRfqMutation.isPending || (pr.items?.length || 0) === 0}
+                  onClick={() => setCreatePoConfirmOpen(true)}
+                  disabled={createPoMutation.isPending || (pr.items?.length || 0) === 0}
+                  className="bg-gradient-primary text-white"
                 >
-                  {createRfqMutation.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <FileSearch className="h-3.5 w-3.5 mr-1.5" />}
-                  Create RFQ
+                  {createPoMutation.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />}
+                  Create PO
                 </Button>
-              )}
+              </div>
             </div>
           )}
 
@@ -1831,6 +1858,17 @@ export default function PurchaseRequestDetailPage() {
         confirmLabel="Create RFQ"
         onConfirm={() => { createRfqMutation.mutate(undefined, { onSuccess: () => setCreateRfqConfirmOpen(false) }); }}
         isLoading={createRfqMutation.isPending}
+      />
+
+      {/* ─── Create PO Confirm ───────────────────────────── */}
+      <ConfirmDialog
+        open={createPoConfirmOpen}
+        onOpenChange={(open) => !open && setCreatePoConfirmOpen(false)}
+        title="Create Purchase Order"
+        description={`Create purchase order(s) from "${pr?.requestNumber}"? One PO will be created per vendor. Items must have a vendor assigned.`}
+        confirmLabel="Create PO"
+        onConfirm={() => createPoMutation.mutate()}
+        isLoading={createPoMutation.isPending}
       />
 
       {/* ─── Approve Confirm ─────────────────────────────── */}
