@@ -1587,8 +1587,8 @@ export default function PurchaseRequestDetailPage() {
             <p className="text-sm text-muted-foreground mt-1">{quickPriceProduct?.name}</p>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-2 space-y-1.5">
                 <Label className="text-[13px]">Vendor <span className="text-red-500">*</span></Label>
                 <SearchableSelect
                   options={vendors.map((v) => ({ value: v.id, label: v.name }))}
