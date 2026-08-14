@@ -349,20 +349,17 @@ export class RfqService {
     if (!quote) throw new NotFoundException('Quote not found');
 
     return this.prisma.$transaction(async (tx) => {
-      // Set all quotes for this RFQ to not awarded
-      await tx.rFQQuote.updateMany({
-        where: { rfqId },
-        data: { isAwarded: false },
-      });
+      // Only one quote can be awarded per RFQ
+      await tx.rFQQuote.updateMany({ where: { rfqId }, data: { isAwarded: false } });
+      await tx.rFQQuote.update({ where: { id: quoteId }, data: { isAwarded: true } });
 
-      // Award the selected quote
-      await tx.rFQQuote.update({
-        where: { id: quoteId },
-        data: { isAwarded: true },
-      });
+      // If this RFQ came from a PR, push the awarded price + vendor back onto the PR.
+      let prSync: { updatedItems: number; pricingsChanged: number } | null = null;
+      if (rfq.purchaseRequestId) {
+        prSync = await this.applyAwardToPurchaseRequest(tx, rfq.purchaseRequestId, quoteId);
+      }
 
-      // Update RFQ status
-      return tx.rFQ.update({
+      const updated = await tx.rFQ.update({
         where: { id: rfqId },
         data: { status: 'AWARDED', awardedAt: new Date() },
         include: {
@@ -375,7 +372,92 @@ export class RfqService {
           },
         },
       });
+      return { ...updated, prSync };
     });
+  }
+
+  /**
+   * After an RFQ that was created from a PR is awarded, reflect the winning quote
+   * back onto the source PR: for each awarded line whose price (or vendor) differs
+   * from the PR item, update the PR item's price + vendor and upsert the vendor's
+   * ProductPricing ("add a new price"). RFQ items are created from the PR item's
+   * product name/description, so items are matched by description.
+   */
+  private async applyAwardToPurchaseRequest(tx: any, purchaseRequestId: string, quoteId: string) {
+    const quote = await tx.rFQQuote.findUnique({
+      where: { id: quoteId },
+      include: { items: { include: { rfqItem: true } } },
+    });
+    if (!quote) return { updatedItems: 0, pricingsChanged: 0 };
+    const vendorId: string = quote.vendorId;
+
+    const prItems = await tx.purchaseRequestItem.findMany({
+      where: { purchaseRequestId },
+      include: { product: { select: { id: true, name: true } } },
+    });
+
+    const norm = (s?: string | null) => (s || '').trim().toLowerCase();
+    const used = new Set<string>();
+    let updatedItems = 0;
+    let pricingsChanged = 0;
+
+    for (const qi of quote.items) {
+      const desc = norm(qi.rfqItem?.description);
+      const price: number = qi.unitPrice || 0;
+
+      const candidates = prItems.filter(
+        (pi: any) => !used.has(pi.id) && norm(pi.product?.name || pi.description) === desc,
+      );
+      const target =
+        candidates.find((c: any) => c.vendorId === vendorId) ||
+        candidates.find((c: any) => !c.vendorId) ||
+        candidates[0];
+      if (!target) continue;
+
+      const priceChanged = Math.abs((target.estimatedPrice || 0) - price) > 1e-9;
+      const vendorChanged = target.vendorId !== vendorId;
+      if (!priceChanged && !vendorChanged) continue; // PR already matches the award
+      used.add(target.id);
+
+      // Record/refresh the vendor's price for this product ("add a new price"),
+      // preserving existing packaging (pcsPerPack) when the pricing already exists.
+      let pcsPerPack = 1;
+      if (target.productId) {
+        const existing = await tx.productPricing.findUnique({
+          where: { productId_vendorId: { productId: target.productId, vendorId } },
+        });
+        if (!existing) {
+          await tx.productPricing.create({
+            data: { productId: target.productId, vendorId, unitCost: price, sellingPrice: price },
+          });
+          pricingsChanged++;
+        } else {
+          pcsPerPack = existing.pcsPerPack || 1;
+          if (Math.abs((existing.unitCost || 0) - price) > 1e-9) {
+            await tx.productPricing.update({ where: { id: existing.id }, data: { unitCost: price } });
+            pricingsChanged++;
+          }
+        }
+      }
+
+      const invQty = (target.quantity || 0) * pcsPerPack;
+      await tx.purchaseRequestItem.update({
+        where: { id: target.id },
+        data: { estimatedPrice: price, vendorId, totalPrice: invQty * price },
+      });
+      updatedItems++;
+    }
+
+    if (updatedItems > 0) {
+      const items = await tx.purchaseRequestItem.findMany({
+        where: { purchaseRequestId },
+        select: { totalPrice: true },
+      });
+      const totalAmount = items.reduce((s: number, i: any) => s + (i.totalPrice || 0), 0);
+      await tx.purchaseRequest.update({ where: { id: purchaseRequestId }, data: { totalAmount } });
+    }
+
+    return { updatedItems, pricingsChanged };
   }
 
   async createFromPrItems(

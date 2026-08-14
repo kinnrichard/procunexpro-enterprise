@@ -144,7 +144,14 @@ export default function RFQDetailPage() {
 
   const awardMutation = useMutation({
     mutationFn: (quoteId: string) => api.put(`/rfq/${rfqId}/award/${quoteId}`),
-    onSuccess: () => { invalidate(); toast({ title: 'Quote Awarded' }); },
+    onSuccess: (res) => {
+      invalidate();
+      const s = res.data?.prSync;
+      toast({
+        title: 'Quote Awarded',
+        description: s?.updatedItems ? `Updated ${s.updatedItems} PR item(s) with the awarded price.` : undefined,
+      });
+    },
     onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to award', variant: 'destructive' }),
   });
 
