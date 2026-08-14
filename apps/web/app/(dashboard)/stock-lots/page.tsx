@@ -279,31 +279,29 @@ export default function StockLotsPage() {
                 <LocationSelect warehouseId={form.warehouseId} areaId={form.areaId} value={form.locationId} onChange={(v) => setForm({ ...form, locationId: v })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">Expiry Date</Label>
-                <Input type="date" value={form.expiryDate} disabled={form.noExpiry} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="h-9 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" placeholder={form.noExpiry ? 'No expiry' : undefined} />
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none pt-0.5">
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Expiry Date</Label>
+              <div className="flex items-center gap-4">
+                <Input type="date" value={form.expiryDate} disabled={form.noExpiry} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="h-9 w-48 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" placeholder={form.noExpiry ? 'No expiry' : undefined} />
+                <label className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-pointer select-none whitespace-nowrap">
                   <input
                     type="checkbox"
                     checked={form.noExpiry}
                     onChange={(e) => setForm({ ...form, noExpiry: e.target.checked, expiryDate: e.target.checked ? '' : form.expiryDate })}
-                    className="h-3.5 w-3.5 rounded border-input accent-primary"
+                    className="h-4 w-4 rounded border-input accent-primary"
                   />
                   No expiry
                 </label>
               </div>
-              {editing && (
+            </div>
+            {editing && (
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Status</Label>
                   <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm">
                     {['AVAILABLE', 'QUARANTINE', 'EXPIRED', 'DEPLETED'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-              )}
-            </div>
-            {editing && (
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">QC Status</Label>
                   <select value={form.qcStatus} onChange={(e) => setForm({ ...form, qcStatus: e.target.value })} className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm">
