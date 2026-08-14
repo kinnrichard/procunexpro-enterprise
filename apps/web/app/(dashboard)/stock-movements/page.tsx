@@ -106,7 +106,7 @@ export default function StockMovementsPage() {
   const watchFromWh = form.watch('fromWarehouseId');
   const watchToWh = form.watch('toWarehouseId');
   const watchQty = form.watch('quantity');
-  const showFrom = ['TRANSFER_OUT', 'SALE', 'WRITE_OFF'].includes(watchType);
+  const showFrom = ['TRANSFER_OUT', 'SALE', 'WRITE_OFF', 'ADJUSTMENT'].includes(watchType);
   const showTo = ['PURCHASE', 'TRANSFER_IN', 'RETURN'].includes(watchType);
 
   // Only items that currently hold stock, optionally filtered by inventory type
