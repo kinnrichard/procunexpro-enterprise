@@ -68,11 +68,28 @@ export class VendorsService {
     const vendor = await this.prisma.vendor.findFirst({
       where: { id, tenantId },
       include: {
-        _count: { select: { products: true, purchaseOrders: true } },
+        _count: { select: { products: true, purchaseOrders: true, rfqs: true, contracts: true } },
+        purchaseOrders: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, orderNumber: true, status: true, totalAmount: true, createdAt: true },
+        },
+        products: {
+          take: 8,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, name: true, sku: true, inventoryType: true },
+        },
       },
     });
     if (!vendor) throw new NotFoundException('Vendor not found');
-    return vendor;
+
+    // Lifetime spend across every PO with this vendor (not just the 5 shown).
+    const spend = await this.prisma.purchaseOrder.aggregate({
+      where: { tenantId, vendorId: id },
+      _sum: { totalAmount: true },
+    });
+
+    return { ...vendor, totalSpend: spend._sum.totalAmount || 0 };
   }
 
   async create(tenantId: string, data: any) {
