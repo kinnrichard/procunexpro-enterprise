@@ -133,9 +133,14 @@ export function VendorFormDialog({ open, onOpenChange, vendor, onSaved }: Readon
   })
   const cities = citiesData ?? []
 
+  // Distinct key: other pages register ['purchase-terms-active'] returning the
+  // raw axios response, which would collide with this array-shaped result.
   const { data: paymentTermsData } = useQuery({
-    queryKey: ['purchase-terms-active'],
-    queryFn: async () => (await api.get('/purchase-terms/active')).data.data as { name: string }[],
+    queryKey: ['purchase-terms-active', 'options'],
+    queryFn: async () => {
+      const res = await api.get('/purchase-terms/active')
+      return (res.data?.data ?? []) as { name: string }[]
+    },
     staleTime: 60_000,
   })
 
