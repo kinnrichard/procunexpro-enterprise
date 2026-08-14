@@ -130,7 +130,7 @@ export default function StockMovementsPage() {
 
   // Per-warehouse stock when a warehouse is chosen; otherwise the item's aggregate on-hand
   const currentStock: number = (needsWarehouse && activeWh) ? warehouseStock : (selectedProduct?.currentStock ?? 0);
-  const showStock = !!selectedProduct && (!needsWarehouse || !!activeWh);
+  const showStock = !!selectedProduct;
   const overStock = isOut && showStock && !whStockLoading && (watchQty || 0) > currentStock;
 
   const createMut = useMutation({
