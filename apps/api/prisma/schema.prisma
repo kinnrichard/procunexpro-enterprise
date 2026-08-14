@@ -837,9 +837,12 @@ model WarehouseLocation {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  warehouse Warehouse      @relation(fields: [warehouseId], references: [id])
-  area      WarehouseArea? @relation(fields: [areaId], references: [id])
-  products  Product[]
+  warehouse          Warehouse       @relation(fields: [warehouseId], references: [id])
+  area               WarehouseArea?  @relation(fields: [areaId], references: [id])
+  products           Product[]
+  stockLots          StockLot[]
+  stockMovementsFrom StockMovement[] @relation("FromLocation")
+  stockMovementsTo   StockMovement[] @relation("ToLocation")
 
   @@unique([warehouseId, code])
 }
@@ -993,6 +996,8 @@ model StockMovement {
   quantity        Float
   fromWarehouseId String?
   toWarehouseId   String?
+  fromLocationId  String?
+  toLocationId    String?
   purchaseOrderId String?
   productionId    String?
   reason          String?
@@ -1003,9 +1008,11 @@ model StockMovement {
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   product       Product        @relation(fields: [productId], references: [id])
-  fromWarehouse Warehouse?     @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
-  toWarehouse   Warehouse?     @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
-  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  fromWarehouse Warehouse?         @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse?         @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
+  fromLocation  WarehouseLocation? @relation("FromLocation", fields: [fromLocationId], references: [id])
+  toLocation    WarehouseLocation? @relation("ToLocation", fields: [toLocationId], references: [id])
+  purchaseOrder PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
   production    Production?    @relation(fields: [productionId], references: [id])
 
   @@unique([tenantId, referenceNumber])
@@ -1093,19 +1100,21 @@ model StockLot {
   source       String? // "PO receipt", "Production PRD-...", "Manual", supplier ref
   status       String    @default("AVAILABLE") // AVAILABLE | DEPLETED | EXPIRED | QUARANTINE
   qcStatus     String    @default("PASSED") // PENDING | PASSED | FAILED | HOLD
-  warehouseId  String? // location of this lot
+  warehouseId  String? // warehouse holding this lot
+  locationId   String? // bin/shelf location within the warehouse
   productionId String? // set when produced in-house
   receivedAt   DateTime  @default(now())
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  tenant       Tenant           @relation(fields: [tenantId], references: [id])
-  product      Product          @relation(fields: [productId], references: [id])
-  warehouse    Warehouse?       @relation(fields: [warehouseId], references: [id])
-  production   Production?      @relation(fields: [productionId], references: [id])
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  product      Product            @relation(fields: [productId], references: [id])
+  warehouse    Warehouse?         @relation(fields: [warehouseId], references: [id])
+  location     WarehouseLocation? @relation(fields: [locationId], references: [id])
+  production   Production?        @relation(fields: [productionId], references: [id])
   consumptions LotConsumption[]
 
-  @@unique([tenantId, productId, warehouseId, lotNumber])
+  @@unique([tenantId, productId, warehouseId, locationId, lotNumber])
 }
 
 // Traceability: which material lots were consumed by which finished production

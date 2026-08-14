@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { LocationSelect } from '@/components/location-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
@@ -47,7 +48,7 @@ export default function StockLotsPage() {
   const [filter, setFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' });
+  const [form, setForm] = useState({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', locationId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' });
 
   // Advanced filters
   const [filterProductId, setFilterProductId] = useState('');
@@ -97,8 +98,8 @@ export default function StockLotsPage() {
 
   const saveMut = useMutation({
     mutationFn: () => editing
-      ? api.put(`/stock-lots/${editing.id}`, { lotNumber: form.lotNumber, warehouseId: form.warehouseId || null, expiryDate: form.expiryDate || null, source: form.source, status: form.status, qcStatus: form.qcStatus })
-      : api.post('/stock-lots', { productId: form.productId, lotNumber: form.lotNumber, quantity: form.quantity, warehouseId: form.warehouseId || null, expiryDate: form.expiryDate || null, source: form.source }),
+      ? api.put(`/stock-lots/${editing.id}`, { lotNumber: form.lotNumber, warehouseId: form.warehouseId || null, locationId: form.locationId || null, expiryDate: form.expiryDate || null, source: form.source, status: form.status, qcStatus: form.qcStatus })
+      : api.post('/stock-lots', { productId: form.productId, lotNumber: form.lotNumber, quantity: form.quantity, warehouseId: form.warehouseId || null, locationId: form.locationId || null, expiryDate: form.expiryDate || null, source: form.source }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
       queryClient.invalidateQueries({ queryKey: ['stock-lots-expiring'] });
@@ -118,8 +119,8 @@ export default function StockLotsPage() {
     onError: () => toast({ title: 'Failed to update QC', variant: 'destructive' }),
   });
 
-  const openAdd = () => { setEditing(null); setForm({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' }); setModalOpen(true); };
-  const openEdit = (row: any) => { setEditing(row); setForm({ productId: row.productId, lotNumber: row.lotNumber, quantity: row.quantity, warehouseId: row.warehouseId || '', expiryDate: row.expiryDate ? row.expiryDate.slice(0, 10) : '', source: row.source || '', status: row.status, qcStatus: row.qcStatus }); setModalOpen(true); };
+  const openAdd = () => { setEditing(null); setForm({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', locationId: '', expiryDate: '', source: '', status: 'AVAILABLE', qcStatus: 'PASSED' }); setModalOpen(true); };
+  const openEdit = (row: any) => { setEditing(row); setForm({ productId: row.productId, lotNumber: row.lotNumber, quantity: row.quantity, warehouseId: row.warehouseId || '', locationId: row.locationId || '', expiryDate: row.expiryDate ? row.expiryDate.slice(0, 10) : '', source: row.source || '', status: row.status, qcStatus: row.qcStatus }); setModalOpen(true); };
 
   const expiryClass = (d: number | null) => {
     if (d === null) return '';
@@ -141,6 +142,7 @@ export default function StockLotsPage() {
     { key: 'lotNumber', label: 'Lot #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
     { key: 'product', label: 'Product', render: (_: any, row: any) => row.product?.name || '—' },
     { key: 'quantity', label: 'Qty', render: (v: number, row: any) => <span className="font-mono font-medium">{v} <span className="text-xs text-muted-foreground font-sans">{row.product?.unit}</span></span> },
+    { key: 'location', label: 'Location', render: (_: any, row: any) => <span className="text-xs text-muted-foreground">{[row.warehouse?.name, row.location?.name].filter(Boolean).join(' · ') || 'Unassigned'}</span> },
     { key: 'expiryDate', label: 'Expiry', render: renderExpiry },
     { key: 'status', label: 'Status', render: (v: string) => <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', statusColors[v] || statusColors.DEPLETED)}>{v}</span> },
     { key: 'qcStatus', label: 'QC', render: (v: string) => <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', qcColors[v] || qcColors.PASSED)}>{v}</span> },
@@ -249,9 +251,15 @@ export default function StockLotsPage() {
                 </div>
               )}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Warehouse</Label>
-              <SearchableSelect options={warehouses} value={form.warehouseId} onChange={(v) => setForm({ ...form, warehouseId: v })} placeholder="Unassigned (no warehouse)" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Warehouse</Label>
+                <SearchableSelect options={warehouses} value={form.warehouseId} onChange={(v) => setForm({ ...form, warehouseId: v, locationId: '' })} placeholder="Unassigned (no warehouse)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Location</Label>
+                <LocationSelect warehouseId={form.warehouseId} value={form.locationId} onChange={(v) => setForm({ ...form, locationId: v })} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">

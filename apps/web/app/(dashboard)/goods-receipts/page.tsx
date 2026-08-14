@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { LocationSelect } from '@/components/location-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
@@ -30,6 +31,8 @@ export default function GoodsReceiptsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [poId, setPoId] = useState('');
   const [supplierDrRef, setSupplierDrRef] = useState('');
+  const [warehouseId, setWarehouseId] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
 
@@ -61,6 +64,8 @@ export default function GoodsReceiptsPage() {
   });
   const purchaseOrderOptions = (allPoData?.data?.data || []).map((o: any) => ({ value: o.id, label: o.orderNumber }));
   const { data: poData } = useQuery({ queryKey: ['receivable-pos'], queryFn: () => api.get('/goods-receipts/receivable-pos'), enabled: modalOpen });
+  const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
+  const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
 
   const items = response?.data?.data || [];
   const total = response?.data?.total || 0;
@@ -78,6 +83,8 @@ export default function GoodsReceiptsPage() {
     mutationFn: () => api.post('/goods-receipts', {
       purchaseOrderId: poId || undefined,
       supplierDrRef: supplierDrRef || undefined,
+      warehouseId: warehouseId || undefined,
+      locationId: locationId || undefined,
       notes: notes || undefined,
       items: rows.filter((r) => r.quantity > 0).map((r) => ({ purchaseOrderItemId: r.purchaseOrderItemId, productId: r.productId, quantity: r.quantity, uom: r.uom, lotNumber: r.lotNumber || undefined, expiryDate: r.expiryDate || undefined })),
     }),
@@ -91,7 +98,7 @@ export default function GoodsReceiptsPage() {
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to receive', variant: 'destructive' }),
   });
 
-  const openCreate = () => { setPoId(''); setSupplierDrRef(''); setNotes(''); setRows([]); setModalOpen(true); };
+  const openCreate = () => { setPoId(''); setSupplierDrRef(''); setWarehouseId(''); setLocationId(''); setNotes(''); setRows([]); setModalOpen(true); };
 
   const columns = [
     { key: 'receiptNumber', label: 'Receipt #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
@@ -147,6 +154,14 @@ export default function GoodsReceiptsPage() {
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Supplier DR / Invoice #</Label>
                 <Input value={supplierDrRef} onChange={(e) => setSupplierDrRef(e.target.value)} className="h-9 rounded-lg" placeholder="e.g., supplier's DR / invoice #" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Receive into Warehouse</Label>
+                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setLocationId(''); }} placeholder="Unassigned (optional)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Location</Label>
+                <LocationSelect warehouseId={warehouseId} value={locationId} onChange={setLocationId} />
               </div>
             </div>
 

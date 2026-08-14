@@ -14,7 +14,7 @@ export class StockLotsService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; productId?: string; status?: string; qcStatus?: string; warehouseId?: string; dateFrom?: string; dateTo?: string; search?: string },
+    params: { page?: number; limit?: number; productId?: string; status?: string; qcStatus?: string; warehouseId?: string; locationId?: string; dateFrom?: string; dateTo?: string; search?: string },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -25,6 +25,7 @@ export class StockLotsService {
     if (params.status) where.status = params.status;
     if (params.qcStatus) where.qcStatus = params.qcStatus;
     if (params.warehouseId) where.warehouseId = params.warehouseId;
+    if (params.locationId) where.locationId = params.locationId;
     if (params.dateFrom || params.dateTo) {
       where.receivedAt = {};
       if (params.dateFrom) where.receivedAt.gte = new Date(params.dateFrom);
@@ -46,6 +47,7 @@ export class StockLotsService {
         include: {
           product: { select: { id: true, name: true, sku: true, unit: true } },
           warehouse: { select: { id: true, name: true } },
+          location: { select: { id: true, name: true, code: true } },
         },
       }),
       this.prisma.stockLot.count({ where }),
@@ -87,6 +89,7 @@ export class StockLotsService {
           quantity: qty,
           initialQty: qty,
           warehouseId: data.warehouseId || null,
+          locationId: data.locationId || null,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
           source: data.source || 'Manual',
           status: 'AVAILABLE',
@@ -105,6 +108,7 @@ export class StockLotsService {
       data: {
         ...(data.lotNumber !== undefined && { lotNumber: data.lotNumber }),
         ...(data.warehouseId !== undefined && { warehouseId: data.warehouseId || null }),
+        ...(data.locationId !== undefined && { locationId: data.locationId || null }),
         ...(data.expiryDate !== undefined && { expiryDate: data.expiryDate ? new Date(data.expiryDate) : null }),
         ...(data.source !== undefined && { source: data.source }),
         ...(data.status !== undefined && { status: data.status }),
@@ -119,11 +123,19 @@ export class StockLotsService {
    * what exists (remainder is treated as unlotted stock). Pure read — caller applies ops
    * inside its own transaction.
    */
-  async allocateFEFO(tenantId: string, productId: string, quantity: number): Promise<LotAllocation[]> {
+  async allocateFEFO(
+    tenantId: string,
+    productId: string,
+    quantity: number,
+    scope?: { warehouseId?: string | null; locationId?: string | null },
+  ): Promise<LotAllocation[]> {
     if (quantity <= 0) return [];
+    const where: any = { tenantId, productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 } };
+    // Optionally scope consumption to a specific warehouse/location (bin-level picking)
+    if (scope?.warehouseId !== undefined) where.warehouseId = scope.warehouseId;
+    if (scope?.locationId !== undefined) where.locationId = scope.locationId;
     const lots = await this.prisma.stockLot.findMany({
-      // Only QC-passed, available lots are consumable
-      where: { tenantId, productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 } },
+      where, // Only QC-passed, available lots are consumable
       orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
     });
 

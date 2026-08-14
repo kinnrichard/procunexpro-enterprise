@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { LocationSelect } from '@/components/location-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
@@ -30,6 +31,8 @@ export default function StockTransfersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [fromWh, setFromWh] = useState('');
   const [toWh, setToWh] = useState('');
+  const [fromLoc, setFromLoc] = useState('');
+  const [toLoc, setToLoc] = useState('');
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
 
@@ -70,7 +73,7 @@ export default function StockTransfersPage() {
   const updateRow = (i: number, patch: Partial<Row>) => setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
   const saveMut = useMutation({
-    mutationFn: () => api.post('/stock-transfers', { fromWarehouseId: fromWh, toWarehouseId: toWh, notes: notes || undefined, items: rows.filter((r) => r.productId && r.quantity > 0) }),
+    mutationFn: () => api.post('/stock-transfers', { fromWarehouseId: fromWh, toWarehouseId: toWh, fromLocationId: fromLoc || undefined, toLocationId: toLoc || undefined, notes: notes || undefined, items: rows.filter((r) => r.productId && r.quantity > 0) }),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['stock-transfers'] });
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
@@ -81,7 +84,7 @@ export default function StockTransfersPage() {
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to transfer', variant: 'destructive' }),
   });
 
-  const openCreate = () => { setFromWh(''); setToWh(''); setNotes(''); setRows([{ productId: '', quantity: 1 }]); setModalOpen(true); };
+  const openCreate = () => { setFromWh(''); setToWh(''); setFromLoc(''); setToLoc(''); setNotes(''); setRows([{ productId: '', quantity: 1 }]); setModalOpen(true); };
 
   const columns = [
     { key: 'transferNumber', label: 'Transfer #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
@@ -144,11 +147,19 @@ export default function StockTransfersPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">From Warehouse <span className="text-red-500">*</span></Label>
-                <SearchableSelect options={warehouses} value={fromWh} onChange={setFromWh} placeholder="Source" />
+                <SearchableSelect options={warehouses} value={fromWh} onChange={(v) => { setFromWh(v); setFromLoc(''); }} placeholder="Source" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">To Warehouse <span className="text-red-500">*</span></Label>
-                <SearchableSelect options={warehouses.filter((w: any) => w.value !== fromWh)} value={toWh} onChange={setToWh} placeholder="Destination" />
+                <SearchableSelect options={warehouses.filter((w: any) => w.value !== fromWh)} value={toWh} onChange={(v) => { setToWh(v); setToLoc(''); }} placeholder="Destination" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">From Location</Label>
+                <LocationSelect warehouseId={fromWh} value={fromLoc} onChange={setFromLoc} placeholder="Any location" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">To Location</Label>
+                <LocationSelect warehouseId={toWh} value={toLoc} onChange={setToLoc} placeholder="Any location" />
               </div>
             </div>
 

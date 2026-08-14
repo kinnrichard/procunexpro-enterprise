@@ -61,6 +61,8 @@ export class StockTransfersService {
     // Source may be "Unassigned" (stock lots with no warehouse) — sent as 'UNASSIGNED' or empty.
     const fromUnassigned = !data.fromWarehouseId || data.fromWarehouseId === 'UNASSIGNED';
     const fromWarehouseId: string | null = fromUnassigned ? null : data.fromWarehouseId;
+    const fromLocationId: string | null = data.fromLocationId || null;
+    const toLocationId: string | null = data.toLocationId || null;
     if (!toWarehouseId) throw new BadRequestException('Destination warehouse is required');
     if (!fromUnassigned && fromWarehouseId === toWarehouseId) throw new BadRequestException('Source and destination must differ');
 
@@ -94,6 +96,8 @@ export class StockTransfersService {
         where: {
           tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
           ...(fromWarehouseId ? { OR: [{ warehouseId: fromWarehouseId }, { warehouseId: null }] } : { warehouseId: null }),
+          // When a source location is given, draw only from that bin/shelf
+          ...(fromLocationId ? { locationId: fromLocationId } : {}),
         },
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
       });
@@ -116,7 +120,7 @@ export class StockTransfersService {
       // Destination lot (new, at target warehouse)
       ops.push(this.prisma.stockLot.create({
         data: {
-          tenantId, productId: r.productId, warehouseId: toWarehouseId,
+          tenantId, productId: r.productId, warehouseId: toWarehouseId, locationId: toLocationId,
           lotNumber: `${transferNumber}-${idx + 1}`,
           quantity: need, initialQty: need,
           expiryDate: earliestExpiry,
@@ -127,8 +131,8 @@ export class StockTransfersService {
 
       // Movements out + in (net-zero to currentStock)
       ops.push(
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_OUT', quantity: need, fromWarehouseId, reason: `Transfer ${transferNumber} to ${toWh.name}`, performedBy: userId } }),
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_IN', quantity: need, toWarehouseId, reason: `Transfer ${transferNumber} from ${fromName}`, performedBy: userId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_OUT', quantity: need, fromWarehouseId, fromLocationId, reason: `Transfer ${transferNumber} to ${toWh.name}`, performedBy: userId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_IN', quantity: need, toWarehouseId, toLocationId, reason: `Transfer ${transferNumber} from ${fromName}`, performedBy: userId } }),
       );
     }
 

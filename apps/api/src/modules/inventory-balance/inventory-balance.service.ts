@@ -47,10 +47,10 @@ export class InventoryBalanceService {
 
     const productIds = products.map((p) => p.id);
 
-    // Per-warehouse available quantities from lots (null warehouse = "Unassigned")
+    // Per-warehouse + per-location available quantities from lots (null = "Unassigned")
     const lotSums = productIds.length
       ? await this.prisma.stockLot.groupBy({
-          by: ['productId', 'warehouseId'],
+          by: ['productId', 'warehouseId', 'locationId'],
           // physical on-hand by location — include QC-held lots (still physically present)
           where: { tenantId, productId: { in: productIds }, status: 'AVAILABLE', quantity: { gt: 0 } },
           _sum: { quantity: true },
@@ -59,11 +59,17 @@ export class InventoryBalanceService {
 
     const warehouses = await this.prisma.warehouse.findMany({ where: { tenantId }, select: { id: true, name: true } });
     const whName = new Map(warehouses.map((w) => [w.id, w.name]));
+    const locations = await this.prisma.warehouseLocation.findMany({ where: { warehouse: { tenantId } }, select: { id: true, name: true } });
+    const locName = new Map(locations.map((l) => [l.id, l.name]));
 
-    const byProduct = new Map<string, Array<{ warehouse: string; quantity: number }>>();
+    const byProduct = new Map<string, Array<{ warehouse: string; location: string | null; quantity: number }>>();
     for (const g of lotSums) {
       const list = byProduct.get(g.productId) || [];
-      list.push({ warehouse: g.warehouseId ? (whName.get(g.warehouseId) || 'Unknown') : 'Unassigned', quantity: round(g._sum.quantity || 0) });
+      list.push({
+        warehouse: g.warehouseId ? (whName.get(g.warehouseId) || 'Unknown') : 'Unassigned',
+        location: g.locationId ? (locName.get(g.locationId) || null) : null,
+        quantity: round(g._sum.quantity || 0),
+      });
       byProduct.set(g.productId, list);
     }
 
