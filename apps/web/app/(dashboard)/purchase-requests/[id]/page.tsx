@@ -1581,30 +1581,32 @@ export default function PurchaseRequestDetailPage() {
 
       {/* ─── Quick Add Pricing Modal ─────────────────────── */}
       <Dialog open={quickPriceOpen} onOpenChange={(open) => { if (!open) { setQuickPriceOpen(false); setQuickPriceProduct(null); } }}>
-        <DialogContent className="max-w-sm p-0 gap-0">
+        <DialogContent className="max-w-xl p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
             <DialogTitle>Quick Add Pricing</DialogTitle>
             <p className="text-sm text-muted-foreground mt-1">{quickPriceProduct?.name}</p>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Vendor <span className="text-red-500">*</span></Label>
-              <SearchableSelect
-                options={vendors.map((v) => ({ value: v.id, label: v.name }))}
-                value={quickPriceVendorId}
-                onChange={setQuickPriceVendorId}
-                placeholder="Select vendor"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-[13px]">Type</Label>
-              <Select value={quickPriceType} onValueChange={setQuickPriceType}>
-                <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="local">Local</SelectItem>
-                  <SelectItem value="imported">Imported</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Vendor <span className="text-red-500">*</span></Label>
+                <SearchableSelect
+                  options={vendors.map((v) => ({ value: v.id, label: v.name }))}
+                  value={quickPriceVendorId}
+                  onChange={setQuickPriceVendorId}
+                  placeholder="Select vendor"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Type</Label>
+                <Select value={quickPriceType} onValueChange={setQuickPriceType}>
+                  <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="local">Local</SelectItem>
+                    <SelectItem value="imported">Imported</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
