@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/auth'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ItemLabelSettings } from '@/components/item-label-settings'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
@@ -2679,6 +2680,8 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <ItemLabelSettings />
 
             <Card>
               <CardHeader>

@@ -4,34 +4,34 @@ import { createPortal } from 'react-dom'
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import JsBarcode from 'jsbarcode'
+import { useLabelCodeType, LabelCodeType } from '@/lib/label-settings'
 
 export interface LabelItem {
   id: string
   name: string
-  code: string // encoded in the QR + barcode (SKU or lot number)
+  code: string // encoded in the QR/barcode (the record's primary key)
   sub?: string // small mono line under the name
   lines?: string[] // extra info lines (location, expiry, qty…)
 }
 
-function LabelCard({ item }: { item: LabelItem }) {
+function LabelCard({ item, type }: { item: LabelItem; type: LabelCodeType }) {
   const bcRef = useRef<SVGSVGElement>(null)
   useEffect(() => {
-    if (!bcRef.current || !item.code) return
+    if (type !== 'BARCODE' || !bcRef.current || !item.code) return
     try {
       JsBarcode(bcRef.current, item.code, { format: 'CODE128', displayValue: true, fontSize: 11, height: 34, margin: 4 })
     } catch {
       /* not encodable — skip barcode */
     }
-  }, [item.code])
+  }, [type, item.code])
 
   return (
     <div className="label-card">
       <div className="label-name">{item.name}</div>
       {item.sub && <div className="label-sub">{item.sub}</div>}
       <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0' }}>
-        <QRCodeSVG value={item.code} size={84} level="M" />
+        {type === 'QR' ? <QRCodeSVG value={item.code} size={84} level="M" /> : <svg ref={bcRef} />}
       </div>
-      <svg ref={bcRef} />
       {item.lines?.map((l) => (
         <div key={l} className="label-sub">{l}</div>
       ))}
@@ -45,6 +45,7 @@ function LabelCard({ item }: { item: LabelItem }) {
  * Pass an empty array to unmount; call onDone to reset after printing.
  */
 export function LabelSheet({ items, onDone }: Readonly<{ items: LabelItem[]; onDone: () => void }>) {
+  const type = useLabelCodeType()
   const [mounted, setMounted] = useState(false)
   const onDoneRef = useRef(onDone)
   onDoneRef.current = onDone
@@ -78,7 +79,7 @@ export function LabelSheet({ items, onDone }: Readonly<{ items: LabelItem[]; onD
     <div id="print-root">
       <div className="label-grid">
         {items.map((it) => (
-          <LabelCard key={it.id} item={it} />
+          <LabelCard key={it.id} item={it} type={type} />
         ))}
       </div>
     </div>,

@@ -159,7 +159,7 @@ function ProfileTab({ product }: Readonly<{ product: any }>) {
         <Field label="Reorder Qty" value={product.reorderQuantity} icon={ArrowDownUp} />
       </div>
 
-      <ItemCodes sku={product.sku} barcode={product.barcode} name={product.name} />
+      <ItemCodes code={product.id} sub={product.sku} name={product.name} />
 
       <div className="relative my-2"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed border-border/60" /></div><div className="relative flex justify-start"><span className="bg-background pr-3 text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">Specifications & Gallery</span></div></div>
 
