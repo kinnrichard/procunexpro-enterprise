@@ -184,7 +184,7 @@ export default function DeliveriesPage() {
               {rows.map((row, i) => (
                 <div key={i} className="grid grid-cols-[1fr_110px_40px] gap-2 items-center">
                   <SearchableSelect options={products.filter((o: any) => o.value === row.productId || !usedIds.has(o.value))} value={row.productId} onChange={(v) => updateRow(i, { productId: v })} placeholder="Select finished product" />
-                  <Input type="number" step="any" value={row.quantity} onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg text-right" />
+                  <Input type="number" step="any" value={row.quantity || ''} placeholder="0" onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg text-right" />
                   <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:text-red-700" onClick={() => removeRow(i)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               ))}

@@ -132,7 +132,7 @@ export default function ReplenishmentPage() {
                     <td className="px-4 py-2.5 text-right"><span className="font-mono font-semibold text-red-600">{s.currentStock}</span> <span className="text-xs text-muted-foreground">{s.unit}</span></td>
                     <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{s.reorderPoint}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <Input type="number" step="any" value={qtyFor(s)} onChange={(e) => setQty({ ...qty, [s.productId]: Number.parseFloat(e.target.value) || 0 })} className="h-8 w-24 rounded-lg text-right ml-auto" />
+                      <Input type="number" step="any" value={qtyFor(s) || ''} placeholder="0" onChange={(e) => setQty({ ...qty, [s.productId]: Number.parseFloat(e.target.value) || 0 })} className="h-8 w-24 rounded-lg text-right ml-auto" />
                     </td>
                     <td className="px-4 py-2.5">{s.vendorName || <span className="text-muted-foreground text-xs">— none —</span>}</td>
                     <td className="px-4 py-2.5 text-right font-mono font-medium">{formatCurrency(qtyFor(s) * (s.costPrice || 0))}</td>

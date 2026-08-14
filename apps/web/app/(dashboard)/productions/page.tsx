@@ -270,7 +270,7 @@ export default function ProductionsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
-                <Input type="number" min={0} step="any" value={quantity} onChange={(e) => setQuantity(Number.parseFloat(e.target.value) || 0)} className="h-9 rounded-lg" />
+                <Input type="number" min={0} step="any" value={quantity || ''} placeholder="0" onChange={(e) => setQuantity(Number.parseFloat(e.target.value) || 0)} className="h-9 rounded-lg" />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -341,7 +341,7 @@ export default function ProductionsPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[13px] text-muted-foreground">Labor hours</Label>
-                    <Input type="number" step="any" value={laborHours} onChange={(e) => setLaborHours(Number.parseFloat(e.target.value) || 0)} className="h-8 rounded-lg" />
+                    <Input type="number" step="any" value={laborHours || ''} placeholder="0" onChange={(e) => setLaborHours(Number.parseFloat(e.target.value) || 0)} className="h-8 rounded-lg" />
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -350,7 +350,7 @@ export default function ProductionsPage() {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <Label className="text-[13px] text-muted-foreground">Overhead cost</Label>
-                  <Input type="number" step="any" value={overheadCost} onChange={(e) => setOverheadCost(Number.parseFloat(e.target.value) || 0)} className="h-8 w-28 rounded-lg text-right" />
+                  <Input type="number" step="any" value={overheadCost || ''} placeholder="0.00" onChange={(e) => setOverheadCost(Number.parseFloat(e.target.value) || 0)} className="h-8 w-28 rounded-lg text-right" />
                 </div>
                 <div className="flex items-center justify-between border-t pt-2 text-sm">
                   <span className="font-medium">Batch total / unit cost</span>

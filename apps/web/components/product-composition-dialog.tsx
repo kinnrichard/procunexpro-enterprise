@@ -135,7 +135,7 @@ export function ProductCompositionDialog({ productId, productName, open, onOpenC
                 onChange={(v) => updateRow(i, { materialId: v })}
                 placeholder="Select material"
               />
-              <Input type="number" min={0} step="any" value={row.quantity} onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg" />
+              <Input type="number" min={0} step="any" value={row.quantity || ''} placeholder="0" onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg" />
               <SearchableSelect options={uomOptions} value={row.uom} onChange={(v) => updateRow(i, { uom: v })} placeholder="UoM" />
               <span className="text-right text-sm tabular-nums">{row.materialId ? formatCurrency(lineCost(row)) : '—'}</span>
               <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:text-red-700" onClick={() => removeRow(i)}>
@@ -162,11 +162,11 @@ export function ProductCompositionDialog({ productId, productName, open, onOpenC
             </div>
             <div className="flex items-center justify-between gap-3">
               <Label className="text-sm text-muted-foreground">Labor / unit</Label>
-              <Input type="number" step="any" value={labor} onChange={(e) => setLabor(Number.parseFloat(e.target.value) || 0)} className="h-8 w-28 rounded-lg text-right" />
+              <Input type="number" step="any" value={labor || ''} placeholder="0.00" onChange={(e) => setLabor(Number.parseFloat(e.target.value) || 0)} className="h-8 w-28 rounded-lg text-right" />
             </div>
             <div className="flex items-center justify-between gap-3">
               <Label className="text-sm text-muted-foreground">Overhead / unit</Label>
-              <Input type="number" step="any" value={overhead} onChange={(e) => setOverhead(Number.parseFloat(e.target.value) || 0)} className="h-8 w-28 rounded-lg text-right" />
+              <Input type="number" step="any" value={overhead || ''} placeholder="0.00" onChange={(e) => setOverhead(Number.parseFloat(e.target.value) || 0)} className="h-8 w-28 rounded-lg text-right" />
             </div>
             <div className="flex items-center justify-between border-t pt-2">
               <div>

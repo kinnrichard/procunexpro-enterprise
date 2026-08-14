@@ -167,7 +167,7 @@ export default function GoodsReceiptsPage() {
                       <tr key={r.purchaseOrderItemId} className="border-t">
                         <td className="px-3 py-2">{r.name} <span className="text-muted-foreground text-xs">({r.sku})</span></td>
                         <td className="px-3 py-2 text-right text-muted-foreground">{r.outstanding} {r.uom}</td>
-                        <td className="px-3 py-2"><Input type="number" step="any" value={r.quantity} onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className="h-8 rounded-lg text-right" /></td>
+                        <td className="px-3 py-2"><Input type="number" step="any" value={r.quantity || ''} placeholder="0" onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className="h-8 rounded-lg text-right" /></td>
                         <td className="px-3 py-2"><Input value={r.lotNumber} onChange={(e) => updateRow(i, { lotNumber: e.target.value })} placeholder="auto" className="h-8 rounded-lg" /></td>
                         <td className="px-3 py-2"><Input type="date" value={r.expiryDate} onChange={(e) => updateRow(i, { expiryDate: e.target.value })} className="h-8 rounded-lg" /></td>
                       </tr>

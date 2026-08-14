@@ -245,7 +245,7 @@ export default function StockLotsPage() {
               {!editing && (
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Quantity</Label>
-                  <Input type="number" step="any" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg" />
+                  <Input type="number" step="any" value={form.quantity || ''} placeholder="0" onChange={(e) => setForm({ ...form, quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg" />
                 </div>
               )}
             </div>
