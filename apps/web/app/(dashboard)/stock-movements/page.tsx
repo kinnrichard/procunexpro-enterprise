@@ -228,24 +228,22 @@ export default function StockMovementsPage() {
             <DialogTitle>New Stock Movement</DialogTitle>
           </DialogHeader>
           <form id="movement-form" onSubmit={form.handleSubmit((d) => createMut.mutate(d))} className="px-6 py-5 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">Inventory Type</Label>
-                <SearchableSelect options={invTypeOptions} value={invType} onChange={(v) => { setInvType(v); form.setValue('productId', ''); }} placeholder="All types" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">Movement Type <span className="text-red-500">*</span></Label>
-                <Controller control={form.control} name="type" render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {['PURCHASE', 'SALE', 'ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'RETURN', 'WRITE_OFF'].map(t => (
-                        <SelectItem key={t} value={t}>{t.replaceAll('_', ' ')}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Movement Type <span className="text-red-500">*</span></Label>
+              <Controller control={form.control} name="type" render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger className="h-9 rounded-lg"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['PURCHASE', 'SALE', 'ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'RETURN', 'WRITE_OFF'].map(t => (
+                      <SelectItem key={t} value={t}>{t.replaceAll('_', ' ')}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Inventory Type</Label>
+              <SearchableSelect options={invTypeOptions} value={invType} onChange={(v) => { setInvType(v); form.setValue('productId', ''); }} placeholder="All types" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Item <span className="text-red-500">*</span></Label>
@@ -280,17 +278,12 @@ export default function StockMovementsPage() {
               <Controller control={form.control} name="quantity" render={({ field }) => (
                 <Input
                   type="number" min={0} step="any"
-                  max={isOut && showStock ? currentStock : undefined}
                   value={field.value ?? ''}
-                  onChange={(e) => {
-                    let v = e.target.value === '' ? 0 : (Number.parseFloat(e.target.value) || 0);
-                    if (isOut && showStock && v > currentStock) v = currentStock;
-                    field.onChange(v);
-                  }}
+                  onChange={(e) => field.onChange(e.target.value === '' ? 0 : (Number.parseFloat(e.target.value) || 0))}
                   className={cn('h-9 rounded-lg', overStock && 'border-red-300 focus-visible:ring-red-200')}
                 />
               )} />
-              {overStock && <p className="text-xs text-red-500">Cannot exceed current stock ({currentStock} {stockUnit}).</p>}
+              {overStock && <p className="text-xs text-red-500">Quantity ({watchQty}) exceeds current stock ({currentStock} {stockUnit}).</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Reason</Label>
