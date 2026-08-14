@@ -19,7 +19,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
-import { Boxes, Plus, AlertTriangle, Clock, Pencil, Check, X } from 'lucide-react';
+import { Boxes, Plus, AlertTriangle, Clock, Pencil, Check, X, Printer } from 'lucide-react';
+import { LabelSheet, LabelItem } from '@/components/label-sheet';
 
 const statusColors: Record<string, string> = {
   AVAILABLE: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -50,6 +51,17 @@ export default function StockLotsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
   const [form, setForm] = useState({ productId: '', lotNumber: '', quantity: 0, warehouseId: '', areaId: '', locationId: '', expiryDate: '', noExpiry: false, source: '', status: 'AVAILABLE', qcStatus: 'PASSED' });
+  const [printItems, setPrintItems] = useState<LabelItem[]>([]);
+
+  function printLot(row: any) {
+    const path = [row.warehouse?.name, row.area?.name, row.location?.name].filter(Boolean).join(' · ');
+    const lines = [
+      path,
+      `Qty ${row.quantity} ${row.product?.unit || ''}`.trim(),
+      row.expiryDate ? `Exp ${String(row.expiryDate).slice(0, 10)}` : '',
+    ].filter(Boolean) as string[];
+    setPrintItems([{ id: row.id, name: row.product?.name || '—', code: row.lotNumber, sub: row.lotNumber, lines }]);
+  }
 
   // Advanced filters
   const [filterProductId, setFilterProductId] = useState('');
@@ -156,6 +168,7 @@ export default function StockLotsPage() {
             <button onClick={() => qcMut.mutate({ id: row.id, qcStatus: 'FAILED' })} title="Fail QC" className="p-1.5 rounded text-red-600 hover:bg-red-50"><X className="h-3.5 w-3.5" /></button>
           </>
         )}
+        <button onClick={() => printLot(row)} title="Print lot label" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Printer className="h-3.5 w-3.5" /></button>
         {can('products', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Pencil className="h-3.5 w-3.5" /></button>}
       </div>
     ) },
@@ -314,6 +327,8 @@ export default function StockLotsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <LabelSheet items={printItems} onDone={() => setPrintItems([])} />
     </div>
   );
 }

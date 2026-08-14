@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Package, Pencil, Ban, RotateCcw, AlertTriangle, Layers, Loader2, Plus } from 'lucide-react'
+import { Package, Pencil, Ban, RotateCcw, AlertTriangle, Layers, Loader2, Plus, Printer } from 'lucide-react'
+import { LabelSheet, LabelItem } from '@/components/label-sheet'
 import api from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { DataTable, Column } from '@/components/data-table'
@@ -146,6 +147,23 @@ export default function ProductsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [toggleTarget, setToggleTarget] = useState<Product | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [printItems, setPrintItems] = useState<LabelItem[]>([])
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function handlePrintLabels() {
+    const rows = selectedIds.size ? products.filter((p) => selectedIds.has(p.id)) : products
+    if (rows.length === 0) return
+    setPrintItems(rows.map((p) => ({ id: p.id, name: p.name, code: p.barcode || p.sku, sub: p.sku })))
+  }
   const [compositionTarget, setCompositionTarget] = useState<Product | null>(null)
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
 
@@ -387,6 +405,20 @@ export default function ProductsPage() {
 
   const columns: Column<Product>[] = [
     {
+      key: 'select',
+      label: '',
+      className: 'w-[36px]',
+      render: (_v: any, row: Product) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(row.id)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggleSelect(row.id)}
+          className="h-4 w-4 rounded border-input accent-primary cursor-pointer align-middle"
+        />
+      ),
+    },
+    {
       key: 'name',
       label: 'Item',
       sortable: true,
@@ -557,7 +589,7 @@ export default function ProductsPage() {
         total={total}
         page={page}
         limit={PAGE_SIZE}
-        onPageChange={setPage}
+        onPageChange={(p) => { setPage(p); setSelectedIds(new Set()); }}
         onSearch={handleSearchChange}
         searchPlaceholder="Search by name, SKU, manufacturer, model..."
         onRowClick={(row: any) => router.push(`/products/${row.sku}`)}
@@ -566,6 +598,9 @@ export default function ProductsPage() {
         emptyIcon={<Package className="h-12 w-12 text-muted-foreground/40 mb-3" />}
         toolbar={
           <div className="flex items-center gap-3 flex-wrap">
+            <Button variant="outline" size="sm" onClick={handlePrintLabels} className="h-9" title="Print labels for selected items (or all on this page)">
+              <Printer className="h-4 w-4 mr-1.5" /> Print labels{selectedIds.size ? ` (${selectedIds.size})` : ''}
+            </Button>
             <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
               <FilterField label="Inventory Type">
                 <Select value={filterInventoryType || 'ALL'} onValueChange={(v) => { setFilterInventoryType(v === 'ALL' ? '' : v); setPage(1) }}>
@@ -878,6 +913,8 @@ export default function ProductsPage() {
         onConfirm={() => toggleTarget && toggleActiveMutation.mutate({ id: toggleTarget.id, isActive: !toggleTarget.isActive })}
         isLoading={toggleActiveMutation.isPending}
       />
+
+      <LabelSheet items={printItems} onDone={() => setPrintItems([])} />
     </div>
   )
 }
