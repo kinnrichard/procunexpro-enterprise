@@ -61,6 +61,8 @@ export class StockTransfersService {
     // Source may be "Unassigned" (stock lots with no warehouse) — sent as 'UNASSIGNED' or empty.
     const fromUnassigned = !data.fromWarehouseId || data.fromWarehouseId === 'UNASSIGNED';
     const fromWarehouseId: string | null = fromUnassigned ? null : data.fromWarehouseId;
+    const fromAreaId: string | null = data.fromAreaId || null;
+    const toAreaId: string | null = data.toAreaId || null;
     const fromLocationId: string | null = data.fromLocationId || null;
     const toLocationId: string | null = data.toLocationId || null;
     if (!toWarehouseId) throw new BadRequestException('Destination warehouse is required');
@@ -96,7 +98,8 @@ export class StockTransfersService {
         where: {
           tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
           ...(fromWarehouseId ? { OR: [{ warehouseId: fromWarehouseId }, { warehouseId: null }] } : { warehouseId: null }),
-          // When a source location is given, draw only from that bin/shelf
+          // When a source area/location is given, draw only from that zone/bin
+          ...(fromAreaId ? { areaId: fromAreaId } : {}),
           ...(fromLocationId ? { locationId: fromLocationId } : {}),
         },
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
@@ -120,7 +123,7 @@ export class StockTransfersService {
       // Destination lot (new, at target warehouse)
       ops.push(this.prisma.stockLot.create({
         data: {
-          tenantId, productId: r.productId, warehouseId: toWarehouseId, locationId: toLocationId,
+          tenantId, productId: r.productId, warehouseId: toWarehouseId, areaId: toAreaId, locationId: toLocationId,
           lotNumber: `${transferNumber}-${idx + 1}`,
           quantity: need, initialQty: need,
           expiryDate: earliestExpiry,

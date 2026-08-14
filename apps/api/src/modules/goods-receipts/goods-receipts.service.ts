@@ -150,6 +150,7 @@ export class GoodsReceiptsService {
             quantity: r.quantity,
             initialQty: r.quantity,
             warehouseId: data.warehouseId || null,
+            areaId: data.areaId || null,
             locationId: data.locationId || null,
             expiryDate: r.expiryDate ? new Date(r.expiryDate) : null,
             source: `GR ${receiptNumber}`,

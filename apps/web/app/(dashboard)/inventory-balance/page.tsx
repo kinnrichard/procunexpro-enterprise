@@ -40,8 +40,8 @@ export default function InventoryBalancePage() {
         {row.lowStock && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
       </div>
     ) },
-    { key: 'warehouses', label: 'By location', render: (v: Array<{ warehouse: string; location: string | null; quantity: number }>) => v.length
-      ? <div className="flex flex-wrap gap-1">{v.map((w) => <span key={`${w.warehouse}-${w.location ?? ''}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs"><span className="text-muted-foreground">{w.location ? `${w.warehouse} · ${w.location}` : w.warehouse}:</span> <span className="font-mono font-medium">{w.quantity}</span></span>)}</div>
+    { key: 'warehouses', label: 'By location', render: (v: Array<{ warehouse: string; area: string | null; location: string | null; quantity: number }>) => v.length
+      ? <div className="flex flex-wrap gap-1">{v.map((w) => { const path = [w.warehouse, w.area, w.location].filter(Boolean).join(' · '); return <span key={`${w.warehouse}-${w.area ?? ''}-${w.location ?? ''}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs"><span className="text-muted-foreground">{path}:</span> <span className="font-mono font-medium">{w.quantity}</span></span>; })}</div>
       : <span className="text-xs text-muted-foreground">—</span> },
     { key: 'unitCost', label: 'Unit Cost', className: 'text-right', render: (v: number) => <span className="font-mono text-sm">{formatCurrency(v)}</span> },
     { key: 'stockValue', label: 'Stock Value', className: 'text-right', render: (v: number) => <span className="font-mono font-medium">{formatCurrency(v)}</span> },

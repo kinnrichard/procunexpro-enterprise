@@ -93,7 +93,8 @@ export class DeliveryReceiptsService {
         where: {
           tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
           ...(data.warehouseId ? { OR: [{ warehouseId: data.warehouseId }, { warehouseId: null }] } : {}),
-          // When a source location is given, pick only from that bin/shelf
+          // When a source area/location is given, pick only from that zone/bin
+          ...(data.areaId ? { areaId: data.areaId } : {}),
           ...(data.locationId ? { locationId: data.locationId } : {}),
         },
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],

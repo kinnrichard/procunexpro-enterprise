@@ -14,7 +14,7 @@ export class StockLotsService {
 
   async findAll(
     tenantId: string,
-    params: { page?: number; limit?: number; productId?: string; status?: string; qcStatus?: string; warehouseId?: string; locationId?: string; dateFrom?: string; dateTo?: string; search?: string },
+    params: { page?: number; limit?: number; productId?: string; status?: string; qcStatus?: string; warehouseId?: string; areaId?: string; locationId?: string; dateFrom?: string; dateTo?: string; search?: string },
   ) {
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -25,6 +25,7 @@ export class StockLotsService {
     if (params.status) where.status = params.status;
     if (params.qcStatus) where.qcStatus = params.qcStatus;
     if (params.warehouseId) where.warehouseId = params.warehouseId;
+    if (params.areaId) where.areaId = params.areaId;
     if (params.locationId) where.locationId = params.locationId;
     if (params.dateFrom || params.dateTo) {
       where.receivedAt = {};
@@ -47,6 +48,7 @@ export class StockLotsService {
         include: {
           product: { select: { id: true, name: true, sku: true, unit: true } },
           warehouse: { select: { id: true, name: true } },
+          area: { select: { id: true, name: true, code: true } },
           location: { select: { id: true, name: true, code: true } },
         },
       }),
@@ -89,6 +91,7 @@ export class StockLotsService {
           quantity: qty,
           initialQty: qty,
           warehouseId: data.warehouseId || null,
+          areaId: data.areaId || null,
           locationId: data.locationId || null,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
           source: data.source || 'Manual',
@@ -108,6 +111,7 @@ export class StockLotsService {
       data: {
         ...(data.lotNumber !== undefined && { lotNumber: data.lotNumber }),
         ...(data.warehouseId !== undefined && { warehouseId: data.warehouseId || null }),
+        ...(data.areaId !== undefined && { areaId: data.areaId || null }),
         ...(data.locationId !== undefined && { locationId: data.locationId || null }),
         ...(data.expiryDate !== undefined && { expiryDate: data.expiryDate ? new Date(data.expiryDate) : null }),
         ...(data.source !== undefined && { source: data.source }),
@@ -127,12 +131,13 @@ export class StockLotsService {
     tenantId: string,
     productId: string,
     quantity: number,
-    scope?: { warehouseId?: string | null; locationId?: string | null },
+    scope?: { warehouseId?: string | null; areaId?: string | null; locationId?: string | null },
   ): Promise<LotAllocation[]> {
     if (quantity <= 0) return [];
     const where: any = { tenantId, productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 } };
-    // Optionally scope consumption to a specific warehouse/location (bin-level picking)
+    // Optionally scope consumption to a specific warehouse/area/location (bin-level picking)
     if (scope?.warehouseId !== undefined) where.warehouseId = scope.warehouseId;
+    if (scope?.areaId !== undefined) where.areaId = scope.areaId;
     if (scope?.locationId !== undefined) where.locationId = scope.locationId;
     const lots = await this.prisma.stockLot.findMany({
       where, // Only QC-passed, available lots are consumable

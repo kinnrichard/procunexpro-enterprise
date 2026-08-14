@@ -822,6 +822,7 @@ model WarehouseArea {
 
   warehouse Warehouse           @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
   locations WarehouseLocation[]
+  stockLots StockLot[]
 
   @@unique([warehouseId, code])
 }
@@ -1051,6 +1052,7 @@ model Production {
   laborCost       Float            @default(0) // laborRate.ratePerHour x laborHours
   overheadCost    Float            @default(0) // actual overhead cost for this batch
   warehouseId     String?
+  areaId          String? // zone/area for finished goods
   locationId      String? // bin/shelf where finished goods are placed
   status          ProductionStatus @default(DRAFT)
   notes           String?
@@ -1102,6 +1104,7 @@ model StockLot {
   status       String    @default("AVAILABLE") // AVAILABLE | DEPLETED | EXPIRED | QUARANTINE
   qcStatus     String    @default("PASSED") // PENDING | PASSED | FAILED | HOLD
   warehouseId  String? // warehouse holding this lot
+  areaId       String? // zone/area within the warehouse
   locationId   String? // bin/shelf location within the warehouse
   productionId String? // set when produced in-house
   receivedAt   DateTime  @default(now())
@@ -1111,11 +1114,12 @@ model StockLot {
   tenant       Tenant             @relation(fields: [tenantId], references: [id])
   product      Product            @relation(fields: [productId], references: [id])
   warehouse    Warehouse?         @relation(fields: [warehouseId], references: [id])
+  area         WarehouseArea?     @relation(fields: [areaId], references: [id])
   location     WarehouseLocation? @relation(fields: [locationId], references: [id])
   production   Production?        @relation(fields: [productionId], references: [id])
   consumptions LotConsumption[]
 
-  @@unique([tenantId, productId, warehouseId, locationId, lotNumber])
+  @@unique([tenantId, productId, warehouseId, areaId, locationId, lotNumber])
 }
 
 // Traceability: which material lots were consumed by which finished production

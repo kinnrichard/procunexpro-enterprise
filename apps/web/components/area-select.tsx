@@ -4,9 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 
-interface LocationSelectProps {
+interface AreaSelectProps {
   warehouseId?: string
-  areaId?: string
   value?: string
   onChange: (value: string) => void
   placeholder?: string
@@ -15,29 +14,25 @@ interface LocationSelectProps {
 }
 
 /**
- * Cascading bin/shelf picker — lists the locations of the selected warehouse.
- * When an areaId is given, the list is narrowed to that zone. Disabled until a
+ * Cascading zone/area picker — lists the areas of the selected warehouse.
+ * Optional: leaving it blank means "no specific area". Disabled until a
  * warehouse is chosen.
  */
-export function LocationSelect({ warehouseId, areaId, value, onChange, placeholder, disabled, className }: Readonly<LocationSelectProps>) {
+export function AreaSelect({ warehouseId, value, onChange, placeholder, disabled, className }: Readonly<AreaSelectProps>) {
   const { data } = useQuery({
-    queryKey: ['warehouse-locations', warehouseId],
-    queryFn: async () => (await api.get(`/warehouses/${warehouseId}/locations`)).data,
+    queryKey: ['warehouse-areas', warehouseId],
+    queryFn: async () => (await api.get(`/warehouses/${warehouseId}/areas`)).data,
     enabled: !!warehouseId,
     staleTime: 60_000,
   })
 
   const rows: any[] = Array.isArray(data) ? data : (data?.data ?? [])
-  const scoped = areaId ? rows.filter((l) => l.areaId === areaId) : rows
-  const options = scoped.map((l) => ({
-    value: l.id,
-    label: !areaId && l.area?.name ? `${l.area.name} · ${l.name}` : l.name,
-  }))
+  const options = rows.map((a) => ({ value: a.id, label: a.name }))
 
   const resolvedPlaceholder = (() => {
     if (!warehouseId) return 'Select a warehouse first'
-    if (options.length === 0) return 'No locations configured'
-    return placeholder || 'Select location'
+    if (options.length === 0) return 'No areas configured'
+    return placeholder || 'Any area'
   })()
 
   return (

@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { LocationSelect } from '@/components/location-select';
+import { AreaSelect } from '@/components/area-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
@@ -32,6 +33,7 @@ export default function GoodsReceiptsPage() {
   const [poId, setPoId] = useState('');
   const [supplierDrRef, setSupplierDrRef] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
+  const [areaId, setAreaId] = useState('');
   const [locationId, setLocationId] = useState('');
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
@@ -84,6 +86,7 @@ export default function GoodsReceiptsPage() {
       purchaseOrderId: poId || undefined,
       supplierDrRef: supplierDrRef || undefined,
       warehouseId: warehouseId || undefined,
+      areaId: areaId || undefined,
       locationId: locationId || undefined,
       notes: notes || undefined,
       items: rows.filter((r) => r.quantity > 0).map((r) => ({ purchaseOrderItemId: r.purchaseOrderItemId, productId: r.productId, quantity: r.quantity, uom: r.uom, lotNumber: r.lotNumber || undefined, expiryDate: r.expiryDate || undefined })),
@@ -98,7 +101,7 @@ export default function GoodsReceiptsPage() {
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to receive', variant: 'destructive' }),
   });
 
-  const openCreate = () => { setPoId(''); setSupplierDrRef(''); setWarehouseId(''); setLocationId(''); setNotes(''); setRows([]); setModalOpen(true); };
+  const openCreate = () => { setPoId(''); setSupplierDrRef(''); setWarehouseId(''); setAreaId(''); setLocationId(''); setNotes(''); setRows([]); setModalOpen(true); };
 
   const columns = [
     { key: 'receiptNumber', label: 'Receipt #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
@@ -157,11 +160,15 @@ export default function GoodsReceiptsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Receive into Warehouse</Label>
-                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setLocationId(''); }} placeholder="Unassigned (optional)" />
+                <SearchableSelect options={warehouses} value={warehouseId} onChange={(v) => { setWarehouseId(v); setAreaId(''); setLocationId(''); }} placeholder="Unassigned (optional)" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Area</Label>
+                <AreaSelect warehouseId={warehouseId} value={areaId} onChange={(v) => { setAreaId(v); setLocationId(''); }} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Location</Label>
-                <LocationSelect warehouseId={warehouseId} value={locationId} onChange={setLocationId} />
+                <LocationSelect warehouseId={warehouseId} areaId={areaId} value={locationId} onChange={setLocationId} />
               </div>
             </div>
 
