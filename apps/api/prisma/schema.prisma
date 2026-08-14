@@ -407,6 +407,7 @@ model Vendor {
   phone         String?
   address       String?
   city          String?
+  province      String?
   country       String?
   website       String?
   taxId         String?

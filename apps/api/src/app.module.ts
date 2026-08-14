@@ -20,6 +20,7 @@ import { StaffModule } from './modules/staff/staff.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { InventoryTypesModule } from './modules/inventory-types/inventory-types.module';
+import { LocationsModule } from './modules/locations/locations.module';
 import { LaborRatesModule } from './modules/labor-rates/labor-rates.module';
 import { GoodsReceiptsModule } from './modules/goods-receipts/goods-receipts.module';
 import { StockTransfersModule } from './modules/stock-transfers/stock-transfers.module';
@@ -72,6 +73,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     PermissionsModule,
     RolesModule,
     InventoryTypesModule,
+    LocationsModule,
     LaborRatesModule,
     GoodsReceiptsModule,
     StockTransfersModule,

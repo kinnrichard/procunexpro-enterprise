@@ -47,6 +47,9 @@ importers:
       cookie-parser:
         specifier: ^1.4.6
         version: 1.4.7
+      country-state-city:
+        specifier: ^3.2.1
+        version: 3.2.1
       multer:
         specifier: 1.4.4-lts.1
         version: 1.4.4-lts.1
@@ -65,6 +68,9 @@ importers:
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
+      select-philippines-address:
+        specifier: ^1.0.6
+        version: 1.0.6
     devDependencies:
       '@nestjs/cli':
         specifier: ^10.3.0
@@ -1376,6 +1382,9 @@ packages:
     peerDependencies:
       postcss: ^8.1.0
 
+  axios@0.21.4:
+    resolution: {integrity: sha512-ut5vewkiu8jjGBdqpM44XxjuCjq9LAKeHVmoVfHVzy8eHgxxq8SbAVQNovDA8mVi05kP0Ea/n/UzcSHcTJQfNg==}
+
   axios@1.16.0:
     resolution: {integrity: sha512-6hp5CwvTPlN2A31g5dxnwAX0orzM7pmCRDLnZSX772mv8WDqICwFjowHuPs04Mc8deIld1+ejhtaMn5vp6b+1w==}
 
@@ -1609,6 +1618,9 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  country-state-city@3.2.1:
+    resolution: {integrity: sha512-kxbanqMc6izjhc/EHkGPCTabSPZ2G6eG4/97akAYHJUN4stzzFEvQPZoF8oXDQ+10gM/O/yUmISCR1ZVxyb6EA==}
 
   create-require@1.1.1:
     resolution: {integrity: sha512-dcKFX3jn0MpIaXjisoRvexIJVEKzaq7z2rZKxf+MSr9TkdmHmsU4m2lcLojrj/FHl8mk5VxMmYA+ftRkP/3oKQ==}
@@ -2690,6 +2702,10 @@ packages:
   read-cache@1.0.0:
     resolution: {integrity: sha512-Owdv/Ft7IjOgm/i0xvNDZ1LrRANRfew4b2prF3OWMQLxLfu3bS8FVhCsrSCMK4lR56Y9ya+AThoTpDCTxCmpRA==}
 
+  read-file@0.2.0:
+    resolution: {integrity: sha512-na/zgd5KplGlR+io+ygXQMIoDfX/Y0bNS5+P2TOXOTk5plquOVd0snudCd30hZJAsnVK2rxuxUP2z0CN+Aw1lQ==}
+    engines: {node: '>=0.8'}
+
   readable-stream@2.3.8:
     resolution: {integrity: sha512-8p0AUk4XODgIewSi0l8Epjs+EVnWiK7NoDIEGU0HhE7+ZyY8D1IMY7odu5lRrFXGg71L15KG8QrPmum45RTtdA==}
 
@@ -2780,6 +2796,9 @@ packages:
   schema-utils@4.3.3:
     resolution: {integrity: sha512-eflK8wEtyOE6+hsaRVPxvUKYCpRgzLqDTb8krvAsRIwOGlHoSgYLgBXoubGgLd2fT41/OUYdb48v4k4WWHQurA==}
     engines: {node: '>= 10.13.0'}
+
+  select-philippines-address@1.0.6:
+    resolution: {integrity: sha512-5szjgG1z8cwWdwbD/eTBHsuzZh8k8ctTuInkDIGSh0ZR5xik71/7XN678OkWarVsgXdf+wNIa4MJYh4gwIB+HQ==}
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
@@ -4432,6 +4451,12 @@ snapshots:
       postcss: 8.5.14
       postcss-value-parser: 4.2.0
 
+  axios@0.21.4:
+    dependencies:
+      follow-redirects: 1.16.0
+    transitivePeerDependencies:
+      - debug
+
   axios@1.16.0:
     dependencies:
       follow-redirects: 1.16.0
@@ -4685,6 +4710,8 @@ snapshots:
       path-type: 4.0.0
     optionalDependencies:
       typescript: 5.7.2
+
+  country-state-city@3.2.1: {}
 
   create-require@1.1.1: {}
 
@@ -5745,6 +5772,8 @@ snapshots:
     dependencies:
       pify: 2.3.0
 
+  read-file@0.2.0: {}
+
   readable-stream@2.3.8:
     dependencies:
       core-util-is: 1.0.3
@@ -5846,6 +5875,13 @@ snapshots:
       ajv: 8.20.0
       ajv-formats: 2.1.1(ajv@8.20.0)
       ajv-keywords: 5.1.0(ajv@8.20.0)
+
+  select-philippines-address@1.0.6:
+    dependencies:
+      axios: 0.21.4
+      read-file: 0.2.0
+    transitivePeerDependencies:
+      - debug
 
   semver@6.3.1: {}
 

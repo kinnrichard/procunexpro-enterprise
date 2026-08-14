@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DatePicker } from '@/components/ui/date-picker'
+import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
@@ -25,16 +26,23 @@ import { usePermissions } from '@/lib/permissions'
 
 // --- Schema ---
 
+const WEBSITE_REGEX = /^https?:\/\/.+/i
+
 const vendorSchema = z.object({
   name: z.string().min(2, 'Vendor name is required'),
-  code: z.string().min(1, 'Code is required'),
-  contactPerson: z.string().optional().or(z.literal('')),
+  code: z.string().optional().or(z.literal('')),
+  contactPerson: z.string().min(1, 'Contact person is required'),
   email: z.string().email('Invalid email').or(z.literal('')).optional(),
-  phone: z.string().optional().or(z.literal('')),
+  phone: z.string().min(1, 'Phone is required'),
   address: z.string().optional().or(z.literal('')),
   city: z.string().optional().or(z.literal('')),
+  province: z.string().optional().or(z.literal('')),
   country: z.string().optional().or(z.literal('')),
-  website: z.string().optional().or(z.literal('')),
+  website: z
+    .string()
+    .optional()
+    .or(z.literal(''))
+    .refine((v) => !v || WEBSITE_REGEX.test(v), 'Enter a valid URL starting with http:// or https://'),
   taxId: z.string().optional().or(z.literal('')),
   paymentTerms: z.string().optional().or(z.literal('')),
   bankName: z.string().optional().or(z.literal('')),
@@ -54,6 +62,7 @@ type Vendor = {
   phone: string | null
   address: string | null
   city: string | null
+  province: string | null
   country: string | null
   website: string | null
   taxId: string | null
@@ -123,16 +132,71 @@ export default function VendorsPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isValid },
   } = useForm<VendorFormData>({
     resolver: zodResolver(vendorSchema),
     defaultValues: {
       name: '', code: '', contactPerson: '', email: '', phone: '',
-      address: '', city: '', country: '', website: '', taxId: '',
+      address: '', city: '', province: '', country: '', website: '', taxId: '',
       paymentTerms: '', bankName: '', bankAccount: '', bankRouting: '', notes: '',
     },
     mode: 'onChange',
   })
+
+  // --- Location cascade (country → province → city) + payment terms ---
+
+  const watchedCountry = watch('country')
+  const watchedProvince = watch('province')
+  const watchedCity = watch('city')
+  const watchedPaymentTerms = watch('paymentTerms')
+
+  const { data: countriesData } = useQuery({
+    queryKey: ['locations-countries'],
+    queryFn: async () => (await api.get('/locations/countries')).data.data as { name: string; code: string }[],
+    staleTime: Infinity,
+  })
+  const countries = countriesData ?? []
+  const countryCode = countries.find((c) => c.name === watchedCountry)?.code
+
+  const { data: provincesData } = useQuery({
+    queryKey: ['locations-provinces', countryCode],
+    queryFn: async () => (await api.get(`/locations/provinces?countryCode=${countryCode}`)).data.data as { name: string; code: string }[],
+    enabled: !!countryCode,
+    staleTime: Infinity,
+  })
+  const provinces = provincesData ?? []
+  const provinceCode = provinces.find((p) => p.name === watchedProvince)?.code
+
+  const { data: citiesData } = useQuery({
+    queryKey: ['locations-cities', countryCode, provinceCode],
+    queryFn: async () => (await api.get(`/locations/cities?countryCode=${countryCode}&provinceCode=${provinceCode}`)).data.data as { name: string; code: string }[],
+    enabled: !!countryCode && !!provinceCode,
+    staleTime: Infinity,
+  })
+  const cities = citiesData ?? []
+
+  const { data: paymentTermsData } = useQuery({
+    queryKey: ['purchase-terms-active'],
+    queryFn: async () => (await api.get('/purchase-terms/active')).data.data as { name: string }[],
+    staleTime: 60_000,
+  })
+
+  const countryOptions = countries.map((c) => ({ value: c.name, label: c.name }))
+  const provinceOptions = provinces.map((p) => ({ value: p.name, label: p.name }))
+  const cityOptions = cities.map((c) => ({ value: c.name, label: c.name }))
+  const paymentTermsOptions = (paymentTermsData ?? []).map((t) => ({ value: t.name, label: t.name }))
+
+  function handleCountryChange(v: string) {
+    setValue('country', v, { shouldValidate: true, shouldDirty: true })
+    setValue('province', '', { shouldDirty: true })
+    setValue('city', '', { shouldDirty: true })
+  }
+  function handleProvinceChange(v: string) {
+    setValue('province', v, { shouldDirty: true })
+    setValue('city', '', { shouldDirty: true })
+  }
 
   // --- Query ---
 
@@ -202,7 +266,7 @@ export default function VendorsPage() {
   function openAdd() {
     reset({
       name: '', code: '', contactPerson: '', email: '', phone: '',
-      address: '', city: '', country: '', website: '', taxId: '',
+      address: '', city: '', province: '', country: '', website: '', taxId: '',
       paymentTerms: '', bankName: '', bankAccount: '', bankRouting: '', notes: '',
     })
     setEditing(null)
@@ -218,6 +282,7 @@ export default function VendorsPage() {
       phone: vendor.phone || '',
       address: vendor.address || '',
       city: vendor.city || '',
+      province: vendor.province || '',
       country: vendor.country || '',
       website: vendor.website || '',
       taxId: vendor.taxId || '',
@@ -436,21 +501,29 @@ export default function VendorsPage() {
                   {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Code <span className="text-red-500">*</span></Label>
+                  <Label className="text-[13px]">Code</Label>
                   <Input
                     {...register('code')}
-                    placeholder="e.g., VND-001"
-                    className={cn('h-9 rounded-lg', errors.code && 'border-red-300 focus-visible:ring-red-200')}
+                    disabled
+                    placeholder="Auto-generated on save"
+                    className="h-9 rounded-lg bg-muted/50 text-muted-foreground"
                   />
-                  {errors.code && <p className="text-xs text-red-500">{errors.code.message}</p>}
+                  <p className="text-xs text-muted-foreground">
+                    {editing ? 'System code (cannot be changed).' : 'Assigned automatically when you save.'}
+                  </p>
                 </div>
               </div>
 
               {/* Row: Contact Person, Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Contact Person</Label>
-                  <Input {...register('contactPerson')} placeholder="Full name" className="h-9 rounded-lg" />
+                  <Label className="text-[13px]">Contact Person <span className="text-red-500">*</span></Label>
+                  <Input
+                    {...register('contactPerson')}
+                    placeholder="Full name"
+                    className={cn('h-9 rounded-lg', errors.contactPerson && 'border-red-300 focus-visible:ring-red-200')}
+                  />
+                  {errors.contactPerson && <p className="text-xs text-red-500">{errors.contactPerson.message}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Email</Label>
@@ -466,8 +539,13 @@ export default function VendorsPage() {
               {/* Row: Phone */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Phone</Label>
-                  <Input {...register('phone')} placeholder="+1 234 567 8900" className="h-9 rounded-lg" />
+                  <Label className="text-[13px]">Phone <span className="text-red-500">*</span></Label>
+                  <Input
+                    {...register('phone')}
+                    placeholder="+63 900 000 0000"
+                    className={cn('h-9 rounded-lg', errors.phone && 'border-red-300 focus-visible:ring-red-200')}
+                  />
+                  {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
                 </div>
               </div>
 
@@ -476,21 +554,46 @@ export default function VendorsPage() {
                 <p className="text-sm font-medium text-muted-foreground mb-3">Address</p>
               </div>
 
-              {/* Row: Address, City, Country */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[13px]">Address</Label>
-                  <Input {...register('address')} placeholder="Street address" className="h-9 rounded-lg" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[13px]">City</Label>
-                  <Input {...register('city')} placeholder="City" className="h-9 rounded-lg" />
-                </div>
+              {/* Row: Address */}
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">Address</Label>
+                <Input {...register('address')} placeholder="Street address" className="h-9 rounded-lg" />
               </div>
+
+              {/* Row: Country, Province */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Country</Label>
-                  <Input {...register('country')} placeholder="Country" className="h-9 rounded-lg" />
+                  <SearchableSelect
+                    options={countryOptions}
+                    value={watchedCountry}
+                    onChange={handleCountryChange}
+                    placeholder="Select country"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Province / State</Label>
+                  <SearchableSelect
+                    options={provinceOptions}
+                    value={watchedProvince}
+                    onChange={handleProvinceChange}
+                    placeholder={watchedCountry ? 'Select province' : 'Select a country first'}
+                    disabled={!countryCode}
+                  />
+                </div>
+              </div>
+
+              {/* Row: City */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">City</Label>
+                  <SearchableSelect
+                    options={cityOptions}
+                    value={watchedCity}
+                    onChange={(v) => setValue('city', v, { shouldDirty: true })}
+                    placeholder={watchedProvince ? 'Select city' : 'Select a province first'}
+                    disabled={!provinceCode}
+                  />
                 </div>
               </div>
 
@@ -503,7 +606,12 @@ export default function VendorsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Website</Label>
-                  <Input {...register('website')} placeholder="https://example.com" className="h-9 rounded-lg" />
+                  <Input
+                    {...register('website')}
+                    placeholder="https://example.com"
+                    className={cn('h-9 rounded-lg', errors.website && 'border-red-300 focus-visible:ring-red-200')}
+                  />
+                  {errors.website && <p className="text-xs text-red-500">{errors.website.message}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Tax ID</Label>
@@ -513,7 +621,12 @@ export default function VendorsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Payment Terms</Label>
-                  <Input {...register('paymentTerms')} placeholder="e.g., Net 30" className="h-9 rounded-lg" />
+                  <SearchableSelect
+                    options={paymentTermsOptions}
+                    value={watchedPaymentTerms}
+                    onChange={(v) => setValue('paymentTerms', v, { shouldDirty: true })}
+                    placeholder={paymentTermsOptions.length ? 'Select payment terms' : 'Configure in Settings › Payment Terms'}
+                  />
                 </div>
               </div>
 
