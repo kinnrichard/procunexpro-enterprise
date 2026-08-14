@@ -115,13 +115,23 @@ export default function StockMovementsPage() {
     .map((p) => ({ value: p.id, label: `${p.name} (${p.sku}) — ${p.currentStock} ${p.unit || ''}`.trim() }));
 
   const selectedProduct = productList.find((p) => p.id === watchProductId);
-  const currentStock: number = selectedProduct?.currentStock ?? 0;
   const stockUnit: string = selectedProduct?.unit || '';
   const isOut = !inTypes.has(watchType); // outbound types reduce stock
   const needsWarehouse = showFrom || showTo;
   const activeWh = showFrom ? watchFromWh : (showTo ? watchToWh : '');
+
+  // Stock of the selected item AT the selected warehouse (summed from its lots)
+  const { data: whStockData, isFetching: whStockLoading } = useQuery({
+    queryKey: ['wh-stock', watchProductId, activeWh],
+    queryFn: () => api.get('/stock-lots', { params: { productId: watchProductId, warehouseId: activeWh, status: 'AVAILABLE', limit: 1000 } }),
+    enabled: !!watchProductId && !!activeWh,
+  });
+  const warehouseStock = Math.round((whStockData?.data?.data || []).reduce((s: number, l: any) => s + (l.quantity || 0), 0) * 1e6) / 1e6;
+
+  // Per-warehouse stock when a warehouse is chosen; otherwise the item's aggregate on-hand
+  const currentStock: number = (needsWarehouse && activeWh) ? warehouseStock : (selectedProduct?.currentStock ?? 0);
   const showStock = !!selectedProduct && (!needsWarehouse || !!activeWh);
-  const overStock = isOut && showStock && (watchQty || 0) > currentStock;
+  const overStock = isOut && showStock && !whStockLoading && (watchQty || 0) > currentStock;
 
   const createMut = useMutation({
     mutationFn: (data: MovementFormData) => api.post('/stock-movements', data),
@@ -272,7 +282,7 @@ export default function StockMovementsPage() {
               <div className="flex items-center justify-between">
                 <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
                 {showStock && (
-                  <span className="text-xs text-muted-foreground">Current stock: <span className="font-mono font-medium text-foreground">{currentStock} {stockUnit}</span></span>
+                  <span className="text-xs text-muted-foreground">Current stock: <span className="font-mono font-medium text-foreground">{whStockLoading && needsWarehouse ? '…' : `${currentStock} ${stockUnit}`}</span></span>
                 )}
               </div>
               <Controller control={form.control} name="quantity" render={({ field }) => (
