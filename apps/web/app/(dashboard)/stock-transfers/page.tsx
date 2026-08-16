@@ -198,7 +198,9 @@ export default function StockTransfersPage() {
                     <div className="grid grid-cols-[1fr_110px_40px] gap-2 items-center">
                       <SearchableSelect options={products.filter((o: any) => o.value === row.productId || !usedIds.has(o.value))} value={row.productId} onChange={(v) => updateRow(i, { productId: v })} placeholder="Select item" />
                       <Input type="number" step="any" value={row.quantity || ''} placeholder="0" onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className={cn('h-9 rounded-lg text-right', over && 'border-red-300 focus-visible:ring-red-200')} />
-                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:text-red-700" onClick={() => removeRow(i)}><Trash2 className="h-4 w-4" /></Button>
+                      {rows.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:text-red-700" onClick={() => removeRow(i)}><Trash2 className="h-4 w-4" /></Button>
+                      )}
                     </div>
                     {row.productId && fromWh && (
                       <p className={cn('text-xs pl-1', over ? 'text-red-500' : 'text-muted-foreground')}>
