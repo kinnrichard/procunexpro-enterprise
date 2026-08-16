@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Inbox, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -63,6 +63,12 @@ export function DataTable<T extends Record<string, any>>({
     debounceRef.current = setTimeout(() => {
       onSearch?.(value)
     }, 300)
+  }
+
+  const handleClearSearch = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    setSearchValue('')
+    onSearch?.('')
   }
 
   React.useEffect(() => {
@@ -197,8 +203,18 @@ export function DataTable<T extends Record<string, any>>({
                 placeholder={searchPlaceholder}
                 value={searchValue}
                 onChange={(e) => handleSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 pr-9"
               />
+              {searchValue && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={handleClearSearch}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           ) : (
             <div />
