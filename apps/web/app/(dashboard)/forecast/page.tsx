@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
-import { TrendingUp, Factory, Loader2, PackageCheck, Search } from 'lucide-react';
+import { TrendingUp, Factory, Loader2, PackageCheck, Search, X } from 'lucide-react';
 
 interface ForecastRow {
   productId: string;
@@ -60,8 +60,13 @@ export default function ForecastPage() {
             placeholder="Search items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 pr-9"
           />
+          {search && (
+            <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <FilterPopover activeCount={buildableOnly ? 1 : 0} onClear={() => setBuildableOnly(false)}>
           <FilterField label="Availability">

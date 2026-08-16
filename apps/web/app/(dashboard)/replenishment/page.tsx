@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
-import { PackagePlus, AlertTriangle, ShoppingCart, Loader2, Search } from 'lucide-react';
+import { PackagePlus, AlertTriangle, ShoppingCart, Loader2, Search, X } from 'lucide-react';
 
 interface Suggestion {
   productId: string;
@@ -93,7 +93,12 @@ export default function ReplenishmentPage() {
       <div className="flex items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search materials..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Input placeholder="Search materials..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 pr-9" />
+          {search && (
+            <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
         <FilterPopover activeCount={onlyWithVendor ? 1 : 0} onClear={() => setOnlyWithVendor(false)}>
           <FilterField label="Vendor">
