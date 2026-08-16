@@ -93,7 +93,10 @@ export default function StockMovementsPage() {
   const productList: any[] = prodData?.data?.data || [];
   const products = productList.map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
   const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
-  const invTypeOptions = (invTypeData?.data?.data || []).map((t: any) => ({ value: t.key, label: t.label }));
+  // Composition types (finished goods / components) are produced, not moved manually — exclude them
+  const invTypeList: any[] = invTypeData?.data?.data || [];
+  const compositionKeys = new Set(invTypeList.filter((t) => t.hasComposition).map((t) => t.key));
+  const invTypeOptions = invTypeList.filter((t) => !t.hasComposition).map((t) => ({ value: t.key, label: t.label }));
 
   const form = useForm<MovementFormData>({
     resolver: zodResolver(movementSchema),
@@ -112,7 +115,7 @@ export default function StockMovementsPage() {
 
   // Filter by inventory type; require existing stock only for OUTBOUND (inbound adds stock)
   const itemOptions = productList
-    .filter((p) => (!invType || p.inventoryType === invType) && (!isOut || (p.currentStock ?? 0) > 0))
+    .filter((p) => !compositionKeys.has(p.inventoryType) && (!invType || p.inventoryType === invType) && (!isOut || (p.currentStock ?? 0) > 0))
     .map((p) => ({
       value: p.id,
       label: isOut ? `${p.name} (${p.sku}) — ${p.currentStock} ${p.unit || ''}`.trim() : `${p.name} (${p.sku})`,
