@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -65,11 +65,25 @@ export default function StockTransfersPage() {
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
 
+  // Available stock at the SOURCE (warehouse + optional area/location), summed per item from lots
+  const { data: srcStockData, isFetching: srcLoading } = useQuery({
+    queryKey: ['transfer-src-stock', fromWh, fromArea, fromLoc],
+    queryFn: () => api.get('/stock-lots', { params: { warehouseId: fromWh, status: 'AVAILABLE', limit: 1000, ...(fromArea && { areaId: fromArea }), ...(fromLoc && { locationId: fromLoc }) } }),
+    enabled: !!fromWh,
+  });
+
   const items = response?.data?.data || [];
   const total = response?.data?.total || 0;
-  const products = (prodData?.data?.data || []).map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
+  const productList: any[] = prodData?.data?.data || [];
+  const products = productList.map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
   const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
   const usedIds = new Set(rows.map((r) => r.productId).filter(Boolean));
+
+  const stockByProduct = new Map<string, number>();
+  for (const l of (srcStockData?.data?.data || [])) stockByProduct.set(l.productId, (stockByProduct.get(l.productId) || 0) + (l.quantity || 0));
+  const availableFor = (pid: string) => Math.round((stockByProduct.get(pid) || 0) * 1e6) / 1e6;
+  const unitFor = (pid: string) => productList.find((p) => p.id === pid)?.unit || '';
+  const overStockRow = !srcLoading && rows.some((r) => r.productId && r.quantity > availableFor(r.productId));
 
   const addRow = () => setRows((r) => [...r, { productId: '', quantity: 1 }]);
   const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
@@ -96,7 +110,7 @@ export default function StockTransfersPage() {
     { key: 'transferDate', label: 'Date', render: (v: string) => formatDate(v) },
   ];
 
-  const canSave = !!fromWh && !!toWh && fromWh !== toWh && rows.some((r) => r.productId && r.quantity > 0);
+  const canSave = !!fromWh && !!toWh && fromWh !== toWh && rows.some((r) => r.productId && r.quantity > 0) && !overStockRow;
 
   return (
     <div className="space-y-6">
@@ -176,13 +190,24 @@ export default function StockTransfersPage() {
 
             <div className="space-y-2">
               <Label className="text-[13px]">Items</Label>
-              {rows.map((row, i) => (
-                <div key={i} className="grid grid-cols-[1fr_110px_40px] gap-2 items-center">
-                  <SearchableSelect options={products.filter((o: any) => o.value === row.productId || !usedIds.has(o.value))} value={row.productId} onChange={(v) => updateRow(i, { productId: v })} placeholder="Select product" />
-                  <Input type="number" step="any" value={row.quantity || ''} placeholder="0" onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg text-right" />
-                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:text-red-700" onClick={() => removeRow(i)}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-              ))}
+              {rows.map((row, i) => {
+                const avail = availableFor(row.productId);
+                const over = !!row.productId && !!fromWh && !srcLoading && row.quantity > avail;
+                return (
+                  <div key={i} className="space-y-1">
+                    <div className="grid grid-cols-[1fr_110px_40px] gap-2 items-center">
+                      <SearchableSelect options={products.filter((o: any) => o.value === row.productId || !usedIds.has(o.value))} value={row.productId} onChange={(v) => updateRow(i, { productId: v })} placeholder="Select item" />
+                      <Input type="number" step="any" value={row.quantity || ''} placeholder="0" onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className={cn('h-9 rounded-lg text-right', over && 'border-red-300 focus-visible:ring-red-200')} />
+                      <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:text-red-700" onClick={() => removeRow(i)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                    {row.productId && fromWh && (
+                      <p className={cn('text-xs pl-1', over ? 'text-red-500' : 'text-muted-foreground')}>
+                        {over ? `Exceeds available (${avail} ${unitFor(row.productId)})` : `Available at source: ${avail} ${unitFor(row.productId)}`}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
               <Button type="button" variant="outline" size="sm" onClick={addRow}><Plus className="h-4 w-4 mr-1.5" /> Add item</Button>
             </div>
 
