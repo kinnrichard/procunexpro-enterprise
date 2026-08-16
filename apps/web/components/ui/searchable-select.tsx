@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronDown, Search } from "lucide-react"
+import { Check, ChevronDown, Search, X } from "lucide-react"
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
@@ -97,7 +97,25 @@ function SearchableSelect({
           )}
         >
           <span className="truncate">{selectedLabel || placeholder}</span>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+          <span className="flex items-center gap-0.5 shrink-0">
+            {value && !disabled && (
+              <span
+                role="button"
+                tabIndex={-1}
+                aria-label="Clear selection"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onChange?.("")
+                }}
+                className="rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </span>
+            )}
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </span>
         </button>
       </PopoverTrigger>
 
