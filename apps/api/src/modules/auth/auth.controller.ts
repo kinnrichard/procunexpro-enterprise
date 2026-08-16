@@ -20,7 +20,9 @@ export class AuthController {
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    return { accessToken: result.accessToken, user: result.user };
+    // Also return the refresh token so the web client can store it (the axios
+    // interceptor refreshes from localStorage). Cookie is kept for other clients.
+    return { accessToken: result.accessToken, refreshToken: result.refreshToken, user: result.user };
   }
 
   @Post('refresh')
