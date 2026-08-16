@@ -79,7 +79,7 @@ export default function StockTransfersPage() {
   const unitFor = (pid: string) => productList.find((p) => p.id === pid)?.unit || '';
   const overStockRow = !srcLoading && rows.some((r) => r.productId && r.quantity > availableFor(r.productId));
 
-  const addRow = () => setRows((r) => [...r, { productId: '', quantity: 1 }]);
+  const addRow = () => setRows((r) => [...r, { productId: '', quantity: 0 }]);
   const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
   const updateRow = (i: number, patch: Partial<Row>) => setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
@@ -95,7 +95,7 @@ export default function StockTransfersPage() {
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to transfer', variant: 'destructive' }),
   });
 
-  const openCreate = () => { setFromWh(''); setToWh(''); setNotes(''); setRows([{ productId: '', quantity: 1 }]); setModalOpen(true); };
+  const openCreate = () => { setFromWh(''); setToWh(''); setNotes(''); setRows([{ productId: '', quantity: 0 }]); setModalOpen(true); };
 
   const columns = [
     { key: 'transferNumber', label: 'Transfer #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
