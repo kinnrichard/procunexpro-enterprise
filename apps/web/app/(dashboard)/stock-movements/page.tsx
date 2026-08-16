@@ -21,7 +21,14 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
-import { ArrowLeftRight, Plus, ArrowDownRight, ArrowUpRight, RefreshCw, Package } from 'lucide-react';
+import { useAuthStore } from '@/lib/auth';
+import { ArrowLeftRight, Plus, ArrowDownRight, ArrowUpRight, RefreshCw, Package, Check, X, Loader2 } from 'lucide-react';
+
+const statusStyles: Record<string, string> = {
+  PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  APPROVED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  REJECTED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
 
 const movementSchema = z.object({
   productId: z.string().min(1, 'Product is required'),
@@ -51,7 +58,9 @@ const inTypes = new Set(['PURCHASE', 'TRANSFER_IN', 'RETURN', 'PRODUCTION_IN']);
 
 export default function StockMovementsPage() {
   const { toast } = useToast();
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
+  const user = useAuthStore((s) => s.user);
+  const canApprove = isAdmin || user?.role === 'MANAGER';
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -146,9 +155,20 @@ export default function StockMovementsPage() {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setModalOpen(false);
-      toast({ title: 'Stock movement recorded' });
+      toast({ title: 'Movement submitted for approval' });
     },
     onError: () => toast({ title: 'Failed to record movement', variant: 'destructive' }),
+  });
+
+  const decideMut = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => api.put(`/stock-movements/${id}/${action}`),
+    onSuccess: (_res, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
+      toast({ title: vars.action === 'approve' ? 'Movement approved & applied' : 'Movement rejected' });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Action failed', variant: 'destructive' }),
   });
 
   const openCreate = () => {
@@ -177,7 +197,34 @@ export default function StockMovementsPage() {
     },
     { key: 'fromWarehouse', label: 'From', render: (_: any, row: any) => row.fromWarehouse?.name || '—' },
     { key: 'toWarehouse', label: 'To', render: (_: any, row: any) => row.toWarehouse?.name || '—' },
+    {
+      key: 'status', label: 'Status', render: (v: string) => (
+        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', statusStyles[v] || statusStyles.APPROVED)}>
+          {(v || 'APPROVED').charAt(0) + (v || 'APPROVED').slice(1).toLowerCase()}
+        </span>
+      ),
+    },
     { key: 'createdAt', label: 'Date', sortable: true, render: (v: string) => formatDateTime(v) },
+    {
+      key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => {
+        if (row.status !== 'PENDING' || !canApprove) return null;
+        const busy = decideMut.isPending && decideMut.variables?.id === row.id;
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <Button size="sm" className="h-7 px-2.5 bg-green-600 hover:bg-green-700 text-white" disabled={busy}
+              onClick={() => decideMut.mutate({ id: row.id, action: 'approve' })}>
+              {busy && decideMut.variables?.action === 'approve' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              <span className="ml-1">Approve</span>
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" disabled={busy}
+              onClick={() => decideMut.mutate({ id: row.id, action: 'reject' })}>
+              {busy && decideMut.variables?.action === 'reject' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+              <span className="ml-1">Reject</span>
+            </Button>
+          </div>
+        );
+      },
+    },
   ];
 
   const typeFilters = ['', 'PURCHASE', 'SALE', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT', 'RETURN', 'WRITE_OFF'];

@@ -17,13 +17,22 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
-import { ArrowLeftRight, Plus, Trash2, MoveRight } from 'lucide-react';
+import { useAuthStore } from '@/lib/auth';
+import { ArrowLeftRight, Plus, Trash2, MoveRight, Check, X, Loader2 } from 'lucide-react';
 
 interface Row { productId: string; quantity: number; }
 
+const statusStyles: Record<string, string> = {
+  PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  APPROVED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  REJECTED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
+
 export default function StockTransfersPage() {
   const { toast } = useToast();
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
+  const user = useAuthStore((s) => s.user);
+  const canApprove = isAdmin || user?.role === 'MANAGER';
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -90,9 +99,20 @@ export default function StockTransfersPage() {
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       setModalOpen(false);
-      toast({ title: `Transfer ${res?.data?.transferNumber || ''} posted` });
+      toast({ title: `Transfer ${res?.data?.transferNumber || ''} submitted for approval` });
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to transfer', variant: 'destructive' }),
+  });
+
+  const decideMut = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => api.put(`/stock-transfers/${id}/${action}`),
+    onSuccess: (_res, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['stock-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+      toast({ title: vars.action === 'approve' ? 'Transfer approved & applied' : 'Transfer rejected' });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Action failed', variant: 'destructive' }),
   });
 
   const openCreate = () => { setFromWh(''); setToWh(''); setNotes(''); setRows([{ productId: '', quantity: 0 }]); setModalOpen(true); };
@@ -101,7 +121,34 @@ export default function StockTransfersPage() {
     { key: 'transferNumber', label: 'Transfer #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
     { key: 'fromWarehouse', label: 'From → To', render: (_: any, row: any) => <span className="flex items-center gap-1.5">{row.fromWarehouse?.name} <MoveRight className="h-3.5 w-3.5 text-muted-foreground" /> {row.toWarehouse?.name}</span> },
     { key: '_count', label: 'Items', className: 'text-center', render: (v: any) => <span className="font-mono text-sm">{v?.items ?? 0}</span> },
+    {
+      key: 'status', label: 'Status', render: (v: string) => (
+        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', statusStyles[v] || statusStyles.APPROVED)}>
+          {(v || 'APPROVED').charAt(0) + (v || 'APPROVED').slice(1).toLowerCase()}
+        </span>
+      ),
+    },
     { key: 'transferDate', label: 'Date', render: (v: string) => formatDate(v) },
+    {
+      key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => {
+        if (row.status !== 'PENDING' || !canApprove) return null;
+        const busy = decideMut.isPending && decideMut.variables?.id === row.id;
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <Button size="sm" className="h-7 px-2.5 bg-green-600 hover:bg-green-700 text-white" disabled={busy}
+              onClick={() => decideMut.mutate({ id: row.id, action: 'approve' })}>
+              {busy && decideMut.variables?.action === 'approve' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              <span className="ml-1">Approve</span>
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" disabled={busy}
+              onClick={() => decideMut.mutate({ id: row.id, action: 'reject' })}>
+              {busy && decideMut.variables?.action === 'reject' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+              <span className="ml-1">Reject</span>
+            </Button>
+          </div>
+        );
+      },
+    },
   ];
 
   const canSave = !!fromWh && !!toWh && fromWh !== toWh && rows.some((r) => r.productId && r.quantity > 0) && !overStockRow;

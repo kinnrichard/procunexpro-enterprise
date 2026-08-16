@@ -1004,6 +1004,10 @@ model StockMovement {
   reason          String?
   notes           String?
   performedBy     String?
+  status          String            @default("APPROVED") // manual movements start PENDING; internal ones auto-APPROVED
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -1228,6 +1232,10 @@ model StockTransfer {
   transferDate    DateTime @default(now())
   createdById     String?
   notes           String?
+  status          String    @default("APPROVED") // new transfers start PENDING; existing rows stay APPROVED
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

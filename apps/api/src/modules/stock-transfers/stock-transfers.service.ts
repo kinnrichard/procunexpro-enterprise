@@ -56,15 +56,15 @@ export class StockTransfersService {
     return transfer;
   }
 
+  /**
+   * Records a transfer as PENDING. No stock moves until a manager approves it —
+   * lots are allocated and TRANSFER_OUT/IN movements are written at approval time.
+   */
   async create(tenantId: string, userId: string, data: any) {
     const { toWarehouseId } = data;
     // Source may be "Unassigned" (stock lots with no warehouse) — sent as 'UNASSIGNED' or empty.
     const fromUnassigned = !data.fromWarehouseId || data.fromWarehouseId === 'UNASSIGNED';
     const fromWarehouseId: string | null = fromUnassigned ? null : data.fromWarehouseId;
-    const fromAreaId: string | null = data.fromAreaId || null;
-    const toAreaId: string | null = data.toAreaId || null;
-    const fromLocationId: string | null = data.fromLocationId || null;
-    const toLocationId: string | null = data.toLocationId || null;
     if (!toWarehouseId) throw new BadRequestException('Destination warehouse is required');
     if (!fromUnassigned && fromWarehouseId === toWarehouseId) throw new BadRequestException('Source and destination must differ');
 
@@ -79,18 +79,64 @@ export class StockTransfersService {
     if (fromWarehouseId && !fromWh) throw new NotFoundException('Source warehouse not found');
     const fromName = fromWh?.name || 'Unassigned';
 
+    // Soft availability check for a better UX; authoritative check runs at approval.
+    await this.assertAvailability(tenantId, fromWarehouseId, fromName, rows);
+
     const today = new Date();
     const trPrefix = `TR-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     const trCount = await this.prisma.stockTransfer.count({ where: { tenantId, transferNumber: { startsWith: trPrefix } } });
     const transferNumber = `${trPrefix}-${String(trCount + 1).padStart(4, '0')}`;
 
+    const created = await this.prisma.stockTransfer.create({
+      data: {
+        tenantId, transferNumber, fromWarehouseId, toWarehouseId, createdById: userId, notes: data.notes || null,
+        status: 'PENDING',
+        items: { create: rows.map((r) => ({ productId: r.productId, quantity: round(r.quantity), uom: r.uom || 'pcs' })) },
+      },
+    });
+    return this.findOne(tenantId, created.id);
+  }
+
+  /** Ensures each item has enough available stock at the source; throws otherwise. */
+  private async assertAvailability(tenantId: string, fromWarehouseId: string | null, fromName: string, rows: any[]) {
+    for (const r of rows) {
+      const need = round(r.quantity);
+      const lots = await this.prisma.stockLot.findMany({
+        where: {
+          tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
+          ...(fromWarehouseId ? { OR: [{ warehouseId: fromWarehouseId }, { warehouseId: null }] } : { warehouseId: null }),
+        },
+      });
+      const available = round(lots.reduce((s, l) => s + l.quantity, 0));
+      if (available < need) {
+        throw new BadRequestException(`Insufficient stock at ${fromName} for one of the items (available ${available}, need ${need})`);
+      }
+    }
+  }
+
+  /** Allocates lots FEFO, creates destination lots + net-zero movements, marks APPROVED. */
+  async approve(tenantId: string, userId: string, id: string) {
+    const transfer = await this.prisma.stockTransfer.findFirst({
+      where: { id, tenantId },
+      include: { items: true, toWarehouse: { select: { id: true, name: true } }, fromWarehouse: { select: { id: true, name: true } } },
+    });
+    if (!transfer) throw new NotFoundException('Transfer not found');
+    if (transfer.status !== 'PENDING') {
+      throw new BadRequestException(`Only pending transfers can be approved (current: ${transfer.status})`);
+    }
+
+    const { transferNumber, fromWarehouseId, toWarehouseId } = transfer;
+    const fromName = transfer.fromWarehouse?.name || 'Unassigned';
+    const toName = transfer.toWarehouse?.name || '';
+    const rows = transfer.items;
+
+    const today = new Date();
     const smPrefix = `SM-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     let smSeq = await this.prisma.stockMovement.count({ where: { tenantId, referenceNumber: { startsWith: smPrefix } } });
     const nextSm = () => `${smPrefix}-${String(++smSeq).padStart(4, '0')}`;
 
     const ops: any[] = [];
 
-    // Allocate each item FEFO from source-warehouse lots (strict: must cover the qty)
     for (let idx = 0; idx < rows.length; idx++) {
       const r = rows[idx];
       const need = round(r.quantity);
@@ -98,9 +144,6 @@ export class StockTransfersService {
         where: {
           tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
           ...(fromWarehouseId ? { OR: [{ warehouseId: fromWarehouseId }, { warehouseId: null }] } : { warehouseId: null }),
-          // When a source area/location is given, draw only from that zone/bin
-          ...(fromAreaId ? { areaId: fromAreaId } : {}),
-          ...(fromLocationId ? { locationId: fromLocationId } : {}),
         },
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
       });
@@ -120,10 +163,9 @@ export class StockTransfersService {
         remaining = round(remaining - take);
       }
 
-      // Destination lot (new, at target warehouse)
       ops.push(this.prisma.stockLot.create({
         data: {
-          tenantId, productId: r.productId, warehouseId: toWarehouseId, areaId: toAreaId, locationId: toLocationId,
+          tenantId, productId: r.productId, warehouseId: toWarehouseId,
           lotNumber: `${transferNumber}-${idx + 1}`,
           quantity: need, initialQty: need,
           expiryDate: earliestExpiry,
@@ -132,22 +174,32 @@ export class StockTransfersService {
         },
       }));
 
-      // Movements out + in (net-zero to currentStock)
       ops.push(
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_OUT', quantity: need, fromWarehouseId, fromLocationId, reason: `Transfer ${transferNumber} to ${toWh.name}`, performedBy: userId } }),
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_IN', quantity: need, toWarehouseId, toLocationId, reason: `Transfer ${transferNumber} from ${fromName}`, performedBy: userId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_OUT', quantity: need, fromWarehouseId, reason: `Transfer ${transferNumber} to ${toName}`, performedBy: userId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_IN', quantity: need, toWarehouseId, reason: `Transfer ${transferNumber} from ${fromName}`, performedBy: userId } }),
       );
     }
 
-    ops.push(this.prisma.stockTransfer.create({
-      data: {
-        tenantId, transferNumber, fromWarehouseId, toWarehouseId, createdById: userId, notes: data.notes || null,
-        items: { create: rows.map((r) => ({ productId: r.productId, quantity: round(r.quantity), uom: r.uom || 'pcs' })) },
-      },
+    ops.push(this.prisma.stockTransfer.update({
+      where: { id },
+      data: { status: 'APPROVED', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
     }));
 
     await this.prisma.$transaction(ops);
-    const created = await this.prisma.stockTransfer.findFirst({ where: { tenantId, transferNumber } });
-    return this.findOne(tenantId, created!.id);
+    return this.findOne(tenantId, id);
+  }
+
+  /** Rejects a pending transfer without moving any stock. */
+  async reject(tenantId: string, userId: string, id: string, reason?: string) {
+    const transfer = await this.prisma.stockTransfer.findFirst({ where: { id, tenantId } });
+    if (!transfer) throw new NotFoundException('Transfer not found');
+    if (transfer.status !== 'PENDING') {
+      throw new BadRequestException(`Only pending transfers can be rejected (current: ${transfer.status})`);
+    }
+    await this.prisma.stockTransfer.update({
+      where: { id },
+      data: { status: 'REJECTED', approvedById: userId, approvedAt: new Date(), rejectionReason: reason || null },
+    });
+    return this.findOne(tenantId, id);
   }
 }
