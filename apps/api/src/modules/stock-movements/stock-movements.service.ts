@@ -24,6 +24,7 @@ export class StockMovementsService {
       limit?: number;
       search?: string;
       type?: string;
+      direction?: string;
       productId?: string;
       warehouseId?: string;
       createdDateFrom?: string;
@@ -37,6 +38,8 @@ export class StockMovementsService {
     const where: any = { tenantId };
 
     if (params.type) where.type = params.type;
+    else if (params.direction === 'in') where.type = { in: ['PURCHASE', 'TRANSFER_IN', 'RETURN', 'PRODUCTION_IN'] };
+    else if (params.direction === 'out') where.type = { in: ['SALE', 'TRANSFER_OUT', 'WRITE_OFF', 'PRODUCTION_ISSUE', 'ADJUSTMENT'] };
 
     if (params.productId) where.productId = params.productId;
 
