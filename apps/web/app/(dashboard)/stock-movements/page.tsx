@@ -108,15 +108,18 @@ export default function StockMovementsPage() {
   const watchQty = form.watch('quantity');
   const showFrom = ['TRANSFER_OUT', 'SALE', 'WRITE_OFF', 'ADJUSTMENT'].includes(watchType);
   const showTo = ['PURCHASE', 'TRANSFER_IN', 'RETURN'].includes(watchType);
+  const isOut = !inTypes.has(watchType); // outbound types reduce stock
 
-  // Only items that currently hold stock, optionally filtered by inventory type
+  // Filter by inventory type; require existing stock only for OUTBOUND (inbound adds stock)
   const itemOptions = productList
-    .filter((p) => (p.currentStock ?? 0) > 0 && (!invType || p.inventoryType === invType))
-    .map((p) => ({ value: p.id, label: `${p.name} (${p.sku}) — ${p.currentStock} ${p.unit || ''}`.trim() }));
+    .filter((p) => (!invType || p.inventoryType === invType) && (!isOut || (p.currentStock ?? 0) > 0))
+    .map((p) => ({
+      value: p.id,
+      label: isOut ? `${p.name} (${p.sku}) — ${p.currentStock} ${p.unit || ''}`.trim() : `${p.name} (${p.sku})`,
+    }));
 
   const selectedProduct = productList.find((p) => p.id === watchProductId);
   const stockUnit: string = selectedProduct?.unit || '';
-  const isOut = !inTypes.has(watchType); // outbound types reduce stock
   const needsWarehouse = showFrom || showTo;
   const activeWh = showFrom ? watchFromWh : (showTo ? watchToWh : '');
 
@@ -259,9 +262,9 @@ export default function StockMovementsPage() {
             <div className="space-y-1.5">
               <Label className="text-[13px]">Item <span className="text-red-500">*</span></Label>
               <Controller control={form.control} name="productId" render={({ field }) => (
-                <SearchableSelect options={itemOptions} value={field.value} onChange={field.onChange} placeholder="Select item (with stock)" />
+                <SearchableSelect options={itemOptions} value={field.value} onChange={field.onChange} placeholder={isOut ? 'Select item (with stock)' : 'Select item'} />
               )} />
-              {itemOptions.length === 0 && <p className="text-xs text-muted-foreground">No items with stock{invType ? ' for this type' : ''}.</p>}
+              {itemOptions.length === 0 && <p className="text-xs text-muted-foreground">{isOut ? 'No items with stock' : 'No items'}{invType ? ' for this type' : ''}.</p>}
             </div>
             {showFrom && (
               <div className="space-y-1.5">
