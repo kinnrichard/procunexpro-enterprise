@@ -8,6 +8,7 @@ import { useTaxStore } from '@/lib/tax';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 import { CommandPalette } from '@/components/command-palette';
+import { IdleTimeout } from '@/components/idle-timeout';
 
 export default function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { isAuthenticated, isLoading, hydrate } = useAuthStore();
@@ -45,6 +46,7 @@ export default function DashboardLayout({ children }: Readonly<{ children: React
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      <IdleTimeout />
       <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <div className={`flex flex-1 flex-col overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-[68px]' : 'lg:ml-64'}`}>
         <Topbar
