@@ -13,8 +13,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { LocationSelect } from '@/components/location-select';
-import { AreaSelect } from '@/components/area-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
@@ -32,10 +30,6 @@ export default function StockTransfersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [fromWh, setFromWh] = useState('');
   const [toWh, setToWh] = useState('');
-  const [fromArea, setFromArea] = useState('');
-  const [toArea, setToArea] = useState('');
-  const [fromLoc, setFromLoc] = useState('');
-  const [toLoc, setToLoc] = useState('');
   const [notes, setNotes] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
 
@@ -65,10 +59,10 @@ export default function StockTransfersPage() {
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
 
-  // Available stock at the SOURCE (warehouse + optional area/location), summed per item from lots
+  // Available stock at the source warehouse, summed per item from lots
   const { data: srcStockData, isFetching: srcLoading } = useQuery({
-    queryKey: ['transfer-src-stock', fromWh, fromArea, fromLoc],
-    queryFn: () => api.get('/stock-lots', { params: { warehouseId: fromWh, status: 'AVAILABLE', limit: 1000, ...(fromArea && { areaId: fromArea }), ...(fromLoc && { locationId: fromLoc }) } }),
+    queryKey: ['transfer-src-stock', fromWh],
+    queryFn: () => api.get('/stock-lots', { params: { warehouseId: fromWh, status: 'AVAILABLE', limit: 1000 } }),
     enabled: !!fromWh,
   });
 
@@ -90,7 +84,7 @@ export default function StockTransfersPage() {
   const updateRow = (i: number, patch: Partial<Row>) => setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
   const saveMut = useMutation({
-    mutationFn: () => api.post('/stock-transfers', { fromWarehouseId: fromWh, toWarehouseId: toWh, fromAreaId: fromArea || undefined, toAreaId: toArea || undefined, fromLocationId: fromLoc || undefined, toLocationId: toLoc || undefined, notes: notes || undefined, items: rows.filter((r) => r.productId && r.quantity > 0) }),
+    mutationFn: () => api.post('/stock-transfers', { fromWarehouseId: fromWh, toWarehouseId: toWh, notes: notes || undefined, items: rows.filter((r) => r.productId && r.quantity > 0) }),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['stock-transfers'] });
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
@@ -101,7 +95,7 @@ export default function StockTransfersPage() {
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to transfer', variant: 'destructive' }),
   });
 
-  const openCreate = () => { setFromWh(''); setToWh(''); setFromArea(''); setToArea(''); setFromLoc(''); setToLoc(''); setNotes(''); setRows([{ productId: '', quantity: 1 }]); setModalOpen(true); };
+  const openCreate = () => { setFromWh(''); setToWh(''); setNotes(''); setRows([{ productId: '', quantity: 1 }]); setModalOpen(true); };
 
   const columns = [
     { key: 'transferNumber', label: 'Transfer #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
@@ -164,27 +158,11 @@ export default function StockTransfersPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">From Warehouse <span className="text-red-500">*</span></Label>
-                <SearchableSelect options={warehouses} value={fromWh} onChange={(v) => { setFromWh(v); setFromArea(''); setFromLoc(''); }} placeholder="Source" />
+                <SearchableSelect options={warehouses} value={fromWh} onChange={setFromWh} placeholder="Source" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-[13px]">To Warehouse <span className="text-red-500">*</span></Label>
-                <SearchableSelect options={warehouses.filter((w: any) => w.value !== fromWh)} value={toWh} onChange={(v) => { setToWh(v); setToArea(''); setToLoc(''); }} placeholder="Destination" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">From Area</Label>
-                <AreaSelect warehouseId={fromWh} value={fromArea} onChange={(v) => { setFromArea(v); setFromLoc(''); }} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">To Area</Label>
-                <AreaSelect warehouseId={toWh} value={toArea} onChange={(v) => { setToArea(v); setToLoc(''); }} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">From Location</Label>
-                <LocationSelect warehouseId={fromWh} areaId={fromArea} value={fromLoc} onChange={setFromLoc} placeholder="Any location" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[13px]">To Location</Label>
-                <LocationSelect warehouseId={toWh} areaId={toArea} value={toLoc} onChange={setToLoc} placeholder="Any location" />
+                <SearchableSelect options={warehouses.filter((w: any) => w.value !== fromWh)} value={toWh} onChange={setToWh} placeholder="Destination" />
               </div>
             </div>
 
