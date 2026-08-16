@@ -104,37 +104,30 @@ export class StockMovementsService {
     if (!product) throw new NotFoundException('Product not found');
 
     const referenceNumber = await this.generateReferenceNumber(tenantId);
+    const qty = data.quantity;
 
-    // Update product stock based on movement type
+    // Inbound types add stock (and create a lot); the rest reduce it (FEFO-consume lots)
     const addTypes = ['PURCHASE', 'TRANSFER_IN', 'RETURN', 'PRODUCTION_IN'];
-    const subtractTypes = ['SALE', 'TRANSFER_OUT', 'WRITE_OFF', 'PRODUCTION_ISSUE'];
+    const isAdd = addTypes.includes(data.type);
 
-    let stockUpdate: any;
-
-    if (addTypes.includes(data.type)) {
-      stockUpdate = { currentStock: { increment: data.quantity } };
-    } else if (subtractTypes.includes(data.type)) {
-      if (product.currentStock < data.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock. Current: ${product.currentStock}, Requested: ${data.quantity}`,
-        );
-      }
-      stockUpdate = { currentStock: { decrement: data.quantity } };
-    } else if (data.type === 'ADJUSTMENT') {
-      stockUpdate = { currentStock: data.quantity };
+    if (!isAdd && product.currentStock < qty) {
+      throw new BadRequestException(
+        `Insufficient stock. Current: ${product.currentStock}, Requested: ${qty}`,
+      );
     }
 
-    // Use transaction to ensure atomicity
-    const [movement] = await this.prisma.$transaction([
+    const ops: any[] = [
       this.prisma.stockMovement.create({
         data: {
           tenantId,
           referenceNumber,
           productId: data.productId,
           type: data.type,
-          quantity: data.quantity,
+          quantity: qty,
           fromWarehouseId: data.fromWarehouseId || null,
           toWarehouseId: data.toWarehouseId || null,
+          fromLocationId: data.fromLocationId || null,
+          toLocationId: data.toLocationId || null,
           purchaseOrderId: data.purchaseOrderId || null,
           reason: data.reason || null,
           notes: data.notes || null,
@@ -146,12 +139,49 @@ export class StockMovementsService {
           toWarehouse: { select: { id: true, name: true } },
         },
       }),
-      this.prisma.product.update({
-        where: { id: data.productId },
-        data: stockUpdate,
-      }),
-    ]);
+    ];
 
-    return movement;
+    if (isAdd) {
+      // Create a stock lot at the destination so lot-based views (Item › Stock) reflect it
+      ops.push(
+        this.prisma.product.update({ where: { id: data.productId }, data: { currentStock: { increment: qty } } }),
+        this.prisma.stockLot.create({
+          data: {
+            tenantId,
+            productId: data.productId,
+            lotNumber: referenceNumber,
+            quantity: qty,
+            initialQty: qty,
+            warehouseId: data.toWarehouseId || null,
+            areaId: data.toAreaId || null,
+            locationId: data.toLocationId || null,
+            source: `Movement ${referenceNumber}`,
+            status: 'AVAILABLE',
+            qcStatus: 'PASSED',
+          },
+        }),
+      );
+    } else {
+      // Consume FEFO from the source warehouse's lots (or unassigned) — best-effort
+      const lots = await this.prisma.stockLot.findMany({
+        where: {
+          tenantId, productId: data.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
+          ...(data.fromWarehouseId ? { OR: [{ warehouseId: data.fromWarehouseId }, { warehouseId: null }] } : {}),
+        },
+        orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
+      });
+      let remaining = qty;
+      for (const lot of lots) {
+        if (remaining <= 0) break;
+        const take = Math.min(lot.quantity, remaining);
+        const after = Math.round((lot.quantity - take) * 1e6) / 1e6;
+        ops.push(this.prisma.stockLot.update({ where: { id: lot.id }, data: { quantity: after, ...(after <= 0 ? { status: 'DEPLETED' } : {}) } }));
+        remaining = Math.round((remaining - take) * 1e6) / 1e6;
+      }
+      ops.push(this.prisma.product.update({ where: { id: data.productId }, data: { currentStock: { decrement: qty } } }));
+    }
+
+    const result = await this.prisma.$transaction(ops);
+    return result[0];
   }
 }
