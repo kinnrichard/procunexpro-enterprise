@@ -257,6 +257,10 @@ export default function StockMovementsPage() {
                   </SelectContent>
                 </Select>
               )} />
+              <p className={cn('text-xs mt-0.5 flex items-center gap-1', isOut ? 'text-red-600' : 'text-emerald-600')}>
+                {isOut ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                {isOut ? 'Reduces stock' : 'Increases stock'}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Inventory Type</Label>
