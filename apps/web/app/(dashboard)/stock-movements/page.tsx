@@ -271,7 +271,7 @@ export default function StockMovementsPage() {
             </div>
             {showFrom && (
               <div className="space-y-1.5">
-                <Label className="text-[13px]">From Warehouse</Label>
+                <Label className="text-[13px]">From Warehouse <span className="text-red-500">*</span></Label>
                 <Controller control={form.control} name="fromWarehouseId" render={({ field }) => (
                   <SearchableSelect options={warehouses} value={field.value || ''} onChange={field.onChange} placeholder="Select warehouse" />
                 )} />
@@ -279,7 +279,7 @@ export default function StockMovementsPage() {
             )}
             {showTo && (
               <div className="space-y-1.5">
-                <Label className="text-[13px]">To Warehouse</Label>
+                <Label className="text-[13px]">To Warehouse <span className="text-red-500">*</span></Label>
                 <Controller control={form.control} name="toWarehouseId" render={({ field }) => (
                   <SearchableSelect options={warehouses} value={field.value || ''} onChange={field.onChange} placeholder="Select warehouse" />
                 )} />
@@ -313,7 +313,7 @@ export default function StockMovementsPage() {
           </form>
           <div className="px-6 py-4 border-t border-border flex justify-between">
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button type="submit" form="movement-form" className="bg-gradient-primary text-white" disabled={!form.formState.isValid || overStock || createMut.isPending}>
+            <Button type="submit" form="movement-form" className="bg-gradient-primary text-white" disabled={!form.formState.isValid || overStock || (needsWarehouse && !activeWh) || createMut.isPending}>
               {createMut.isPending ? 'Recording...' : 'Record Movement'}
             </Button>
           </div>
