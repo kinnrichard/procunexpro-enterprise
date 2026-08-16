@@ -207,8 +207,8 @@ export default function StockLotsPage() {
         toolbar={
           <div className="flex items-center gap-3 flex-wrap">
             <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
-              <FilterField label="Product">
-                <SearchableSelect options={products} value={filterProductId} onChange={(v) => { setFilterProductId(v); setPage(1); }} placeholder="All products" />
+              <FilterField label="Item">
+                <SearchableSelect options={products} value={filterProductId} onChange={(v) => { setFilterProductId(v); setPage(1); }} placeholder="All items" />
               </FilterField>
               <FilterField label="QC Status">
                 <Select value={filterQcStatus || 'ALL'} onValueChange={(v) => { setFilterQcStatus(v === 'ALL' ? '' : v); setPage(1); }}>

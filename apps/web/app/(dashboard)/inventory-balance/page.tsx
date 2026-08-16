@@ -92,7 +92,7 @@ export default function InventoryBalancePage() {
   const activeFilterCount = [warehouseId, lowStock].filter(Boolean).length;
 
   const columns = [
-    { key: 'name', label: 'Product', render: (_: any, row: any) => <div><p className="font-medium">{row.name}</p><p className="text-xs text-muted-foreground font-mono">{row.sku}</p></div> },
+    { key: 'name', label: 'Item', render: (_: any, row: any) => <div><p className="font-medium">{row.name}</p><p className="text-xs text-muted-foreground font-mono">{row.sku}</p></div> },
     { key: 'category', label: 'Category', render: (v: string) => v || <span className="text-muted-foreground">—</span> },
     { key: 'onHand', label: 'On-hand', render: (v: number, row: any) => (
       <div className="flex items-center gap-1.5">
@@ -140,7 +140,7 @@ export default function InventoryBalancePage() {
             limit={15}
             onPageChange={setPage}
             onSearch={setSearch}
-            searchPlaceholder="Search products..."
+            searchPlaceholder="Search items..."
             isLoading={isLoading}
             emptyMessage="No products found"
             toolbar={
