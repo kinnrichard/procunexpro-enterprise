@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../database/prisma.service';
 import { UnitsOfMeasureService, convertQuantity } from '../units-of-measure/units-of-measure.service';
 import { StockLotsService, LotAllocation } from '../stock-lots/stock-lots.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 
 // Round only for display/comparison noise, keeping fractional precision
 const roundQty = (n: number) => Math.round(n * 1e6) / 1e6;
@@ -13,6 +14,7 @@ export class ProductionsService {
     private readonly prisma: PrismaService,
     private readonly uom: UnitsOfMeasureService,
     private readonly lots: StockLotsService,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   private readonly itemInclude = {
@@ -91,7 +93,10 @@ export class ProductionsService {
       this.prisma.production.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    const approvals = await this.approvals.getRequestsMap(tenantId, 'PRODUCTION', data.map((p) => p.id));
+    const withApproval = data.map((p) => ({ ...p, approval: approvals.get(p.id) || null }));
+
+    return { data: withApproval, total, page, limit };
   }
 
   async findOne(tenantId: string, id: string) {
@@ -100,7 +105,8 @@ export class ProductionsService {
       include: this.itemInclude,
     });
     if (!production) throw new NotFoundException('Production not found');
-    return production;
+    const approval = await this.approvals.getRequest(tenantId, 'PRODUCTION', id);
+    return { ...production, approval };
   }
 
   // Preview the materials a run of `quantity` units would consume, from the product's BOM
@@ -276,7 +282,46 @@ export class ProductionsService {
   }
 
   // Consume materials + produce finished goods, all atomically
+  /**
+   * Complete a production. Consuming materials + producing finished goods is gated
+   * by the PRODUCTION workflow: with a workflow configured this submits for approval
+   * (production stays DRAFT until every stage is cleared, then runs); no workflow →
+   * runs immediately.
+   */
   async complete(tenantId: string, id: string, userId: string) {
+    const production = await this.prisma.production.findFirst({ where: { id, tenantId }, include: { items: true } });
+    if (!production) throw new NotFoundException('Production not found');
+    if (production.status === 'COMPLETED') throw new BadRequestException('Production is already completed');
+    if (production.status === 'CANCELLED') throw new BadRequestException('Cannot complete a cancelled production');
+    if (production.items.length === 0) throw new BadRequestException('Production has no materials to consume');
+
+    const { required } = await this.approvals.ensureRequest(tenantId, 'PRODUCTION', id, userId);
+    if (!required) return this.applyComplete(tenantId, id, userId);
+    return this.findOne(tenantId, id);
+  }
+
+  /** Records an approval on the current stage; runs the production once fully approved. */
+  async approve(tenantId: string, id: string, userId: string, userRole: string) {
+    const production = await this.prisma.production.findFirst({ where: { id, tenantId }, select: { status: true } });
+    if (!production) throw new NotFoundException('Production not found');
+    if (production.status !== 'DRAFT') throw new BadRequestException('This production is no longer awaiting approval');
+    const outcome = await this.approvals.decide(tenantId, 'PRODUCTION', id, userId, userRole, 'APPROVED');
+    if (outcome.approved) return this.applyComplete(tenantId, id, userId);
+    return this.findOne(tenantId, id);
+  }
+
+  /** Rejects the production run; it stays DRAFT for revision. */
+  async reject(tenantId: string, id: string, userId: string, userRole: string, reason?: string) {
+    const production = await this.prisma.production.findFirst({ where: { id, tenantId }, select: { status: true } });
+    if (!production) throw new NotFoundException('Production not found');
+    if (production.status !== 'DRAFT') throw new BadRequestException('This production is no longer awaiting approval');
+    await this.approvals.decide(tenantId, 'PRODUCTION', id, userId, userRole, 'REJECTED', reason);
+    await this.prisma.production.update({ where: { id }, data: { approvedById: userId, approvedAt: new Date(), rejectionReason: reason || null } });
+    return this.findOne(tenantId, id);
+  }
+
+  /** Runs the production: consumes materials (FEFO) + produces the finished good. */
+  private async applyComplete(tenantId: string, id: string, userId: string) {
     const production = await this.prisma.production.findFirst({
       where: { id, tenantId },
       include: { items: { include: { material: true } }, product: { select: { shelfLifeDays: true, qcRequired: true } } },
@@ -392,7 +437,7 @@ export class ProductionsService {
       }),
       this.prisma.production.update({
         where: { id: production.id },
-        data: { status: 'COMPLETED', producedAt },
+        data: { status: 'COMPLETED', producedAt, approvedById: userId, approvedAt: producedAt, rejectionReason: null },
       }),
     );
 

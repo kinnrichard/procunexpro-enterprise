@@ -21,6 +21,7 @@ import { AreaSelect } from '@/components/area-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
+import { ApprovalStatusBadge, ApprovalActions } from '@/components/approval-controls';
 import { Factory, Plus, CheckCircle2, FileEdit, XCircle, AlertTriangle } from 'lucide-react';
 
 interface PreviewRow {
@@ -130,11 +131,11 @@ export default function ProductionsPage() {
 
   const completeMut = useMutation({
     mutationFn: (id: string) => api.post(`/productions/${id}/complete`),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['productions'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
-      toast({ title: 'Production completed — stock updated' });
+      toast({ title: res?.data?.status === 'COMPLETED' ? 'Production completed — stock updated' : 'Submitted for approval' });
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to complete production', variant: 'destructive' }),
   });
@@ -189,12 +190,20 @@ export default function ProductionsPage() {
     { key: 'product', label: 'Product', render: (_: any, row: any) => row.product?.name || '—' },
     { key: 'quantity', label: 'Qty', render: (v: number) => <span className="font-medium">{v}</span> },
     { key: '_count', label: 'Materials', render: (v: any) => v?.items ?? 0 },
-    { key: 'status', label: 'Status', render: (v: string) => <StatusBadge status={v} /> },
+    { key: 'status', label: 'Status', render: (v: string, row: any) => (
+      row.approval?.status === 'PENDING' || row.approval?.status === 'REJECTED'
+        ? <ApprovalStatusBadge approval={row.approval} fallback={v} />
+        : <StatusBadge status={v} />
+    ) },
     { key: 'createdAt', label: 'Created', sortable: true, render: (v: string) => formatDateTime(v) },
     {
-      key: 'actions', label: '', render: (_: any, row: any) => (
-        row.status === 'DRAFT' && can('productions', 'edit') ? (
-          <div className="flex items-center gap-1.5">
+      key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => {
+        if (row.status !== 'DRAFT') return null;
+        if (row.approval?.status === 'PENDING') {
+          return <ApprovalActions endpoint="/productions" id={row.id} approval={row.approval} invalidateKeys={['productions', 'products', 'stock-movements', 'stock-lots']} appliedLabel="Production completed — stock updated" />;
+        }
+        return can('productions', 'edit') ? (
+          <div className="flex items-center gap-1.5 justify-end">
             <Button size="sm" variant="ghost" className="h-8 text-green-600 hover:text-green-700" onClick={() => setConfirmTarget({ row, action: 'complete' })} disabled={confirmLoading}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> Complete
             </Button>
@@ -202,8 +211,8 @@ export default function ProductionsPage() {
               <XCircle className="h-4 w-4" />
             </Button>
           </div>
-        ) : null
-      ),
+        ) : null;
+      },
     },
   ];
 
