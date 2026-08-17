@@ -20,10 +20,12 @@ import { Separator } from '@/components/ui/separator';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
+import { useAuthStore } from '@/lib/auth';
 import {
   ArrowLeft, Loader2, Send, CheckCircle, XCircle, Trophy,
   Clock, FileText, Ban, ChevronRight, Calendar, StickyNote,
-  Package, BarChart3, Plus, User,
+  Package, BarChart3, Plus, User, Check, X, ShieldCheck,
 } from 'lucide-react';
 
 // ─── Status Timeline ──────────────────────────────────────
@@ -85,6 +87,8 @@ export default function RFQDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { isAdmin } = usePermissions();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const formatCurrency = useCurrencyStore((s) => s.format);
   const rfqId = params.id as string;
@@ -126,8 +130,20 @@ export default function RFQDetailPage() {
 
   const publishMutation = useMutation({
     mutationFn: () => api.put(`/rfq/${rfqId}/publish`),
-    onSuccess: () => { invalidate(); toast({ title: 'RFQ Published' }); },
+    onSuccess: (res: any) => { invalidate(); toast({ title: res?.data?.status === 'PUBLISHED' ? 'RFQ Published' : 'Submitted for approval' }); },
     onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to publish', variant: 'destructive' }),
+  });
+
+  const decideMutation = useMutation({
+    mutationFn: (action: 'approve' | 'reject') => api.put(`/rfq/${rfqId}/${action}`),
+    onSuccess: (res: any, action) => {
+      invalidate();
+      const st = res?.data?.status;
+      const msg = action === 'reject' ? 'RFQ rejected'
+        : st === 'PUBLISHED' ? 'Approved & published' : 'Stage approved — sent to next approver';
+      toast({ title: msg });
+    },
+    onError: (err: any) => toast({ title: err.response?.data?.message || 'Action failed', variant: 'destructive' }),
   });
 
   const closeMutation = useMutation({
@@ -180,11 +196,31 @@ export default function RFQDetailPage() {
 
   function renderHeaderActions() {
     if (!rfq) return null;
+    const appr = rfq.approval;
+    const pending = appr?.status === 'PENDING';
+    const eligible = isAdmin || (!!appr?.currentRole && user?.role === appr.currentRole);
     return (
       <div className="flex items-center gap-2">
-        {rfq.status === 'DRAFT' && (
+        {rfq.status === 'DRAFT' && pending && (
+          <>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5" /> Pending Approval{appr.totalSteps > 1 ? ` · Stage ${appr.currentStep}/${appr.totalSteps}` : ''} · {appr.currentStepName || appr.currentRole}
+            </span>
+            {eligible && (
+              <>
+                <Button onClick={() => decideMutation.mutate('approve')} disabled={decideMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+                  {decideMutation.isPending && decideMutation.variables === 'approve' ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Check className="h-4 w-4 mr-1.5" />} Approve
+                </Button>
+                <Button variant="outline" onClick={() => decideMutation.mutate('reject')} disabled={decideMutation.isPending} className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
+                  {decideMutation.isPending && decideMutation.variables === 'reject' ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <X className="h-4 w-4 mr-1.5" />} Reject
+                </Button>
+              </>
+            )}
+          </>
+        )}
+        {rfq.status === 'DRAFT' && !pending && (
           <Button onClick={() => setPublishConfirmOpen(true)} disabled={publishMutation.isPending || (rfq.items?.length || 0) === 0} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
-            {publishMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} Publish
+            {publishMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} {appr?.status === 'REJECTED' ? 'Re-submit' : 'Publish'}
           </Button>
         )}
         {rfq.status === 'PUBLISHED' && (

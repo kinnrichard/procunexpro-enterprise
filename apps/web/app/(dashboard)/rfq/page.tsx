@@ -277,9 +277,11 @@ export default function RFQPage() {
 
   const actionMut = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) => api.put(`/rfq/${id}/${action}`),
-    onSuccess: (_, vars) => {
+    onSuccess: (res: any, vars) => {
       queryClient.invalidateQueries({ queryKey: ['rfqs'] });
-      toast({ title: `RFQ ${vars.action === 'publish' ? 'published' : 'closed'}` });
+      const title = vars.action === 'close' ? 'RFQ closed'
+        : res?.data?.status === 'PUBLISHED' ? 'RFQ published' : 'Submitted for approval';
+      toast({ title });
     },
     onError: () => toast({ title: 'Action failed', variant: 'destructive' }),
   });
@@ -318,7 +320,10 @@ export default function RFQPage() {
     {
       key: 'actions', label: '', render: (_: any, row: any) => (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          {row.status === 'DRAFT' && (
+          {row.status === 'DRAFT' && row.approval?.status === 'PENDING' && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title={`Stage ${row.approval.currentStep}/${row.approval.totalSteps} · ${row.approval.currentStepName || row.approval.currentRole}`}>Pending approval</span>
+          )}
+          {row.status === 'DRAFT' && row.approval?.status !== 'PENDING' && (
             <>
               <button onClick={() => actionMut.mutate({ id: row.id, action: 'publish' })} className="p-1.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600" title="Publish"><Send className="h-3.5 w-3.5" /></button>
               {can('rfq', 'edit') && <button onClick={() => openEdit(row)} className="p-1.5 rounded-md hover:bg-accent text-muted-foreground"><Pencil className="h-3.5 w-3.5" /></button>}

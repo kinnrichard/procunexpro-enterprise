@@ -2,12 +2,14 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { EmailService } from '../../common/services/email.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 
 @Injectable()
 export class RfqService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly approvals: ApprovalsService,
   ) {}
 
   private generateRfqNumber(): string {
@@ -73,9 +75,11 @@ export class RfqService {
       : [];
     const userMap = new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]));
 
+    const approvals = await this.approvals.getRequestsMap(tenantId, 'RFQ', rfqs.map((r) => r.id));
     const data = rfqs.map((rfq) => ({
       ...rfq,
       createdByName: rfq.createdBy ? userMap.get(rfq.createdBy) || null : null,
+      approval: approvals.get(rfq.id) || null,
     }));
 
     return { data, total, page, limit };
@@ -120,7 +124,9 @@ export class RfqService {
       ? `${frontendUrl}/rfq/respond/${rfq.vendorTokens[0].token}`
       : null;
 
-    return { ...rfq, createdByUser, vendorResponseUrl };
+    const approval = await this.approvals.getRequest(tenantId, 'RFQ', id);
+
+    return { ...rfq, createdByUser, vendorResponseUrl, approval };
   }
 
   async create(tenantId: string, data: any, createdBy?: string) {
@@ -207,7 +213,49 @@ export class RfqService {
     return { message: 'RFQ deleted' };
   }
 
-  async publish(tenantId: string, id: string) {
+  /**
+   * Publishing an RFQ (which emails vendors) is gated by the RFQ approval workflow.
+   * If a workflow is configured, the first call submits the RFQ for approval and it
+   * only goes out once fully approved (via approve()). No workflow → publishes now.
+   */
+  async publish(tenantId: string, id: string, userId?: string) {
+    const rfq = await this.prisma.rFQ.findFirst({ where: { id, tenantId }, include: { items: { select: { id: true } } } });
+    if (!rfq) throw new NotFoundException('RFQ not found');
+    if (rfq.status !== 'DRAFT') throw new BadRequestException('Only draft RFQs can be published');
+    if (rfq.items.length === 0) throw new BadRequestException('Cannot publish an RFQ with no items');
+
+    // Already approved (e.g. re-clicking Publish after approval) → send it out.
+    const existing = await this.approvals.getRequest(tenantId, 'RFQ', id);
+    if (existing?.status === 'APPROVED') return this.doPublish(tenantId, id);
+
+    const { required } = await this.approvals.ensureRequest(tenantId, 'RFQ', id, userId);
+    if (!required) return this.doPublish(tenantId, id);
+
+    // Submitted for approval — RFQ stays DRAFT until fully approved.
+    return this.findOne(tenantId, id);
+  }
+
+  /** Records an approval on the current stage; publishes the RFQ once fully approved. */
+  async approve(tenantId: string, id: string, userId: string, userRole: string) {
+    const rfq = await this.prisma.rFQ.findFirst({ where: { id, tenantId }, select: { status: true } });
+    if (!rfq) throw new NotFoundException('RFQ not found');
+    if (rfq.status !== 'DRAFT') throw new BadRequestException('This RFQ is no longer awaiting approval');
+    const outcome = await this.approvals.decide(tenantId, 'RFQ', id, userId, userRole, 'APPROVED');
+    if (outcome.approved) await this.doPublish(tenantId, id);
+    return this.findOne(tenantId, id);
+  }
+
+  /** Rejects the RFQ at the current stage; it stays in DRAFT. */
+  async reject(tenantId: string, id: string, userId: string, userRole: string, reason?: string) {
+    const rfq = await this.prisma.rFQ.findFirst({ where: { id, tenantId }, select: { status: true } });
+    if (!rfq) throw new NotFoundException('RFQ not found');
+    if (rfq.status !== 'DRAFT') throw new BadRequestException('This RFQ is no longer awaiting approval');
+    await this.approvals.decide(tenantId, 'RFQ', id, userId, userRole, 'REJECTED', reason);
+    return this.findOne(tenantId, id);
+  }
+
+  /** The actual publish: flips to PUBLISHED and emails the vendor a response link. */
+  private async doPublish(tenantId: string, id: string) {
     const rfq = await this.prisma.rFQ.findFirst({
       where: { id, tenantId },
       include: {

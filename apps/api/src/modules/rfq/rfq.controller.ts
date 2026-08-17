@@ -81,7 +81,19 @@ export class RfqController {
   @Put(':id/publish')
   @RequirePermission(MODULE, 'edit')
   publish(@Req() req: any, @Param('id') id: string) {
-    return this.rfqService.publish(req.user.tenantId, id);
+    return this.rfqService.publish(req.user.tenantId, id, req.user.id);
+  }
+
+  @Put(':id/approve')
+  @RequirePermission(MODULE, 'view')
+  approve(@Req() req: any, @Param('id') id: string) {
+    return this.rfqService.approve(req.user.tenantId, id, req.user.id, req.user.role);
+  }
+
+  @Put(':id/reject')
+  @RequirePermission(MODULE, 'view')
+  reject(@Req() req: any, @Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.rfqService.reject(req.user.tenantId, id, req.user.id, req.user.role, body?.reason);
   }
 
   @Put(':id/close')

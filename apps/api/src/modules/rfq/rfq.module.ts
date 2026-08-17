@@ -4,9 +4,10 @@ import { RfqPublicController } from './rfq-public.controller';
 import { RfqService } from './rfq.service';
 import { EmailService } from '../../common/services/email.service';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { ApprovalsModule } from '../approvals/approvals.module';
 
 @Module({
-  imports: [PermissionsModule],
+  imports: [PermissionsModule, ApprovalsModule],
   controllers: [RfqController, RfqPublicController],
   providers: [RfqService, EmailService],
   exports: [RfqService],
