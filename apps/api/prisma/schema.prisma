@@ -26,8 +26,9 @@ enum VendorStatus {
 
 enum PurchaseRequestStatus {
   DRAFT
-  MANAGER_APPROVAL
-  FINANCE_APPROVAL
+  PENDING_APPROVAL
+  MANAGER_APPROVAL // legacy — replaced by PENDING_APPROVAL + approval workflow engine
+  FINANCE_APPROVAL // legacy — replaced by PENDING_APPROVAL + approval workflow engine
   PROCUREMENT
   COMPLETED
   REJECTED

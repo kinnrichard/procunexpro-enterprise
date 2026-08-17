@@ -1,17 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-
-const STATUS_FLOW = ['DRAFT', 'MANAGER_APPROVAL', 'FINANCE_APPROVAL', 'PROCUREMENT', 'COMPLETED'];
-
-const STATUS_ROLE_MAP: Record<string, string> = {
-  MANAGER_APPROVAL: 'MANAGER',
-  FINANCE_APPROVAL: 'FINANCE_OFFICER',
-  PROCUREMENT: 'PROCUREMENT_OFFICER',
-};
+import { ApprovalsService } from '../approvals/approvals.service';
 
 @Injectable()
 export class PurchaseRequestsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly approvals: ApprovalsService,
+  ) {}
 
   private async generateRequestNumber(tenantId: string): Promise<string> {
     const today = new Date();
@@ -128,7 +124,10 @@ export class PurchaseRequestsService {
       this.prisma.purchaseRequest.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    const approvals = await this.approvals.getRequestsMap(tenantId, 'PURCHASE_REQUEST', data.map((p) => p.id));
+    const withApproval = data.map((p) => ({ ...p, approval: approvals.get(p.id) || null }));
+
+    return { data: withApproval, total, page, limit };
   }
 
   async findAllItems(tenantId: string, params: { page?: number; limit?: number; search?: string; prStatus?: string }) {
@@ -192,7 +191,9 @@ export class PurchaseRequestsService {
       },
     });
     if (!pr) throw new NotFoundException('Purchase request not found');
-    return pr;
+    const status = await this.ensureApprovalMigrated(tenantId, pr);
+    const approval = await this.approvals.getRequest(tenantId, 'PURCHASE_REQUEST', id);
+    return { ...pr, status, approval };
   }
 
   async create(tenantId: string, userId: string, data: any) {
@@ -481,7 +482,34 @@ export class PurchaseRequestsService {
 
   // ─── Status Transitions ─────────────────────────────────────
 
-  async submit(tenantId: string, id: string) {
+  /**
+   * Back-compat: PRs created before the approval engine sit in the legacy
+   * MANAGER_APPROVAL / FINANCE_APPROVAL statuses. On first access we lazily create
+   * an ApprovalRequest at the equivalent stage and flip them to PENDING_APPROVAL,
+   * so no one-time DB migration is needed. Returns the effective status.
+   */
+  private async ensureApprovalMigrated(tenantId: string, pr: { id: string; status: string }): Promise<string> {
+    if (pr.status !== 'MANAGER_APPROVAL' && pr.status !== 'FINANCE_APPROVAL') return pr.status;
+    const wf = await this.approvals.getWorkflow(tenantId, 'PURCHASE_REQUEST');
+    const steps = (wf?.rules ?? []).map((r) => ({ order: r.stepOrder, name: r.name || r.role, role: r.role }));
+    if (steps.length === 0) return pr.status; // no workflow to map onto — leave as-is
+    const target = pr.status === 'FINANCE_APPROVAL' ? 2 : 1;
+    const currentStep = Math.min(target, steps.length);
+    await this.prisma.approvalRequest.upsert({
+      where: { tenantId_entityType_entityId: { tenantId, entityType: 'PURCHASE_REQUEST', entityId: pr.id } },
+      create: { tenantId, entityType: 'PURCHASE_REQUEST', entityId: pr.id, status: 'PENDING', currentStep, steps: steps as any },
+      update: {},
+    });
+    await this.prisma.purchaseRequest.update({ where: { id: pr.id }, data: { status: 'PENDING_APPROVAL' } });
+    return 'PENDING_APPROVAL';
+  }
+
+  /**
+   * Submit for approval. Starts the configured PURCHASE_REQUEST workflow; the PR
+   * sits in PENDING_APPROVAL while it moves through the stages, then lands in
+   * PROCUREMENT. With no workflow configured it goes straight to PROCUREMENT.
+   */
+  async submit(tenantId: string, id: string, userId?: string) {
     const pr = await this.findOne(tenantId, id);
     if (pr.status !== 'DRAFT') {
       throw new BadRequestException('Can only submit purchase requests in DRAFT status');
@@ -490,93 +518,68 @@ export class PurchaseRequestsService {
       throw new BadRequestException('Cannot submit a request with no items');
     }
 
-    return this.prisma.purchaseRequest.update({
-      where: { id },
-      data: { status: 'MANAGER_APPROVAL' },
-    });
-  }
-
-  private assertRoleCanApprove(userRole: string, requiredRole: string) {
-    // SUPERADMIN and ADMIN can approve any stage
-    if (userRole === 'SUPERADMIN' || userRole === 'ADMIN') return;
-    if (userRole !== requiredRole) {
-      throw new ForbiddenException(`Only ${requiredRole} role can perform this approval`);
+    const { required } = await this.approvals.ensureRequest(tenantId, 'PURCHASE_REQUEST', id, userId);
+    if (!required) {
+      await this.prisma.purchaseRequest.update({ where: { id }, data: { status: 'PROCUREMENT', procurementSubStatus: 'READY_TO_START' } });
+    } else {
+      await this.prisma.purchaseRequest.update({ where: { id }, data: { status: 'PENDING_APPROVAL' } });
     }
+    return this.findOne(tenantId, id);
   }
 
+  /** Records an approval on the current stage; PR moves to PROCUREMENT once fully approved. */
   async approve(tenantId: string, id: string, userId: string, userRole: string) {
     const pr = await this.prisma.purchaseRequest.findFirst({ where: { id, tenantId } });
     if (!pr) throw new NotFoundException('Purchase request not found');
-
-    const currentStatus = pr.status;
-    const requiredRole = STATUS_ROLE_MAP[currentStatus];
-    if (!requiredRole) {
-      throw new BadRequestException(`Cannot approve a purchase request in ${currentStatus} status`);
+    const status = await this.ensureApprovalMigrated(tenantId, pr);
+    if (status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException(`Cannot approve a purchase request in ${status} status`);
     }
 
-    this.assertRoleCanApprove(userRole, requiredRole);
+    const before = await this.approvals.getRequest(tenantId, 'PURCHASE_REQUEST', id);
+    const stepOrder = before?.currentStep ?? 1;
+    const outcome = await this.approvals.decide(tenantId, 'PURCHASE_REQUEST', id, userId, userRole, 'APPROVED');
 
-    const currentIndex = STATUS_FLOW.indexOf(currentStatus);
-    const nextStatus = STATUS_FLOW[currentIndex + 1];
-
-    const updateData: any = { status: nextStatus };
-
-    // When entering PROCUREMENT stage, set default sub-status
-    if (nextStatus === 'PROCUREMENT') {
-      updateData.procurementSubStatus = 'READY_TO_START';
-    }
-
-    // Record approval step
+    // Keep an ApprovalStep record so the PR timeline still shows who cleared each stage.
     await this.prisma.approvalStep.create({
-      data: {
-        purchaseRequestId: id,
-        stepOrder: currentIndex,
-        role: userRole as any,
-        userId,
-        action: 'APPROVED',
-        actionAt: new Date(),
-      },
+      data: { purchaseRequestId: id, stepOrder, role: userRole as any, userId, action: 'APPROVED', actionAt: new Date() },
     });
 
-    return this.prisma.purchaseRequest.update({
-      where: { id },
-      data: updateData,
-    });
+    if (outcome.approved) {
+      await this.prisma.purchaseRequest.update({
+        where: { id },
+        data: { status: 'PROCUREMENT', procurementSubStatus: 'READY_TO_START', approvedAt: new Date() },
+      });
+    }
+    return this.findOne(tenantId, id);
   }
 
+  /** Rejects the PR at the current stage. */
   async reject(tenantId: string, id: string, rejectionNote: string, userId: string, userRole: string) {
     const pr = await this.prisma.purchaseRequest.findFirst({ where: { id, tenantId } });
     if (!pr) throw new NotFoundException('Purchase request not found');
-
-    const currentStatus = pr.status;
-    const requiredRole = STATUS_ROLE_MAP[currentStatus];
-    if (!requiredRole) {
-      throw new BadRequestException(`Cannot reject a purchase request in ${currentStatus} status`);
+    const status = await this.ensureApprovalMigrated(tenantId, pr);
+    if (status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException(`Cannot reject a purchase request in ${status} status`);
     }
 
-    this.assertRoleCanApprove(userRole, requiredRole);
+    const before = await this.approvals.getRequest(tenantId, 'PURCHASE_REQUEST', id);
+    const stepOrder = before?.currentStep ?? 1;
+    await this.approvals.decide(tenantId, 'PURCHASE_REQUEST', id, userId, userRole, 'REJECTED', rejectionNote);
 
-    // Record rejection step
     await this.prisma.approvalStep.create({
-      data: {
-        purchaseRequestId: id,
-        stepOrder: STATUS_FLOW.indexOf(currentStatus),
-        role: userRole as any,
-        userId,
-        action: 'REJECTED',
-        comment: rejectionNote || null,
-        actionAt: new Date(),
-      },
+      data: { purchaseRequestId: id, stepOrder, role: userRole as any, userId, action: 'REJECTED', comment: rejectionNote || null, actionAt: new Date() },
     });
 
-    return this.prisma.purchaseRequest.update({
+    await this.prisma.purchaseRequest.update({
       where: { id },
       data: {
         status: 'REJECTED',
-        rejectedAtStage: currentStatus,
+        rejectedAtStage: `APPROVAL_${stepOrder}`,
         rejectionNote: rejectionNote || null,
       },
     });
+    return this.findOne(tenantId, id);
   }
 
   async updateProcurementSubStatus(tenantId: string, id: string, subStatus: string) {

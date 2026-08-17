@@ -19,7 +19,7 @@ export class DashboardService {
       this.prisma.purchaseRequest.count({ where: { tenantId } }),
       this.prisma.purchaseOrder.count({ where: { tenantId } }),
       this.prisma.purchaseRequest.count({
-        where: { tenantId, status: { in: ['MANAGER_APPROVAL', 'FINANCE_APPROVAL'] } },
+        where: { tenantId, status: 'PENDING_APPROVAL' },
       }),
       this.prisma.purchaseOrder.count({
         where: { tenantId, status: 'PENDING_APPROVAL' },

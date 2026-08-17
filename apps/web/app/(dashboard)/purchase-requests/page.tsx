@@ -227,7 +227,7 @@ export default function PurchaseRequestsPage() {
 
   const stats = useMemo(() => ({
     total,
-    pending: items.filter((i: any) => ['MANAGER_APPROVAL', 'FINANCE_APPROVAL'].includes(i.status)).length,
+    pending: items.filter((i: any) => i.status === 'PENDING_APPROVAL').length,
     procurement: items.filter((i: any) => i.status === 'PROCUREMENT').length,
     completed: items.filter((i: any) => i.status === 'COMPLETED').length,
   }), [items, total]);
@@ -398,8 +398,8 @@ export default function PurchaseRequestsPage() {
     },
   ];
 
-  const statusFilters = ['', 'DRAFT', 'MANAGER_APPROVAL', 'FINANCE_APPROVAL', 'PROCUREMENT', 'COMPLETED', 'REJECTED', 'CANCELLED'];
-  const statusLabels: Record<string, string> = { '': 'All', DRAFT: 'Draft', MANAGER_APPROVAL: 'Manager', FINANCE_APPROVAL: 'Finance', PROCUREMENT: 'Procurement', COMPLETED: 'Completed', REJECTED: 'Rejected', CANCELLED: 'Cancelled' };
+  const statusFilters = ['', 'DRAFT', 'PENDING_APPROVAL', 'PROCUREMENT', 'COMPLETED', 'REJECTED', 'CANCELLED'];
+  const statusLabels: Record<string, string> = { '': 'All', DRAFT: 'Draft', PENDING_APPROVAL: 'Pending Approval', PROCUREMENT: 'Procurement', COMPLETED: 'Completed', REJECTED: 'Rejected', CANCELLED: 'Cancelled' };
 
   // ─── Render ─────────────────────────────────────────────
   return (

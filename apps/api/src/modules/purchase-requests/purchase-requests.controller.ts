@@ -110,17 +110,17 @@ export class PurchaseRequestsController {
   @Put(':id/submit')
   @RequirePermission(MODULE, 'edit')
   submit(@Req() req: any, @Param('id') id: string) {
-    return this.purchaseRequestsService.submit(req.user.tenantId, id);
+    return this.purchaseRequestsService.submit(req.user.tenantId, id, req.user.id);
   }
 
   @Put(':id/approve')
-  @RequirePermission(MODULE, 'edit')
+  @RequirePermission(MODULE, 'view')
   approve(@Req() req: any, @Param('id') id: string) {
     return this.purchaseRequestsService.approve(req.user.tenantId, id, req.user.id, req.user.role);
   }
 
   @Put(':id/reject')
-  @RequirePermission(MODULE, 'edit')
+  @RequirePermission(MODULE, 'view')
   reject(@Req() req: any, @Param('id') id: string, @Body() body: { rejectionNote?: string }) {
     return this.purchaseRequestsService.reject(req.user.tenantId, id, body.rejectionNote || '', req.user.id, req.user.role);
   }

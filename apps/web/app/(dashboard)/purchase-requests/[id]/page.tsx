@@ -25,9 +25,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { usePermissions } from '@/lib/permissions';
+import { useAuthStore } from '@/lib/auth';
 import {
   ArrowLeft, Plus, Trash2, Loader2, Send, CheckCircle, XCircle, X, Filter,
-  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info, Package, FileSearch,
+  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info, Package, FileSearch, ShieldCheck,
 } from 'lucide-react';
 
 type Vendor = { id: string; name: string };
@@ -40,8 +42,6 @@ const priorityColors: Record<string, string> = {
 };
 
 // ─── Status Timeline ──────────────────────────────────────
-const statusOrder = ['DRAFT', 'MANAGER_APPROVAL', 'FINANCE_APPROVAL', 'PROCUREMENT', 'COMPLETED'];
-
 const PROCUREMENT_SUB_STATUSES = [
   { value: 'READY_TO_START', label: 'Ready to Start' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
@@ -50,46 +50,57 @@ const PROCUREMENT_SUB_STATUSES = [
   { value: 'COMPLETED', label: 'Completed' },
 ];
 
-const STAGE_LABELS: Record<string, string> = {
-  DRAFT: 'Draft',
-  MANAGER_APPROVAL: 'Manager Approval',
-  FINANCE_APPROVAL: 'Finance Approval',
-  PROCUREMENT: 'Procurement',
-  COMPLETED: 'Completed',
-};
-
 type ApprovalStepData = { stepOrder: number; role: string; action?: string; comment?: string; actionAt?: string; user?: { id: string; firstName: string; lastName: string } | null };
 
-function StatusTimeline({ status, rejectionNote, rejectedAtStage, procurementSubStatus, approvalSteps = [], createdAt, requestedBy }: Readonly<{
+type TimelineStage = { key: string; label: string; order: number };
+
+function StatusTimeline({ status, rejectionNote, rejectedAtStage, procurementSubStatus, approvalSteps = [], approval, createdAt, requestedBy }: Readonly<{
   status: string; rejectionNote?: string; rejectedAtStage?: string; procurementSubStatus?: string;
-  approvalSteps?: ApprovalStepData[]; createdAt?: string;
+  approvalSteps?: ApprovalStepData[]; approval?: any; createdAt?: string;
   requestedBy?: { firstName: string; lastName: string } | null;
 }>) {
   const isRejected = status === 'REJECTED';
   const isCancelled = status === 'CANCELLED';
-  const currentIndex = isRejected
-    ? statusOrder.indexOf(rejectedAtStage || 'MANAGER_APPROVAL')
-    : statusOrder.indexOf(status);
+
+  // Approval stages are dynamic — read from the request's snapshot (falls back to a
+  // single generic stage for drafts that haven't been submitted yet).
+  const snapshot: any[] = approval?.steps?.length ? approval.steps : [{ order: 1, name: 'Approval', role: '' }];
+  const approvalStages: TimelineStage[] = snapshot.map((s: any) => ({ key: `APPROVAL_${s.order}`, label: s.name || s.role || 'Approval', order: s.order }));
+  const stages: TimelineStage[] = [
+    { key: 'DRAFT', label: 'Draft', order: 0 },
+    ...approvalStages,
+    { key: 'PROCUREMENT', label: 'Procurement', order: -1 },
+    { key: 'COMPLETED', label: 'Completed', order: -2 },
+  ];
+  const procurementIndex = approvalStages.length + 1;
+
+  let currentIndex: number;
+  if (isRejected) currentIndex = Math.max(0, stages.findIndex(s => s.key === (rejectedAtStage || 'APPROVAL_1')));
+  else if (status === 'DRAFT') currentIndex = 0;
+  else if (status === 'PENDING_APPROVAL') currentIndex = Math.min(approval?.currentStep ?? 1, approvalStages.length);
+  else if (status === 'PROCUREMENT') currentIndex = procurementIndex;
+  else if (status === 'COMPLETED') currentIndex = stages.length - 1;
+  else currentIndex = 0;
 
   const rejectionStep = isRejected
     ? approvalSteps.find(s => s.action === 'REJECTED')
     : null;
 
-  function getStepForStage(stageKey: string): ApprovalStepData | undefined {
-    const stageIndex = statusOrder.indexOf(stageKey);
-    return approvalSteps.find(s => s.stepOrder === stageIndex && s.action === 'APPROVED');
+  function getStepForStage(stage: TimelineStage): ApprovalStepData | undefined {
+    if (!stage.key.startsWith('APPROVAL_')) return undefined;
+    return approvalSteps.find(s => s.stepOrder === stage.order && s.action === 'APPROVED');
   }
 
   return (
     <div className="w-full">
       {/* Progress bar */}
       <div className="flex items-center gap-0 mb-4">
-        {statusOrder.map((stageKey, i) => {
+        {stages.map((stage, i) => {
           const isDone = currentIndex > i;
           const isCurrent = currentIndex === i;
-          const isRejectedStage = isRejected && rejectedAtStage === stageKey;
+          const isRejectedStage = isRejected && rejectedAtStage === stage.key;
           return (
-            <div key={stageKey} className="flex items-center flex-1 last:flex-none">
+            <div key={stage.key} className="flex items-center flex-1 last:flex-none">
               <div className={cn(
                 'w-3 h-3 rounded-full border-2 shrink-0 transition-all',
                 isDone && 'bg-emerald-500 border-emerald-500',
@@ -97,7 +108,7 @@ function StatusTimeline({ status, rejectionNote, rejectedAtStage, procurementSub
                 isRejectedStage && 'bg-red-500 border-red-500 ring-4 ring-red-500/10',
                 !isDone && !isCurrent && !isRejectedStage && 'bg-background border-muted-foreground/30',
               )} />
-              {i < statusOrder.length - 1 && (
+              {i < stages.length - 1 && (
                 <div className={cn('h-0.5 flex-1 mx-1', isDone ? 'bg-emerald-500' : 'bg-border')} />
               )}
             </div>
@@ -106,15 +117,16 @@ function StatusTimeline({ status, rejectionNote, rejectedAtStage, procurementSub
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-5 gap-3">
-        {statusOrder.map((stageKey, i) => {
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}>
+        {stages.map((stage, i) => {
+          const stageKey = stage.key;
           const isDone = currentIndex > i;
           const isCurrent = currentIndex === i;
           const isUpcoming = currentIndex < i;
           const isRejectedStage = isRejected && rejectedAtStage === stageKey;
           const isDraft = stageKey === 'DRAFT';
 
-          const step = getStepForStage(stageKey);
+          const step = getStepForStage(stage);
           const approvedBy = step?.user;
           const approvedAt = step?.actionAt;
 
@@ -130,7 +142,7 @@ function StatusTimeline({ status, rejectionNote, rejectedAtStage, procurementSub
             >
               {/* Label + status indicator */}
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] font-semibold text-foreground">{STAGE_LABELS[stageKey]}</p>
+                <p className="text-[11px] font-semibold text-foreground truncate">{stage.label}</p>
                 {isDone && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
                 {isRejectedStage && <XCircle className="h-3.5 w-3.5 text-red-500" />}
                 {isCurrent && !isRejectedStage && <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
@@ -441,6 +453,8 @@ export default function PurchaseRequestDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { isAdmin } = usePermissions();
+  const authUser = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const formatCurrency = useCurrencyStore((s) => s.format);
   const currencySymbol = useCurrencyStore((s) => s.symbol);
@@ -663,14 +677,14 @@ export default function PurchaseRequestDetailPage() {
   // ─── Status Mutations ──────────────────────────────────
   const submitMutation = useMutation({
     mutationFn: () => api.put(`/purchase-requests/${prId}/submit`),
-    onSuccess: () => { invalidate(); toast({ title: 'Submitted for approval' }); },
+    onSuccess: (res: any) => { invalidate(); toast({ title: res?.data?.status === 'PROCUREMENT' ? 'Submitted — no approval required' : 'Submitted for approval' }); },
     onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed to submit', variant: 'destructive' }),
   });
 
   const approveMutation = useMutation({
     mutationFn: () => api.put(`/purchase-requests/${prId}/approve`),
-    onSuccess: () => { invalidate(); toast({ title: 'Purchase request approved' }); },
-    onError: () => toast({ title: 'Failed to approve', variant: 'destructive' }),
+    onSuccess: (res: any) => { invalidate(); toast({ title: res?.data?.status === 'PROCUREMENT' ? 'Approved — moved to Procurement' : 'Stage approved — sent to next approver' }); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to approve', variant: 'destructive' }),
   });
 
   const createRfqMutation = useMutation({
@@ -884,12 +898,9 @@ export default function PurchaseRequestDetailPage() {
   if (isLoading) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Loading…</div>;
   if (!pr) return <div className="flex items-center justify-center h-full py-20 text-muted-foreground">Purchase request not found</div>;
 
-  const isApprovalStage = ['MANAGER_APPROVAL', 'FINANCE_APPROVAL', 'PROCUREMENT'].includes(pr?.status);
-  const approvalStageLabel: Record<string, string> = {
-    MANAGER_APPROVAL: 'Manager Approve',
-    FINANCE_APPROVAL: 'Finance Approve',
-    PROCUREMENT: 'Procurement Approve',
-  };
+  const pendingApproval = pr?.status === 'PENDING_APPROVAL';
+  const appr = pr?.approval;
+  const eligibleApprover = isAdmin || (!!appr?.currentRole && authUser?.role === appr.currentRole);
 
   function renderHeaderActions() {
     return (
@@ -905,14 +916,21 @@ export default function PurchaseRequestDetailPage() {
             Submit for Approval
           </Button>
         )}
-        {isApprovalStage && (
+        {pendingApproval && (
           <>
-            <Button onClick={() => setApproveConfirmOpen(true)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
-              <CheckCircle className="h-4 w-4 mr-2" /> {approvalStageLabel[pr.status] || 'Approve'}
-            </Button>
-            <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}>
-              <XCircle className="h-4 w-4 mr-2" /> Reject
-            </Button>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5" /> {appr && appr.totalSteps > 1 ? `Stage ${appr.currentStep}/${appr.totalSteps} · ` : ''}{appr?.currentStepName || appr?.currentRole || 'Pending Approval'}
+            </span>
+            {eligibleApprover && (
+              <>
+                <Button onClick={() => setApproveConfirmOpen(true)} disabled={approveMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+                  <CheckCircle className="h-4 w-4 mr-2" /> Approve
+                </Button>
+                <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}>
+                  <XCircle className="h-4 w-4 mr-2" /> Reject
+                </Button>
+              </>
+            )}
           </>
         )}
       </div>
@@ -975,6 +993,7 @@ export default function PurchaseRequestDetailPage() {
             rejectedAtStage={pr.rejectedAtStage}
             procurementSubStatus={pr.procurementSubStatus}
             approvalSteps={pr.approvalSteps || []}
+            approval={pr.approval}
             createdAt={pr.createdAt}
             requestedBy={pr.requestedBy}
           />

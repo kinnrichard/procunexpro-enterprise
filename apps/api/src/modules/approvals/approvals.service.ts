@@ -10,9 +10,9 @@ import { FULL_ACCESS_ROLES } from '../permissions/permissions.constants';
 export const APPROVAL_MODULES = [
   { entityType: 'STOCK_MOVEMENT', label: 'Stock Movements', enforced: true },
   { entityType: 'STOCK_TRANSFER', label: 'Stock Transfers', enforced: true },
+  { entityType: 'PURCHASE_REQUEST', label: 'Purchase Requests', enforced: true },
   { entityType: 'PURCHASE_ORDER', label: 'Purchase Orders', enforced: true },
   { entityType: 'RFQ', label: 'Request for Quotation', enforced: true },
-  { entityType: 'PURCHASE_REQUEST', label: 'Purchase Requests', enforced: false },
 ];
 
 /** Default stages seeded per module, mirroring the flow in place today. */
