@@ -19,22 +19,6 @@ export const APPROVAL_MODULES = [
   { entityType: 'DELIVERY', label: 'Deliveries', enforced: true },
 ];
 
-/** Default stages seeded per module, mirroring the flow in place today. */
-const DEFAULT_STEPS: Record<string, { name: string; role: string }[]> = {
-  PURCHASE_REQUEST: [
-    { name: 'Manager Approval', role: 'MANAGER' },
-    { name: 'Finance Approval', role: 'FINANCE_OFFICER' },
-  ],
-  PURCHASE_ORDER: [{ name: 'Manager Approval', role: 'MANAGER' }],
-  STOCK_MOVEMENT: [{ name: 'Manager Approval', role: 'MANAGER' }],
-  STOCK_TRANSFER: [{ name: 'Manager Approval', role: 'MANAGER' }],
-  RFQ: [{ name: 'Manager Approval', role: 'MANAGER' }],
-  GOODS_RECEIPT: [{ name: 'Manager Approval', role: 'MANAGER' }],
-  STOCK_LOT: [{ name: 'Manager Approval', role: 'MANAGER' }],
-  PRODUCTION: [{ name: 'Manager Approval', role: 'MANAGER' }],
-  DELIVERY: [{ name: 'Manager Approval', role: 'MANAGER' }],
-};
-
 interface StepSnapshot { order: number; name: string; role: string }
 
 @Injectable()
@@ -43,27 +27,12 @@ export class ApprovalsService {
 
   // ---- Configuration ---------------------------------------------------
 
-  /** Seed a default workflow for any module that doesn't have one yet. */
-  async ensureDefaults(tenantId: string) {
-    const existing = await this.prisma.approvalWorkflow.findMany({ where: { tenantId }, select: { entityType: true } });
-    const have = new Set(existing.map((w) => w.entityType));
-    for (const mod of APPROVAL_MODULES) {
-      if (have.has(mod.entityType)) continue;
-      const steps = DEFAULT_STEPS[mod.entityType] || [{ name: 'Approval', role: 'MANAGER' }];
-      await this.prisma.approvalWorkflow.create({
-        data: {
-          tenantId,
-          entityType: mod.entityType,
-          name: `${mod.label} Approval`,
-          isActive: true,
-          rules: { create: steps.map((s, i) => ({ stepOrder: i + 1, name: s.name, role: s.role, isRequired: true })) },
-        },
-      });
-    }
-  }
-
+  /**
+   * Approvals are opt-in: modules ship with NO stages. Each module appears in the
+   * config with an empty stage list until an admin adds stages, and a module with
+   * no stages requires no approval (documents post immediately). No seeding.
+   */
   async listWorkflows(tenantId: string) {
-    await this.ensureDefaults(tenantId);
     const workflows = await this.prisma.approvalWorkflow.findMany({
       where: { tenantId },
       include: { rules: { orderBy: { stepOrder: 'asc' } } },
