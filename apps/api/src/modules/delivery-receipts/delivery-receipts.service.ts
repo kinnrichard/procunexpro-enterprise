@@ -1,13 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 
 const round = (n: number) => Math.round(n * 1e6) / 1e6;
 const WEB_BASE = process.env.WEB_URL || 'http://localhost:3005';
 
 @Injectable()
 export class DeliveryReceiptsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly approvals: ApprovalsService,
+  ) {}
 
   private signUrl(token: string) {
     return `${WEB_BASE}/dr/sign/${token}`;
@@ -40,7 +44,8 @@ export class DeliveryReceiptsService {
       }),
       this.prisma.deliveryReceipt.count({ where }),
     ]);
-    return { data: data.map((d) => ({ ...d, signUrl: this.signUrl(d.token) })), total, page, limit };
+    const approvals = await this.approvals.getRequestsMap(tenantId, 'DELIVERY', data.map((d) => d.id));
+    return { data: data.map((d) => ({ ...d, signUrl: this.signUrl(d.token), approval: approvals.get(d.id) || null })), total, page, limit };
   }
 
   async findOne(tenantId: string, id: string) {
@@ -52,10 +57,15 @@ export class DeliveryReceiptsService {
       },
     });
     if (!dr) throw new NotFoundException('Delivery receipt not found');
-    return { ...dr, signUrl: this.signUrl(dr.token) };
+    const approval = await this.approvals.getRequest(tenantId, 'DELIVERY', id);
+    return { ...dr, signUrl: this.signUrl(dr.token), approval };
   }
 
-  // Release finished goods to a customer and create the DR (with external sign token)
+  /**
+   * Records a delivery. Stock is NOT drawn until the DELIVERY workflow is satisfied —
+   * on final approval the finished goods are consumed FEFO, on-hand is decremented,
+   * a SALE movement is written and the DR is RELEASED. No workflow → releases now.
+   */
   async create(tenantId: string, userId: string, data: any) {
     const customer = await this.prisma.customer.findFirst({ where: { id: data.customerId, tenantId } });
     if (!customer) throw new NotFoundException('Customer not found');
@@ -69,16 +79,79 @@ export class DeliveryReceiptsService {
     });
     const prodMap = new Map(products.map((p) => [p.id, p]));
 
+    // Pre-check stock availability for a better UX; authoritative check runs on release.
+    for (const r of rows) {
+      const prod = prodMap.get(r.productId);
+      if (!prod) throw new NotFoundException('Product not found');
+      if (prod.currentStock < round(r.quantity)) {
+        throw new BadRequestException(`Insufficient stock for ${prod.name} (available ${prod.currentStock}, need ${round(r.quantity)})`);
+      }
+    }
+
     const today = new Date();
     const drPrefix = `DR-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     const drCount = await this.prisma.deliveryReceipt.count({ where: { tenantId, drNumber: { startsWith: drPrefix } } });
     const drNumber = `${drPrefix}-${String(drCount + 1).padStart(4, '0')}`;
 
+    const dr = await this.prisma.deliveryReceipt.create({
+      data: {
+        tenantId, drNumber, customerId: data.customerId,
+        warehouseId: data.warehouseId || null, areaId: data.areaId || null, locationId: data.locationId || null,
+        status: 'DRAFT', notes: data.notes || null,
+        deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : today,
+        token: randomUUID(), createdById: userId,
+        items: { create: rows.map((r) => ({ productId: r.productId, quantity: round(r.quantity), uom: r.uom || prodMap.get(r.productId)?.unit || 'pcs' })) },
+      },
+    });
+
+    const { required } = await this.approvals.ensureRequest(tenantId, 'DELIVERY', dr.id, userId);
+    if (!required) await this.applyRelease(tenantId, dr.id, userId);
+    return this.findOne(tenantId, dr.id);
+  }
+
+  /** Records an approval on the current stage; releases the goods once fully approved. */
+  async approve(tenantId: string, id: string, userId: string, userRole: string) {
+    const dr = await this.prisma.deliveryReceipt.findFirst({ where: { id, tenantId } });
+    if (!dr) throw new NotFoundException('Delivery receipt not found');
+    if (dr.status !== 'DRAFT') throw new BadRequestException('This delivery is no longer awaiting approval');
+    const outcome = await this.approvals.decide(tenantId, 'DELIVERY', id, userId, userRole, 'APPROVED');
+    if (outcome.approved) await this.applyRelease(tenantId, id, userId);
+    return this.findOne(tenantId, id);
+  }
+
+  /** Rejects the delivery without drawing any stock; it stays DRAFT. */
+  async reject(tenantId: string, id: string, userId: string, userRole: string, reason?: string) {
+    const dr = await this.prisma.deliveryReceipt.findFirst({ where: { id, tenantId } });
+    if (!dr) throw new NotFoundException('Delivery receipt not found');
+    if (dr.status !== 'DRAFT') throw new BadRequestException('This delivery is no longer awaiting approval');
+    await this.approvals.decide(tenantId, 'DELIVERY', id, userId, userRole, 'REJECTED', reason);
+    await this.prisma.deliveryReceipt.update({ where: { id }, data: { approvedById: userId, approvedAt: new Date(), rejectionReason: reason || null } });
+    return this.findOne(tenantId, id);
+  }
+
+  /** Releases the delivery: FEFO draw + on-hand decrement + SALE movements + RELEASED. */
+  private async applyRelease(tenantId: string, id: string, approverId: string) {
+    const dr = await this.prisma.deliveryReceipt.findFirst({
+      where: { id, tenantId },
+      include: { items: true, customer: { select: { name: true } } },
+    });
+    if (!dr) throw new NotFoundException('Delivery receipt not found');
+    const rows = dr.items;
+
+    const products = await this.prisma.product.findMany({
+      where: { tenantId, id: { in: rows.map((r) => r.productId) } },
+      select: { id: true, name: true, currentStock: true },
+    });
+    const prodMap = new Map(products.map((p) => [p.id, p]));
+
+    const today = new Date();
     const smPrefix = `SM-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
     let smSeq = await this.prisma.stockMovement.count({ where: { tenantId, referenceNumber: { startsWith: smPrefix } } });
     const nextSm = () => `${smPrefix}-${String(++smSeq).padStart(4, '0')}`;
 
-    const ops: any[] = [];
+    const ops: any[] = [
+      this.prisma.deliveryReceipt.update({ where: { id }, data: { status: 'RELEASED', releasedAt: today, approvedById: approverId, approvedAt: today, rejectionReason: null } }),
+    ];
 
     for (const r of rows) {
       const need = round(r.quantity);
@@ -88,14 +161,12 @@ export class DeliveryReceiptsService {
         throw new BadRequestException(`Insufficient stock for ${prod.name} (available ${prod.currentStock}, need ${need})`);
       }
 
-      // Draw down finished-good lots FEFO (QC-passed), best-effort
       const lots = await this.prisma.stockLot.findMany({
         where: {
           tenantId, productId: r.productId, status: 'AVAILABLE', qcStatus: 'PASSED', quantity: { gt: 0 },
-          ...(data.warehouseId ? { OR: [{ warehouseId: data.warehouseId }, { warehouseId: null }] } : {}),
-          // When a source area/location is given, pick only from that zone/bin
-          ...(data.areaId ? { areaId: data.areaId } : {}),
-          ...(data.locationId ? { locationId: data.locationId } : {}),
+          ...(dr.warehouseId ? { OR: [{ warehouseId: dr.warehouseId }, { warehouseId: null }] } : {}),
+          ...(dr.areaId ? { areaId: dr.areaId } : {}),
+          ...(dr.locationId ? { locationId: dr.locationId } : {}),
         },
         orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
       });
@@ -110,23 +181,11 @@ export class DeliveryReceiptsService {
 
       ops.push(
         this.prisma.product.update({ where: { id: r.productId }, data: { currentStock: { decrement: need } } }),
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'SALE', quantity: need, fromWarehouseId: data.warehouseId || null, fromLocationId: data.locationId || null, reason: `Released via ${drNumber} to ${customer.name}`, performedBy: userId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'SALE', quantity: need, fromWarehouseId: dr.warehouseId || null, fromLocationId: dr.locationId || null, reason: `Released via ${dr.drNumber} to ${dr.customer?.name || ''}`, performedBy: approverId } }),
       );
     }
 
-    ops.push(this.prisma.deliveryReceipt.create({
-      data: {
-        tenantId, drNumber, customerId: data.customerId, warehouseId: data.warehouseId || null,
-        status: 'RELEASED', releasedAt: today, notes: data.notes || null,
-        deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : today,
-        token: randomUUID(), createdById: userId,
-        items: { create: rows.map((r) => ({ productId: r.productId, quantity: round(r.quantity), uom: r.uom || prodMap.get(r.productId)?.unit || 'pcs' })) },
-      },
-    }));
-
     await this.prisma.$transaction(ops);
-    const created = await this.prisma.deliveryReceipt.findFirst({ where: { tenantId, drNumber } });
-    return this.findOne(tenantId, created!.id);
   }
 
   async cancel(tenantId: string, id: string) {

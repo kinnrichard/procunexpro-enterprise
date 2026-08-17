@@ -1203,6 +1203,8 @@ model DeliveryReceipt {
   drNumber      String // DR-YYYYMMDD-####
   customerId    String
   warehouseId   String?
+  areaId        String?
+  locationId    String?
   status        String    @default("RELEASED") // DRAFT | RELEASED | SIGNED | CANCELLED (DRAFT = awaiting approval)
   approvedById  String?
   approvedAt    DateTime?

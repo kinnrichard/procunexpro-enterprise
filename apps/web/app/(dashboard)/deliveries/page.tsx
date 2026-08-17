@@ -19,6 +19,7 @@ import { AreaSelect } from '@/components/area-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
+import { ApprovalStatusBadge, ApprovalActions } from '@/components/approval-controls';
 import { Send, Plus, Trash2, Link2, XCircle, CheckCircle2 } from 'lucide-react';
 
 interface Row { productId: string; quantity: number; }
@@ -89,7 +90,7 @@ export default function DeliveriesPage() {
       queryClient.invalidateQueries({ queryKey: ['delivery-receipts'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setModalOpen(false);
-      toast({ title: `Released — ${res?.data?.drNumber || ''}` });
+      toast({ title: res?.data?.status === 'RELEASED' ? `Released — ${res?.data?.drNumber || ''}` : `Delivery ${res?.data?.drNumber || ''} submitted for approval` });
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to release', variant: 'destructive' }),
   });
@@ -108,25 +109,34 @@ export default function DeliveriesPage() {
     { key: 'customer', label: 'Customer', render: (_: any, row: any) => row.customer?.name || '—' },
     { key: '_count', label: 'Items', className: 'text-center', render: (v: any) => <span className="font-mono text-sm">{v?.items ?? 0}</span> },
     { key: 'status', label: 'Status', render: (v: string, row: any) => (
-      <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium', statusColors[v] || statusColors.DRAFT)}>
-        {v === 'SIGNED' && <CheckCircle2 className="h-3 w-3" />}{v}{row.signedByName ? ` · ${row.signedByName}` : ''}
-      </span>
+      row.approval?.status === 'PENDING' || row.approval?.status === 'REJECTED'
+        ? <ApprovalStatusBadge approval={row.approval} fallback={v} />
+        : (
+          <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium', statusColors[v] || statusColors.DRAFT)}>
+            {v === 'SIGNED' && <CheckCircle2 className="h-3 w-3" />}{v}{row.signedByName ? ` · ${row.signedByName}` : ''}
+          </span>
+        )
     ) },
     { key: 'deliveryDate', label: 'Date', render: (v: string) => formatDate(v) },
-    { key: 'actions', label: '', render: (_: any, row: any) => (
-      <div className="flex items-center gap-0.5 justify-end">
-        <button onClick={() => copyLink(row.signUrl)} title="Copy sign link" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Link2 className="h-3.5 w-3.5" /></button>
-        {row.status === 'RELEASED' && can('deliveries', 'edit') && (
-          <button onClick={() => cancelMut.mutate(row.id)} title="Cancel" className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><XCircle className="h-3.5 w-3.5" /></button>
-        )}
-      </div>
-    ) },
+    { key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => {
+      if (row.status === 'DRAFT' && row.approval?.status === 'PENDING') {
+        return <ApprovalActions endpoint="/delivery-receipts" id={row.id} approval={row.approval} invalidateKeys={['delivery-receipts', 'products', 'stock-lots', 'stock-movements']} appliedLabel="Goods released" />;
+      }
+      return (
+        <div className="flex items-center gap-0.5 justify-end">
+          {row.status !== 'DRAFT' && <button onClick={() => copyLink(row.signUrl)} title="Copy sign link" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Link2 className="h-3.5 w-3.5" /></button>}
+          {row.status === 'RELEASED' && can('deliveries', 'edit') && (
+            <button onClick={() => cancelMut.mutate(row.id)} title="Cancel" className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><XCircle className="h-3.5 w-3.5" /></button>
+          )}
+        </div>
+      );
+    } },
   ];
 
   const canSave = !!customerId && !!warehouseId && rows.some((r) => r.productId && r.quantity > 0);
 
-  const statusFilters = ['', 'RELEASED', 'SIGNED', 'CANCELLED'];
-  const statusLabels: Record<string, string> = { '': 'All', RELEASED: 'Awaiting sign', SIGNED: 'Signed', CANCELLED: 'Cancelled' };
+  const statusFilters = ['', 'DRAFT', 'RELEASED', 'SIGNED', 'CANCELLED'];
+  const statusLabels: Record<string, string> = { '': 'All', DRAFT: 'Pending', RELEASED: 'Awaiting sign', SIGNED: 'Signed', CANCELLED: 'Cancelled' };
 
   return (
     <div className="space-y-6">

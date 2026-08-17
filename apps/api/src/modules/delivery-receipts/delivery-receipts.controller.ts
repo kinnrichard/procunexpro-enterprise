@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Body, Param, Query, Req, UseGuards,
+  Controller, Get, Post, Put, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -52,5 +52,17 @@ export class DeliveryReceiptsController {
   @RequirePermission(MODULE, 'edit')
   cancel(@Req() req: any, @Param('id') id: string) {
     return this.service.cancel(req.user.tenantId, id);
+  }
+
+  @Put(':id/approve')
+  @RequirePermission(MODULE, 'view')
+  approve(@Req() req: any, @Param('id') id: string) {
+    return this.service.approve(req.user.tenantId, id, req.user.id, req.user.role);
+  }
+
+  @Put(':id/reject')
+  @RequirePermission(MODULE, 'view')
+  reject(@Req() req: any, @Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.service.reject(req.user.tenantId, id, req.user.id, req.user.role, body?.reason);
   }
 }

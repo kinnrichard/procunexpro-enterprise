@@ -16,7 +16,7 @@ export const APPROVAL_MODULES = [
   { entityType: 'GOODS_RECEIPT', label: 'Goods Receipt', enforced: true },
   { entityType: 'STOCK_LOT', label: 'Stock Lots & Expiry', enforced: true },
   { entityType: 'PRODUCTION', label: 'Production', enforced: true },
-  { entityType: 'DELIVERY', label: 'Deliveries', enforced: false },
+  { entityType: 'DELIVERY', label: 'Deliveries', enforced: true },
 ];
 
 /** Default stages seeded per module, mirroring the flow in place today. */
