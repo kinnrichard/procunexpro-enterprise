@@ -14,7 +14,7 @@ export const APPROVAL_MODULES = [
   { entityType: 'PURCHASE_ORDER', label: 'Purchase Orders', enforced: true },
   { entityType: 'RFQ', label: 'Request for Quotation', enforced: true },
   { entityType: 'GOODS_RECEIPT', label: 'Goods Receipt', enforced: true },
-  { entityType: 'STOCK_LOT', label: 'Stock Lots & Expiry', enforced: false },
+  { entityType: 'STOCK_LOT', label: 'Stock Lots & Expiry', enforced: true },
   { entityType: 'PRODUCTION', label: 'Production', enforced: false },
   { entityType: 'DELIVERY', label: 'Deliveries', enforced: false },
 ];

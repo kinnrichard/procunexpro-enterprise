@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 
 export interface LotAllocation {
   lotId: string;
@@ -10,7 +11,10 @@ export interface LotAllocation {
 
 @Injectable()
 export class StockLotsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly approvals: ApprovalsService,
+  ) {}
 
   async findAll(
     tenantId: string,
@@ -55,7 +59,10 @@ export class StockLotsService {
       this.prisma.stockLot.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    const approvals = await this.approvals.getRequestsMap(tenantId, 'STOCK_LOT', data.map((l) => l.id));
+    const withApproval = data.map((l) => ({ ...l, approval: approvals.get(l.id) || null }));
+
+    return { data: withApproval, total, page, limit };
   }
 
   // Lots already expired or expiring within `days`, still holding stock
@@ -76,31 +83,68 @@ export class StockLotsService {
     return { data };
   }
 
-  async create(tenantId: string, data: any) {
+  /**
+   * Manual lot creation. Until the STOCK_LOT workflow is satisfied the lot is held
+   * as QUARANTINE (excluded from FEFO / available stock) and does NOT top up on-hand.
+   * On final approval it flips to AVAILABLE and increments the product's stock.
+   * No workflow → available immediately.
+   */
+  async create(tenantId: string, data: any, userId?: string) {
     const product = await this.prisma.product.findFirst({ where: { id: data.productId, tenantId } });
     if (!product) throw new NotFoundException('Product not found');
 
     const qty = data.quantity ?? 0;
-    // Manual lot creation also tops up the product's aggregate stock
-    const [lot] = await this.prisma.$transaction([
-      this.prisma.stockLot.create({
-        data: {
-          tenantId,
-          productId: data.productId,
-          lotNumber: data.lotNumber,
-          quantity: qty,
-          initialQty: qty,
-          warehouseId: data.warehouseId || null,
-          areaId: data.areaId || null,
-          locationId: data.locationId || null,
-          expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
-          source: data.source || 'Manual',
-          status: 'AVAILABLE',
-        },
-      }),
-      this.prisma.product.update({ where: { id: data.productId }, data: { currentStock: { increment: qty } } }),
+    const lot = await this.prisma.stockLot.create({
+      data: {
+        tenantId,
+        productId: data.productId,
+        lotNumber: data.lotNumber,
+        quantity: qty,
+        initialQty: qty,
+        warehouseId: data.warehouseId || null,
+        areaId: data.areaId || null,
+        locationId: data.locationId || null,
+        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+        source: data.source || 'Manual',
+        status: 'QUARANTINE', // held until approved
+      },
+    });
+
+    const { required } = await this.approvals.ensureRequest(tenantId, 'STOCK_LOT', lot.id, userId);
+    if (!required) await this.applyLot(tenantId, lot.id, userId);
+    return this.prisma.stockLot.findUnique({ where: { id: lot.id } });
+  }
+
+  /** Records an approval on the current stage; releases the lot once fully approved. */
+  async approve(tenantId: string, id: string, userId: string, userRole: string) {
+    const lot = await this.prisma.stockLot.findFirst({ where: { id, tenantId } });
+    if (!lot) throw new NotFoundException('Lot not found');
+    if (lot.status !== 'QUARANTINE') throw new BadRequestException(`Only pending lots can be approved (current: ${lot.status})`);
+    const outcome = await this.approvals.decide(tenantId, 'STOCK_LOT', id, userId, userRole, 'APPROVED');
+    if (outcome.approved) await this.applyLot(tenantId, id, userId);
+    return this.prisma.stockLot.findUnique({ where: { id } });
+  }
+
+  /** Rejects the lot; it stays held (never counts toward stock). */
+  async reject(tenantId: string, id: string, userId: string, userRole: string, reason?: string) {
+    const lot = await this.prisma.stockLot.findFirst({ where: { id, tenantId } });
+    if (!lot) throw new NotFoundException('Lot not found');
+    if (lot.status !== 'QUARANTINE') throw new BadRequestException(`Only pending lots can be rejected (current: ${lot.status})`);
+    await this.approvals.decide(tenantId, 'STOCK_LOT', id, userId, userRole, 'REJECTED', reason);
+    return this.prisma.stockLot.update({
+      where: { id },
+      data: { approvedById: userId, approvedAt: new Date(), rejectionReason: reason || null },
+    });
+  }
+
+  /** Releases a held lot: sets it AVAILABLE and tops up the product's aggregate stock. */
+  private async applyLot(tenantId: string, id: string, approverId?: string) {
+    const lot = await this.prisma.stockLot.findFirst({ where: { id, tenantId } });
+    if (!lot) throw new NotFoundException('Lot not found');
+    await this.prisma.$transaction([
+      this.prisma.stockLot.update({ where: { id }, data: { status: 'AVAILABLE', approvedById: approverId || null, approvedAt: new Date(), rejectionReason: null } }),
+      this.prisma.product.update({ where: { id: lot.productId }, data: { currentStock: { increment: lot.quantity } } }),
     ]);
-    return lot;
   }
 
   async update(tenantId: string, id: string, data: any) {

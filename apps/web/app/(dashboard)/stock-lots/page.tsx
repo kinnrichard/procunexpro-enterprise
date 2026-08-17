@@ -19,6 +19,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
+import { ApprovalStatusBadge, ApprovalActions } from '@/components/approval-controls';
 import { Boxes, Plus, AlertTriangle, Clock, Pencil, Check, X, Printer } from 'lucide-react';
 import { LabelSheet, LabelItem } from '@/components/label-sheet';
 
@@ -113,12 +114,13 @@ export default function StockLotsPage() {
     mutationFn: () => editing
       ? api.put(`/stock-lots/${editing.id}`, { lotNumber: form.lotNumber, warehouseId: form.warehouseId || null, areaId: form.areaId || null, locationId: form.locationId || null, expiryDate: form.expiryDate || null, source: form.source, status: form.status, qcStatus: form.qcStatus })
       : api.post('/stock-lots', { productId: form.productId, lotNumber: form.lotNumber, quantity: form.quantity, warehouseId: form.warehouseId || null, areaId: form.areaId || null, locationId: form.locationId || null, expiryDate: form.expiryDate || null, source: form.source }),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
       queryClient.invalidateQueries({ queryKey: ['stock-lots-expiring'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setModalOpen(false);
-      toast({ title: editing ? 'Lot updated' : 'Lot added' });
+      const pending = !editing && res?.data?.status === 'QUARANTINE';
+      toast({ title: editing ? 'Lot updated' : pending ? 'Lot submitted for approval' : 'Lot added' });
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to save lot', variant: 'destructive' }),
   });
@@ -157,11 +159,16 @@ export default function StockLotsPage() {
     { key: 'quantity', label: 'Qty', render: (v: number, row: any) => <span className="font-mono font-medium">{v} <span className="text-xs text-muted-foreground font-sans">{row.product?.unit}</span></span> },
     { key: 'location', label: 'Location', render: (_: any, row: any) => <span className="text-xs text-muted-foreground">{[row.warehouse?.name, row.area?.name, row.location?.name].filter(Boolean).join(' · ') || 'Unassigned'}</span> },
     { key: 'expiryDate', label: 'Expiry', render: renderExpiry },
-    { key: 'status', label: 'Status', render: (v: string) => <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', statusColors[v] || statusColors.DEPLETED)}>{v}</span> },
+    { key: 'status', label: 'Status', render: (v: string, row: any) => (
+      row.approval && row.approval.status !== 'APPROVED'
+        ? <ApprovalStatusBadge approval={row.approval} />
+        : <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', statusColors[v] || statusColors.DEPLETED)}>{v}</span>
+    ) },
     { key: 'qcStatus', label: 'QC', render: (v: string) => <span className={cn('inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium', qcColors[v] || qcColors.PASSED)}>{v}</span> },
     { key: 'source', label: 'Source', render: (v: string) => <span className="text-xs text-muted-foreground">{v || '—'}</span> },
     { key: 'actions', label: '', render: (_: any, row: any) => (
       <div className="flex items-center gap-0.5 justify-end">
+        <ApprovalActions endpoint="/stock-lots" id={row.id} approval={row.approval} invalidateKeys={['stock-lots', 'stock-lots-expiring', 'products']} appliedLabel="Lot approved & released" />
         {can('products', 'edit') && ['PENDING', 'HOLD'].includes(row.qcStatus) && (
           <>
             <button onClick={() => qcMut.mutate({ id: row.id, qcStatus: 'PASSED' })} title="Pass QC" className="p-1.5 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>

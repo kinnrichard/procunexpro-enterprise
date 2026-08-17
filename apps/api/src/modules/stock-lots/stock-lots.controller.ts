@@ -53,7 +53,19 @@ export class StockLotsController {
   @Post()
   @RequirePermission(MODULE, 'create')
   create(@Req() req: any, @Body() body: any) {
-    return this.service.create(req.user.tenantId, body);
+    return this.service.create(req.user.tenantId, body, req.user.id);
+  }
+
+  @Put(':id/approve')
+  @RequirePermission(MODULE, 'view')
+  approve(@Req() req: any, @Param('id') id: string) {
+    return this.service.approve(req.user.tenantId, id, req.user.id, req.user.role);
+  }
+
+  @Put(':id/reject')
+  @RequirePermission(MODULE, 'view')
+  reject(@Req() req: any, @Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.service.reject(req.user.tenantId, id, req.user.id, req.user.role, body?.reason);
   }
 
   @Put(':id')
