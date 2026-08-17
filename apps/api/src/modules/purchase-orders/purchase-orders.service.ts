@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Priority } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 
 @Injectable()
 export class PurchaseOrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly approvals: ApprovalsService,
+  ) {}
 
   private async generateOrderNumber(tenantId: string): Promise<string> {
     const today = new Date();
@@ -78,7 +82,10 @@ export class PurchaseOrdersService {
       this.prisma.purchaseOrder.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    const approvals = await this.approvals.getRequestsMap(tenantId, 'PURCHASE_ORDER', data.map((p) => p.id));
+    const withApproval = data.map((p) => ({ ...p, approval: approvals.get(p.id) || null }));
+
+    return { data: withApproval, total, page, limit };
   }
 
   async findOne(tenantId: string, id: string) {
@@ -101,7 +108,8 @@ export class PurchaseOrdersService {
       },
     });
     if (!po) throw new NotFoundException('Purchase order not found');
-    return po;
+    const approval = await this.approvals.getRequest(tenantId, 'PURCHASE_ORDER', id);
+    return { ...po, approval };
   }
 
   async create(tenantId: string, userId: string, data: any) {
@@ -349,34 +357,51 @@ export class PurchaseOrdersService {
     return { message: 'Purchase order deleted' };
   }
 
-  async submit(tenantId: string, id: string) {
+  /**
+   * Submit for approval. Starts the configured PURCHASE_ORDER workflow; the PO
+   * sits in PENDING_APPROVAL until every stage is cleared. When no workflow is
+   * configured, it auto-approves straight to APPROVED.
+   */
+  async submit(tenantId: string, id: string, userId?: string) {
     const po = await this.prisma.purchaseOrder.findFirst({ where: { id, tenantId } });
     if (!po) throw new NotFoundException('Purchase order not found');
     if (po.status !== 'DRAFT') {
       throw new BadRequestException('Can only submit purchase orders in DRAFT status');
     }
 
-    return this.prisma.purchaseOrder.update({
-      where: { id },
-      data: { status: 'PENDING_APPROVAL' },
-    });
+    const { required } = await this.approvals.ensureRequest(tenantId, 'PURCHASE_ORDER', id, userId);
+    if (!required) {
+      await this.prisma.purchaseOrder.update({ where: { id }, data: { status: 'APPROVED', approvedAt: new Date(), approvedBy: userId || null } });
+    } else {
+      await this.prisma.purchaseOrder.update({ where: { id }, data: { status: 'PENDING_APPROVAL' } });
+    }
+    return this.findOne(tenantId, id);
   }
 
-  async approve(tenantId: string, id: string, approvedBy: string) {
+  /** Records an approval on the current stage; PO becomes APPROVED once fully approved. */
+  async approve(tenantId: string, id: string, userId: string, userRole: string) {
     const po = await this.prisma.purchaseOrder.findFirst({ where: { id, tenantId } });
     if (!po) throw new NotFoundException('Purchase order not found');
     if (po.status !== 'PENDING_APPROVAL') {
       throw new BadRequestException('Can only approve purchase orders in PENDING_APPROVAL status');
     }
+    const outcome = await this.approvals.decide(tenantId, 'PURCHASE_ORDER', id, userId, userRole, 'APPROVED');
+    if (outcome.approved) {
+      await this.prisma.purchaseOrder.update({ where: { id }, data: { status: 'APPROVED', approvedAt: new Date(), approvedBy: userId } });
+    }
+    return this.findOne(tenantId, id);
+  }
 
-    return this.prisma.purchaseOrder.update({
-      where: { id },
-      data: {
-        status: 'APPROVED',
-        approvedAt: new Date(),
-        approvedBy,
-      },
-    });
+  /** Rejects the PO at the current stage; it returns to DRAFT for revision/resubmit. */
+  async reject(tenantId: string, id: string, userId: string, userRole: string, reason?: string) {
+    const po = await this.prisma.purchaseOrder.findFirst({ where: { id, tenantId } });
+    if (!po) throw new NotFoundException('Purchase order not found');
+    if (po.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('Can only reject purchase orders in PENDING_APPROVAL status');
+    }
+    await this.approvals.decide(tenantId, 'PURCHASE_ORDER', id, userId, userRole, 'REJECTED', reason);
+    await this.prisma.purchaseOrder.update({ where: { id }, data: { status: 'DRAFT' } });
+    return this.findOne(tenantId, id);
   }
 
   async send(tenantId: string, id: string) {

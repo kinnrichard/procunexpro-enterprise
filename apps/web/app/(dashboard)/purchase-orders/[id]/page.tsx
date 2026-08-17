@@ -22,9 +22,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
+import { usePermissions } from '@/lib/permissions';
+import { useAuthStore } from '@/lib/auth';
 import {
   ArrowLeft, Loader2, Send, CheckCircle, XCircle, Truck, PackageCheck,
-  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, CreditCard, MapPin, Info,
+  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, CreditCard, MapPin, Info, ShieldCheck,
 } from 'lucide-react';
 
 // ─── Status Timeline ──────────────────────────────────────
@@ -179,6 +181,8 @@ export default function PurchaseOrderDetailPage() {
   const formatCurrency = useCurrencyStore((s) => s.format);
   const currencySymbol = useCurrencyStore((s) => s.symbol);
   const taxRate = useTaxStore((s) => s.getDefaultRate)();
+  const { isAdmin } = usePermissions();
+  const user = useAuthStore((s) => s.user);
   const poId = params.id as string;
 
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
@@ -217,13 +221,18 @@ export default function PurchaseOrderDetailPage() {
 
   const submitMutation = useMutation({
     mutationFn: () => api.put(`/purchase-orders/${poId}/submit`),
-    onSuccess: () => { invalidate(); toast({ title: 'Submitted for approval' }); },
+    onSuccess: (res: any) => { invalidate(); toast({ title: res?.data?.status === 'APPROVED' ? 'Approved' : 'Submitted for approval' }); },
     onError: (err: any) => toast({ title: err.response?.data?.message || 'Failed', variant: 'destructive' }),
   });
   const approveMutation = useMutation({
     mutationFn: () => api.put(`/purchase-orders/${poId}/approve`),
-    onSuccess: () => { invalidate(); toast({ title: 'Approved' }); },
-    onError: () => toast({ title: 'Failed', variant: 'destructive' }),
+    onSuccess: (res: any) => { invalidate(); toast({ title: res?.data?.status === 'APPROVED' ? 'Approved' : 'Stage approved — sent to next approver' }); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed', variant: 'destructive' }),
+  });
+  const rejectMutation = useMutation({
+    mutationFn: () => api.put(`/purchase-orders/${poId}/reject`, { reason: rejectionNote }),
+    onSuccess: () => { invalidate(); toast({ title: 'Order rejected' }); setRejectConfirmOpen(false); setRejectionNote(''); },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed', variant: 'destructive' }),
   });
   const sendMutation = useMutation({
     mutationFn: () => api.put(`/purchase-orders/${poId}/send`),
@@ -249,12 +258,23 @@ export default function PurchaseOrderDetailPage() {
             {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} Submit
           </Button>
         )}
-        {po.status === 'PENDING_APPROVAL' && (
-          <>
-            <Button onClick={() => setApproveConfirmOpen(true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4 mr-2" /> Approve</Button>
-            <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}><XCircle className="h-4 w-4 mr-2" /> Reject</Button>
-          </>
-        )}
+        {po.status === 'PENDING_APPROVAL' && (() => {
+          const appr = po.approval;
+          const eligible = isAdmin || (!!appr?.currentRole && user?.role === appr.currentRole);
+          return (
+            <>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5" /> Pending Approval{appr && appr.totalSteps > 1 ? ` · Stage ${appr.currentStep}/${appr.totalSteps}` : ''}{appr ? ` · ${appr.currentStepName || appr.currentRole}` : ''}
+              </span>
+              {eligible && (
+                <>
+                  <Button onClick={() => setApproveConfirmOpen(true)} className="bg-green-600 hover:bg-green-700 text-white"><CheckCircle className="h-4 w-4 mr-2" /> Approve</Button>
+                  <Button variant="destructive" onClick={() => setRejectConfirmOpen(true)}><XCircle className="h-4 w-4 mr-2" /> Reject</Button>
+                </>
+              )}
+            </>
+          );
+        })()}
         {po.status === 'APPROVED' && (
           <Button onClick={() => setSendConfirmOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white"><Truck className="h-4 w-4 mr-2" /> Send to Vendor</Button>
         )}
@@ -495,7 +515,9 @@ export default function PurchaseOrderDetailPage() {
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => { setRejectConfirmOpen(false); setRejectionNote(''); }}>Cancel</Button>
-            <Button size="sm" variant="destructive" disabled={!rejectionNote.trim()}>Reject</Button>
+            <Button size="sm" variant="destructive" disabled={!rejectionNote.trim() || rejectMutation.isPending} onClick={() => rejectMutation.mutate()}>
+              {rejectMutation.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null} Reject
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

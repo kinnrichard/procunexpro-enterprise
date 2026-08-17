@@ -9,6 +9,7 @@ import { z } from 'zod';
 import api from '@/lib/api';
 import { formatCurrency, formatDate, cn } from '@/lib/utils';
 import { usePermissions } from '@/lib/permissions';
+import { useAuthStore } from '@/lib/auth';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -247,7 +248,8 @@ const priorityColors: Record<string, string> = {
 export default function PurchaseOrdersPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { can } = usePermissions();
+  const { can, isAdmin } = usePermissions();
+  const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -342,8 +344,15 @@ export default function PurchaseOrdersPage() {
 
   const actionMut = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) => api.put(`/purchase-orders/${id}/${action}`),
-    onSuccess: (_, vars) => { queryClient.invalidateQueries({ queryKey: ['purchase-orders'] }); toast({ title: `Order ${vars.action === 'receive' ? 'received' : vars.action + 'ed'} successfully` }); },
-    onError: () => toast({ title: 'Action failed', variant: 'destructive' }),
+    onSuccess: (res: any, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      const st = res?.data?.status;
+      let title = `Order ${vars.action === 'receive' ? 'received' : vars.action + 'ed'} successfully`;
+      if (vars.action === 'submit') title = st === 'APPROVED' ? 'Order approved' : 'Submitted for approval';
+      else if (vars.action === 'approve') title = st === 'APPROVED' ? 'Order approved' : 'Stage approved — sent to next approver';
+      toast({ title });
+    },
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Action failed', variant: 'destructive' }),
   });
 
   const openCreate = () => {
@@ -394,8 +403,11 @@ export default function PurchaseOrdersPage() {
               {can('purchase-orders', 'delete') && <button onClick={() => setDeleteTarget(row)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>}
             </>
           )}
-          {row.status === 'PENDING_APPROVAL' && (
-            <button onClick={() => actionMut.mutate({ id: row.id, action: 'approve' })} className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600" title="Approve"><CheckCircle className="h-3.5 w-3.5" /></button>
+          {row.status === 'PENDING_APPROVAL' && (isAdmin || (!!row.approval?.currentRole && user?.role === row.approval.currentRole)) && (
+            <button onClick={() => actionMut.mutate({ id: row.id, action: 'approve' })} className="p-1.5 rounded-md hover:bg-green-50 dark:hover:bg-green-900/20 text-green-600" title={`Approve${row.approval?.totalSteps > 1 ? ` (Stage ${row.approval.currentStep}/${row.approval.totalSteps})` : ''}`}><CheckCircle className="h-3.5 w-3.5" /></button>
+          )}
+          {row.status === 'PENDING_APPROVAL' && !(isAdmin || (!!row.approval?.currentRole && user?.role === row.approval.currentRole)) && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" title={row.approval ? `Stage ${row.approval.currentStep}/${row.approval.totalSteps} · ${row.approval.currentStepName || row.approval.currentRole}` : ''}>Pending</span>
           )}
           {row.status === 'APPROVED' && (
             <button onClick={() => actionMut.mutate({ id: row.id, action: 'send' })} className="p-1.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600" title="Send to Vendor"><Truck className="h-3.5 w-3.5" /></button>
