@@ -19,6 +19,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
+import { ApprovalStatusBadge, ApprovalActions } from '@/components/approval-controls';
 import { PackageCheck, Plus, Truck } from 'lucide-react';
 
 interface Row { purchaseOrderItemId: string; productId: string; name: string; sku: string; uom: string; outstanding: number; quantity: number; lotNumber: string; expiryDate: string; }
@@ -96,7 +97,8 @@ export default function GoodsReceiptsPage() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
       setModalOpen(false);
-      toast({ title: `Received — ${res?.data?.receiptNumber || ''}` });
+      const pending = res?.data?.status === 'PENDING';
+      toast({ title: pending ? `Receipt ${res?.data?.receiptNumber || ''} submitted for approval` : `Received — ${res?.data?.receiptNumber || ''}` });
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to receive', variant: 'destructive' }),
   });
@@ -108,7 +110,9 @@ export default function GoodsReceiptsPage() {
     { key: 'purchaseOrder', label: 'PO', render: (_: any, row: any) => row.purchaseOrder?.orderNumber || '—' },
     { key: 'supplierDrRef', label: 'Supplier DR', render: (v: string) => v || <span className="text-muted-foreground">—</span> },
     { key: '_count', label: 'Items', className: 'text-center', render: (v: any) => <span className="font-mono text-sm">{v?.items ?? 0}</span> },
+    { key: 'status', label: 'Status', render: (_: any, row: any) => <ApprovalStatusBadge approval={row.approval} fallback={row.status} /> },
     { key: 'receiptDate', label: 'Date', render: (v: string) => formatDate(v) },
+    { key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => <ApprovalActions endpoint="/goods-receipts" id={row.id} approval={row.approval} fallback={row.status} invalidateKeys={['goods-receipts', 'products', 'stock-lots']} appliedLabel="Received & posted" /> },
   ];
 
   const canSave = !!warehouseId && rows.length > 0 && rows.some((r) => r.quantity > 0);

@@ -1061,6 +1061,9 @@ model Production {
   areaId          String? // zone/area for finished goods
   locationId      String? // bin/shelf where finished goods are placed
   status          ProductionStatus @default(DRAFT)
+  approvedById    String? // approval workflow: who cleared the final stage
+  approvedAt      DateTime?
+  rejectionReason String?
   notes           String?
   producedAt      DateTime?
   createdBy       String?
@@ -1109,6 +1112,9 @@ model StockLot {
   source       String? // "PO receipt", "Production PRD-...", "Manual", supplier ref
   status       String    @default("AVAILABLE") // AVAILABLE | DEPLETED | EXPIRED | QUARANTINE
   qcStatus     String    @default("PASSED") // PENDING | PASSED | FAILED | HOLD
+  approvedById String? // approval workflow: who cleared the final stage
+  approvedAt   DateTime?
+  rejectionReason String?
   warehouseId  String? // warehouse holding this lot
   areaId       String? // zone/area within the warehouse
   locationId   String? // bin/shelf location within the warehouse
@@ -1154,6 +1160,13 @@ model GoodsReceipt {
   supplierDrRef   String? // supplier's delivery receipt / invoice number
   receiptDate     DateTime @default(now())
   receivedById    String?
+  warehouseId     String? // destination warehouse (applied to all items on approval)
+  areaId          String?
+  locationId      String?
+  status          String   @default("APPROVED") // new receipts start PENDING; existing rows stay APPROVED
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1190,7 +1203,10 @@ model DeliveryReceipt {
   drNumber      String // DR-YYYYMMDD-####
   customerId    String
   warehouseId   String?
-  status        String    @default("RELEASED") // DRAFT | RELEASED | SIGNED | CANCELLED
+  status        String    @default("RELEASED") // DRAFT | RELEASED | SIGNED | CANCELLED (DRAFT = awaiting approval)
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectionReason String?
   deliveryDate  DateTime  @default(now())
   notes         String?
   token         String    @unique // for the external, no-login sign page

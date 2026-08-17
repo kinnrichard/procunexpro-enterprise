@@ -13,6 +13,10 @@ export const APPROVAL_MODULES = [
   { entityType: 'PURCHASE_REQUEST', label: 'Purchase Requests', enforced: true },
   { entityType: 'PURCHASE_ORDER', label: 'Purchase Orders', enforced: true },
   { entityType: 'RFQ', label: 'Request for Quotation', enforced: true },
+  { entityType: 'GOODS_RECEIPT', label: 'Goods Receipt', enforced: true },
+  { entityType: 'STOCK_LOT', label: 'Stock Lots & Expiry', enforced: false },
+  { entityType: 'PRODUCTION', label: 'Production', enforced: false },
+  { entityType: 'DELIVERY', label: 'Deliveries', enforced: false },
 ];
 
 /** Default stages seeded per module, mirroring the flow in place today. */
@@ -25,6 +29,10 @@ const DEFAULT_STEPS: Record<string, { name: string; role: string }[]> = {
   STOCK_MOVEMENT: [{ name: 'Manager Approval', role: 'MANAGER' }],
   STOCK_TRANSFER: [{ name: 'Manager Approval', role: 'MANAGER' }],
   RFQ: [{ name: 'Manager Approval', role: 'MANAGER' }],
+  GOODS_RECEIPT: [{ name: 'Manager Approval', role: 'MANAGER' }],
+  STOCK_LOT: [{ name: 'Manager Approval', role: 'MANAGER' }],
+  PRODUCTION: [{ name: 'Manager Approval', role: 'MANAGER' }],
+  DELIVERY: [{ name: 'Manager Approval', role: 'MANAGER' }],
 };
 
 interface StepSnapshot { order: number; name: string; role: string }
