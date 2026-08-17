@@ -34,7 +34,6 @@ import {
   ScrollText,
 
   Users,
-  GitBranch,
   Settings,
   LogOut,
   type LucideIcon,
@@ -115,7 +114,6 @@ const navigation: NavSection[] = [
       { label: 'Users', href: '/users', icon: Users },
       { label: 'Staff', href: '/staff', icon: Contact },
       { label: 'Supplier Scoring', href: '/supplier-scoring', icon: BarChart3 },
-      { label: 'Workflows', href: '/workflows', icon: GitBranch },
       { label: 'Settings', href: '/settings', icon: Settings },
     ],
   },

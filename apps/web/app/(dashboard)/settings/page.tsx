@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/auth'
 import { PageHeader } from '@/components/page-header'
@@ -2607,12 +2608,14 @@ function ChartOfAccountsConfig() {
 export default function SettingsPage() {
   const { user } = useAuthStore()
   const { theme } = useTheme()
+  const searchParams = useSearchParams()
+  const initialTab = searchParams.get('tab') || 'general'
 
   return (
     <div className="space-y-6">
       <PageHeader title="Settings" description="Manage application preferences and configuration" />
 
-      <Tabs defaultValue="general" orientation="vertical" className="flex items-start gap-6 w-full">
+      <Tabs defaultValue={initialTab} orientation="vertical" className="flex items-start gap-6 w-full">
         <TabsList className="flex flex-col h-auto w-52 shrink-0 items-stretch justify-start rounded-none border-r bg-transparent p-0 pr-2 gap-0.5">
           <TabsTrigger value="general" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">General</TabsTrigger>
           <TabsTrigger value="roles" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Roles &amp; Permissions</TabsTrigger>
