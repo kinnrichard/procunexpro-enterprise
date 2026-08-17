@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 
 const round = (n: number) => Math.round(n * 1e6) / 1e6;
 
 @Injectable()
 export class StockTransfersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly approvals: ApprovalsService,
+  ) {}
 
   async findAll(
     tenantId: string,
@@ -40,7 +44,9 @@ export class StockTransfersService {
       }),
       this.prisma.stockTransfer.count({ where }),
     ]);
-    return { data, total, page, limit };
+    const approvals = await this.approvals.getRequestsMap(tenantId, 'STOCK_TRANSFER', data.map((t) => t.id));
+    const withApproval = data.map((t) => ({ ...t, approval: approvals.get(t.id) || null }));
+    return { data: withApproval, total, page, limit };
   }
 
   async findOne(tenantId: string, id: string) {
@@ -94,6 +100,12 @@ export class StockTransfersService {
         items: { create: rows.map((r) => ({ productId: r.productId, quantity: round(r.quantity), uom: r.uom || 'pcs' })) },
       },
     });
+
+    const { required } = await this.approvals.ensureRequest(tenantId, 'STOCK_TRANSFER', created.id, userId);
+    if (!required) {
+      // No workflow configured → apply immediately.
+      await this.applyApproved(tenantId, created.id, userId);
+    }
     return this.findOne(tenantId, created.id);
   }
 
@@ -114,16 +126,27 @@ export class StockTransfersService {
     }
   }
 
+  /** Records an approval on the current stage; applies the transfer once fully approved. */
+  async approve(tenantId: string, id: string, userId: string, userRole: string) {
+    const transfer = await this.prisma.stockTransfer.findFirst({ where: { id, tenantId } });
+    if (!transfer) throw new NotFoundException('Transfer not found');
+    if (transfer.status !== 'PENDING') {
+      throw new BadRequestException(`Only pending transfers can be approved (current: ${transfer.status})`);
+    }
+    const outcome = await this.approvals.decide(tenantId, 'STOCK_TRANSFER', id, userId, userRole, 'APPROVED');
+    if (outcome.approved) {
+      await this.applyApproved(tenantId, id, userId);
+    }
+    return this.findOne(tenantId, id);
+  }
+
   /** Allocates lots FEFO, creates destination lots + net-zero movements, marks APPROVED. */
-  async approve(tenantId: string, userId: string, id: string) {
+  private async applyApproved(tenantId: string, id: string, approverId: string) {
     const transfer = await this.prisma.stockTransfer.findFirst({
       where: { id, tenantId },
       include: { items: true, toWarehouse: { select: { id: true, name: true } }, fromWarehouse: { select: { id: true, name: true } } },
     });
     if (!transfer) throw new NotFoundException('Transfer not found');
-    if (transfer.status !== 'PENDING') {
-      throw new BadRequestException(`Only pending transfers can be approved (current: ${transfer.status})`);
-    }
 
     const { transferNumber, fromWarehouseId, toWarehouseId } = transfer;
     const fromName = transfer.fromWarehouse?.name || 'Unassigned';
@@ -175,27 +198,28 @@ export class StockTransfersService {
       }));
 
       ops.push(
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_OUT', quantity: need, fromWarehouseId, reason: `Transfer ${transferNumber} to ${toName}`, performedBy: userId } }),
-        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_IN', quantity: need, toWarehouseId, reason: `Transfer ${transferNumber} from ${fromName}`, performedBy: userId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_OUT', quantity: need, fromWarehouseId, reason: `Transfer ${transferNumber} to ${toName}`, performedBy: approverId } }),
+        this.prisma.stockMovement.create({ data: { tenantId, referenceNumber: nextSm(), productId: r.productId, type: 'TRANSFER_IN', quantity: need, toWarehouseId, reason: `Transfer ${transferNumber} from ${fromName}`, performedBy: approverId } }),
       );
     }
 
     ops.push(this.prisma.stockTransfer.update({
       where: { id },
-      data: { status: 'APPROVED', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
+      data: { status: 'APPROVED', approvedById: approverId, approvedAt: new Date(), rejectionReason: null },
     }));
 
     await this.prisma.$transaction(ops);
     return this.findOne(tenantId, id);
   }
 
-  /** Rejects a pending transfer without moving any stock. */
-  async reject(tenantId: string, userId: string, id: string, reason?: string) {
+  /** Rejects the transfer at the current stage without moving any stock. */
+  async reject(tenantId: string, id: string, userId: string, userRole: string, reason?: string) {
     const transfer = await this.prisma.stockTransfer.findFirst({ where: { id, tenantId } });
     if (!transfer) throw new NotFoundException('Transfer not found');
     if (transfer.status !== 'PENDING') {
       throw new BadRequestException(`Only pending transfers can be rejected (current: ${transfer.status})`);
     }
+    await this.approvals.decide(tenantId, 'STOCK_TRANSFER', id, userId, userRole, 'REJECTED', reason);
     await this.prisma.stockTransfer.update({
       where: { id },
       data: { status: 'REJECTED', approvedById: userId, approvedAt: new Date(), rejectionReason: reason || null },

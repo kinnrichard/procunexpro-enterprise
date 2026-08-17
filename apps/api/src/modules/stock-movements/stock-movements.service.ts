@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { ApprovalsService } from '../approvals/approvals.service';
 
 @Injectable()
 export class StockMovementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly approvals: ApprovalsService,
+  ) {}
 
   private async generateReferenceNumber(tenantId: string): Promise<string> {
     const today = new Date();
@@ -83,7 +87,10 @@ export class StockMovementsService {
       this.prisma.stockMovement.count({ where }),
     ]);
 
-    return { data, total, page, limit };
+    const approvals = await this.approvals.getRequestsMap(tenantId, 'STOCK_MOVEMENT', data.map((m) => m.id));
+    const withApproval = data.map((m) => ({ ...m, approval: approvals.get(m.id) || null }));
+
+    return { data: withApproval, total, page, limit };
   }
 
   async findOne(tenantId: string, id: string) {
@@ -103,29 +110,26 @@ export class StockMovementsService {
   private static readonly ADD_TYPES = ['PURCHASE', 'TRANSFER_IN', 'RETURN', 'PRODUCTION_IN'];
 
   /**
-   * Manual stock movements are created as PENDING and do NOT touch stock until a
-   * manager approves them. Internal flows (goods receipts, production, transfers)
-   * write their own APPROVED movements directly and are unaffected.
+   * Manual stock movements are created as PENDING and do NOT touch stock until the
+   * configured approval workflow is fully satisfied. When no workflow is configured
+   * for the module, the movement auto-approves and applies immediately. Internal
+   * flows (goods receipts, production, transfers) write their own movements directly.
    */
   async create(tenantId: string, userId: string, data: any) {
-    const product = await this.prisma.product.findFirst({
-      where: { id: data.productId, tenantId },
-    });
+    const product = await this.prisma.product.findFirst({ where: { id: data.productId, tenantId } });
     if (!product) throw new NotFoundException('Product not found');
 
     const qty = data.quantity;
     const isAdd = StockMovementsService.ADD_TYPES.includes(data.type);
 
-    // Sanity-check availability up front for a better UX; re-checked at approval.
+    // Sanity-check availability up front for a better UX; re-checked when applied.
     if (!isAdd && product.currentStock < qty) {
-      throw new BadRequestException(
-        `Insufficient stock. Current: ${product.currentStock}, Requested: ${qty}`,
-      );
+      throw new BadRequestException(`Insufficient stock. Current: ${product.currentStock}, Requested: ${qty}`);
     }
 
     const referenceNumber = await this.generateReferenceNumber(tenantId);
 
-    return this.prisma.stockMovement.create({
+    const movement = await this.prisma.stockMovement.create({
       data: {
         tenantId,
         referenceNumber,
@@ -142,21 +146,49 @@ export class StockMovementsService {
         performedBy: userId,
         status: 'PENDING',
       },
-      include: {
-        product: { select: { id: true, name: true, sku: true } },
-        fromWarehouse: { select: { id: true, name: true } },
-        toWarehouse: { select: { id: true, name: true } },
-      },
     });
+
+    const { required } = await this.approvals.ensureRequest(tenantId, 'STOCK_MOVEMENT', movement.id, userId);
+    if (!required) {
+      // No workflow configured → apply immediately.
+      await this.applyApproved(tenantId, movement.id, userId);
+    }
+    return this.findOne(tenantId, movement.id);
   }
 
-  /** Applies the pending movement's stock effect and marks it APPROVED. */
-  async approve(tenantId: string, userId: string, id: string) {
+  /** Records an approval on the current stage; applies stock only once fully approved. */
+  async approve(tenantId: string, id: string, userId: string, userRole: string) {
     const movement = await this.prisma.stockMovement.findFirst({ where: { id, tenantId } });
     if (!movement) throw new NotFoundException('Stock movement not found');
     if (movement.status !== 'PENDING') {
       throw new BadRequestException(`Only pending movements can be approved (current: ${movement.status})`);
     }
+    const outcome = await this.approvals.decide(tenantId, 'STOCK_MOVEMENT', id, userId, userRole, 'APPROVED');
+    if (outcome.approved) {
+      await this.applyApproved(tenantId, id, userId);
+    }
+    return this.findOne(tenantId, id);
+  }
+
+  /** Rejects the movement at the current stage without touching stock. */
+  async reject(tenantId: string, id: string, userId: string, userRole: string, reason?: string) {
+    const movement = await this.prisma.stockMovement.findFirst({ where: { id, tenantId } });
+    if (!movement) throw new NotFoundException('Stock movement not found');
+    if (movement.status !== 'PENDING') {
+      throw new BadRequestException(`Only pending movements can be rejected (current: ${movement.status})`);
+    }
+    await this.approvals.decide(tenantId, 'STOCK_MOVEMENT', id, userId, userRole, 'REJECTED', reason);
+    await this.prisma.stockMovement.update({
+      where: { id },
+      data: { status: 'REJECTED', approvedById: userId, approvedAt: new Date(), rejectionReason: reason || null },
+    });
+    return this.findOne(tenantId, id);
+  }
+
+  /** Applies the movement's stock effect (lot create / FEFO consume) and marks it APPROVED. */
+  private async applyApproved(tenantId: string, id: string, approverId: string) {
+    const movement = await this.prisma.stockMovement.findFirst({ where: { id, tenantId } });
+    if (!movement) throw new NotFoundException('Stock movement not found');
 
     const product = await this.prisma.product.findFirst({ where: { id: movement.productId, tenantId } });
     if (!product) throw new NotFoundException('Product not found');
@@ -165,20 +197,13 @@ export class StockMovementsService {
     const isAdd = StockMovementsService.ADD_TYPES.includes(movement.type);
 
     if (!isAdd && product.currentStock < qty) {
-      throw new BadRequestException(
-        `Insufficient stock. Current: ${product.currentStock}, Requested: ${qty}`,
-      );
+      throw new BadRequestException(`Insufficient stock. Current: ${product.currentStock}, Requested: ${qty}`);
     }
 
     const ops: any[] = [
       this.prisma.stockMovement.update({
         where: { id },
-        data: { status: 'APPROVED', approvedById: userId, approvedAt: new Date(), rejectionReason: null },
-        include: {
-          product: { select: { id: true, name: true, sku: true } },
-          fromWarehouse: { select: { id: true, name: true } },
-          toWarehouse: { select: { id: true, name: true } },
-        },
+        data: { status: 'APPROVED', approvedById: approverId, approvedAt: new Date(), rejectionReason: null },
       }),
     ];
 
@@ -219,25 +244,6 @@ export class StockMovementsService {
       ops.push(this.prisma.product.update({ where: { id: movement.productId }, data: { currentStock: { decrement: qty } } }));
     }
 
-    const result = await this.prisma.$transaction(ops);
-    return result[0];
-  }
-
-  /** Rejects a pending movement without touching stock. */
-  async reject(tenantId: string, userId: string, id: string, reason?: string) {
-    const movement = await this.prisma.stockMovement.findFirst({ where: { id, tenantId } });
-    if (!movement) throw new NotFoundException('Stock movement not found');
-    if (movement.status !== 'PENDING') {
-      throw new BadRequestException(`Only pending movements can be rejected (current: ${movement.status})`);
-    }
-    return this.prisma.stockMovement.update({
-      where: { id },
-      data: { status: 'REJECTED', approvedById: userId, approvedAt: new Date(), rejectionReason: reason || null },
-      include: {
-        product: { select: { id: true, name: true, sku: true } },
-        fromWarehouse: { select: { id: true, name: true } },
-        toWarehouse: { select: { id: true, name: true } },
-      },
-    });
+    await this.prisma.$transaction(ops);
   }
 }

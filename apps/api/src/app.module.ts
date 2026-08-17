@@ -25,6 +25,7 @@ import { PublicItemsModule } from './modules/public-items/public-items.module';
 import { LaborRatesModule } from './modules/labor-rates/labor-rates.module';
 import { GoodsReceiptsModule } from './modules/goods-receipts/goods-receipts.module';
 import { StockTransfersModule } from './modules/stock-transfers/stock-transfers.module';
+import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { DeliveryReceiptsModule } from './modules/delivery-receipts/delivery-receipts.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
@@ -79,6 +80,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     LaborRatesModule,
     GoodsReceiptsModule,
     StockTransfersModule,
+    ApprovalsModule,
     DeliveryReceiptsModule,
     DashboardModule,
     HealthModule,

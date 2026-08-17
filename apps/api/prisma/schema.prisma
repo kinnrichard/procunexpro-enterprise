@@ -184,6 +184,7 @@ model Tenant {
   contracts          Contract[]
   budgets            Budget[]
   approvalWorkflows  ApprovalWorkflow[]
+  approvalRequests   ApprovalRequest[]
   notifications      Notification[]
   auditLogs          AuditLog[]
   documents          Document[]
@@ -1441,12 +1442,47 @@ model ApprovalWorkflowRule {
   id         String   @id @default(cuid())
   workflowId String
   stepOrder  Int
+  name       String? // friendly stage label, e.g. "Manager Approval"
   role       String
   isRequired Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   workflow ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+// Runtime tracker: one per document that goes through a configured workflow.
+model ApprovalRequest {
+  id          String   @id @default(cuid())
+  tenantId    String
+  entityType  String // matches ApprovalWorkflow.entityType (PURCHASE_REQUEST, STOCK_MOVEMENT, ...)
+  entityId    String
+  status      String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  currentStep Int      @default(1) // 1-based index into the snapshotted steps
+  steps       Json // snapshot of [{ order, name, role }] taken at submission time
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  decisions ApprovalDecision[]
+
+  @@unique([tenantId, entityType, entityId])
+  @@index([tenantId, entityType, status])
+}
+
+model ApprovalDecision {
+  id          String   @id @default(cuid())
+  requestId   String
+  stepOrder   Int
+  stepName    String
+  role        String
+  decision    String // APPROVED | REJECTED
+  decidedById String?
+  comment     String?
+  decidedAt   DateTime @default(now())
+
+  request ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 }
 
 model ApprovalStep {

@@ -60,7 +60,7 @@ export default function StockMovementsPage() {
   const { toast } = useToast();
   const { can, isAdmin } = usePermissions();
   const user = useAuthStore((s) => s.user);
-  const canApprove = isAdmin || user?.role === 'MANAGER';
+  const eligibleFor = (a: any) => isAdmin || (!!a?.currentRole && user?.role === a.currentRole);
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -151,22 +151,25 @@ export default function StockMovementsPage() {
 
   const createMut = useMutation({
     mutationFn: (data: MovementFormData) => api.post('/stock-movements', data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setModalOpen(false);
-      toast({ title: 'Movement submitted for approval' });
+      toast({ title: res?.data?.status === 'PENDING' ? 'Movement submitted for approval' : 'Stock movement recorded' });
     },
     onError: () => toast({ title: 'Failed to record movement', variant: 'destructive' }),
   });
 
   const decideMut = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => api.put(`/stock-movements/${id}/${action}`),
-    onSuccess: (_res, vars) => {
+    onSuccess: (res: any, vars) => {
       queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
-      toast({ title: vars.action === 'approve' ? 'Movement approved & applied' : 'Movement rejected' });
+      const st = res?.data?.status;
+      const msg = vars.action === 'reject' ? 'Movement rejected'
+        : st === 'APPROVED' ? 'Approved & applied' : 'Stage approved — sent to next approver';
+      toast({ title: msg });
     },
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Action failed', variant: 'destructive' }),
   });
@@ -198,16 +201,27 @@ export default function StockMovementsPage() {
     { key: 'fromWarehouse', label: 'From', render: (_: any, row: any) => row.fromWarehouse?.name || '—' },
     { key: 'toWarehouse', label: 'To', render: (_: any, row: any) => row.toWarehouse?.name || '—' },
     {
-      key: 'status', label: 'Status', render: (v: string) => (
-        <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', statusStyles[v] || statusStyles.APPROVED)}>
-          {(v || 'APPROVED').charAt(0) + (v || 'APPROVED').slice(1).toLowerCase()}
-        </span>
-      ),
+      key: 'status', label: 'Status', render: (_: any, row: any) => {
+        const a = row.approval;
+        const st = a?.status || row.status || 'APPROVED';
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit', statusStyles[st] || statusStyles.APPROVED)}>
+              {st.charAt(0) + st.slice(1).toLowerCase()}
+            </span>
+            {st === 'PENDING' && a && a.totalSteps > 1 && (
+              <span className="text-[11px] text-muted-foreground">Stage {a.currentStep}/{a.totalSteps} · {a.currentStepName || a.currentRole}</span>
+            )}
+          </div>
+        );
+      },
     },
     { key: 'createdAt', label: 'Date', sortable: true, render: (v: string) => formatDateTime(v) },
     {
       key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => {
-        if (row.status !== 'PENDING' || !canApprove) return null;
+        const a = row.approval;
+        const st = a?.status || row.status;
+        if (st !== 'PENDING' || !eligibleFor(a)) return null;
         const busy = decideMut.isPending && decideMut.variables?.id === row.id;
         return (
           <div className="flex items-center justify-end gap-1.5">

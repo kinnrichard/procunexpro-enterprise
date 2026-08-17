@@ -25,6 +25,7 @@ import { useTaxStore } from '@/lib/tax'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Textarea } from '@/components/ui/textarea'
 import { WarehousesConfig } from '@/components/warehouses-config'
+import { ApprovalWorkflowsConfig } from '@/components/approval-workflows-config'
 
 import {
   Building2, Palette, Bell, Shield, Factory, Globe, Network, Users, Coins, Star, Percent, FileText, Truck,
@@ -2615,6 +2616,7 @@ export default function SettingsPage() {
         <TabsList className="flex flex-col h-auto w-52 shrink-0 items-stretch justify-start rounded-none border-r bg-transparent p-0 pr-2 gap-0.5">
           <TabsTrigger value="general" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">General</TabsTrigger>
           <TabsTrigger value="roles" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Roles &amp; Permissions</TabsTrigger>
+          <TabsTrigger value="approvals" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Approval Workflows</TabsTrigger>
           <TabsTrigger value="company" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Company</TabsTrigger>
           <TabsTrigger value="departments" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Departments</TabsTrigger>
           <TabsTrigger value="warehouses" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Warehouses</TabsTrigger>
@@ -2828,6 +2830,10 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* Roles & Permissions Tab */}
+        <TabsContent value="approvals" className="mt-0">
+          <ApprovalWorkflowsConfig />
+        </TabsContent>
+
         <TabsContent value="roles" className="mt-0">
           <RolesPermissionsConfig />
         </TabsContent>
