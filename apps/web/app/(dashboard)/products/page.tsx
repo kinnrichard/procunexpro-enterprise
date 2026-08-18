@@ -6,7 +6,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Package, Pencil, Ban, RotateCcw, AlertTriangle, Layers, Loader2, Plus, Printer } from 'lucide-react'
+import { Package, Pencil, Ban, RotateCcw, AlertTriangle, Layers, Loader2, Plus, Printer, Upload } from 'lucide-react'
+import { BulkImportDialog } from '@/components/bulk-import-dialog'
 import { LabelSheet, LabelItem } from '@/components/label-sheet'
 import api from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
@@ -140,6 +141,7 @@ export default function ProductsPage() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const { can } = usePermissions()
+  const [bulkOpen, setBulkOpen] = useState(false)
 
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -558,9 +560,14 @@ export default function ProductsPage() {
       {/* Header */}
       <PageHeader title="Items" description="Manage your items catalog and inventory">
         {can('products', 'create') && (
-          <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
-            <Plus className="h-4 w-4 mr-2" /> New Item
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setBulkOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" /> Bulk Upload
+            </Button>
+            <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
+              <Plus className="h-4 w-4 mr-2" /> New Item
+            </Button>
+          </div>
         )}
       </PageHeader>
 
@@ -891,6 +898,17 @@ export default function ProductsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <BulkImportDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        templateUrl="/products/import-template"
+        importUrl="/products/import"
+        templateFilename="items-import-template.xlsx"
+        title="Bulk Upload Items"
+        description="Download the template, fill one item per row, then upload it. Items are created at 0 stock — add stock later via Goods Receipt / Stock Lots."
+        onImported={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+      />
 
       {/* Delete Confirmation */}
       <ProductCompositionDialog

@@ -1,22 +1,48 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, Req, Res, UseGuards,
+  UseInterceptors, UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { ProductsService } from './products.service';
+import { ItemImportService } from './item-import.service';
 
 const MODULE = 'products';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly itemImport: ItemImportService,
+  ) {}
 
   @Get('low-stock')
   @RequirePermission(MODULE, 'view')
   getLowStock(@Req() req: any) {
     return this.productsService.getLowStock(req.user.tenantId);
+  }
+
+  // --- Bulk import ---
+
+  @Get('import-template')
+  @RequirePermission(MODULE, 'create')
+  async importTemplate(@Req() req: any, @Res() res: Response) {
+    const buffer = await this.itemImport.buildTemplate(req.user.tenantId);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="items-import-template.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('import')
+  @RequirePermission(MODULE, 'create')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
+  importItems(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+    return this.itemImport.importItems(req.user.tenantId, file);
   }
 
   @Get()
