@@ -8,7 +8,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { Download, Upload, Loader2, CheckCircle2, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 
 interface ImportError { row: number; sku: string; message: string }
-interface ImportResult { total: number; created: number; failed: number; errors: ImportError[] }
+interface NewConfig { manufacturers: string[]; origins: string[]; categories: string[]; subCategories: string[] }
+interface ImportResult { total: number; created: number; failed: number; errors: ImportError[]; createdConfig?: NewConfig }
 
 interface Props {
   open: boolean;
@@ -119,6 +120,23 @@ export function BulkImportDialog({
                 {result.failed > 0 && <span className="flex items-center gap-1.5 text-red-600"><AlertTriangle className="h-4 w-4" /> {result.failed} skipped</span>}
                 <span className="text-muted-foreground ml-auto">{result.total} row{result.total === 1 ? '' : 's'} total</span>
               </div>
+              {(() => {
+                const nc = result.createdConfig;
+                if (!nc) return null;
+                const parts = [
+                  [nc.categories.length, 'category', 'categories'],
+                  [nc.subCategories.length, 'sub-category', 'sub-categories'],
+                  [nc.manufacturers.length, 'manufacturer', 'manufacturers'],
+                  [nc.origins.length, 'origin', 'origins'],
+                ].filter(([n]) => (n as number) > 0).map(([n, s, p]) => `${n} ${n === 1 ? s : p}`);
+                if (parts.length === 0) return null;
+                const names = [...nc.categories, ...nc.subCategories, ...nc.manufacturers, ...nc.origins];
+                return (
+                  <p className="text-xs text-muted-foreground" title={names.join(', ')}>
+                    <span className="text-blue-600 font-medium">Also added {parts.join(', ')}</span> that weren’t in Settings yet.
+                  </p>
+                );
+              })()}
               {result.errors.length > 0 && (
                 <div className="max-h-48 overflow-y-auto rounded border bg-muted/30 divide-y">
                   {result.errors.map((e) => (

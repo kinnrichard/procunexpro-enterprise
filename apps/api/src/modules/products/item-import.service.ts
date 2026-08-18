@@ -35,12 +35,31 @@ const NUMERIC_FIELDS = new Set(['minStock', 'maxStock', 'reorderPoint', 'reorder
 const norm = (s: string) => s.replace(/\*/g, '').trim().toLowerCase();
 const FIELD_BY_HEADER = new Map(COLUMNS.map((c) => [norm(c.header), c.field]));
 
+interface NewConfig { manufacturers: string[]; origins: string[]; categories: string[]; subCategories: string[] }
+
+interface Lookups {
+  invTypes: { key: string; label: string }[];
+  categories: { id: string; name: string; parentId: string | null }[];
+  manufacturers: { id: string; name: string }[];
+  origins: { id: string; name: string }[];
+  uoms: { code: string }[];
+  invTypeByName: Map<string, string>;
+  catByName: Map<string, string>;
+  subByParent: Map<string, Map<string, string>>;
+  mfrByName: Map<string, string>;
+  originByName: Map<string, string>;
+  uomCodes: Set<string>;
+}
+
 export interface ImportResult {
   total: number;
   created: number;
   failed: number;
   errors: { row: number; sku: string; message: string }[];
+  createdConfig: NewConfig;
 }
+
+const slugCode = (name: string) => name.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 24) || 'ITEM';
 
 @Injectable()
 export class ItemImportService {
@@ -113,10 +132,11 @@ export class ItemImportService {
 
     title('How to use');
     line('1. Fill one item per row on the "Items" sheet. Columns marked * are required.');
-    line('2. For Inventory Type / Category / Sub Category / Manufacturer / Origin, type a value listed below (case-insensitive).');
-    line('3. Sub Category must belong to the Category on the same row.');
-    line('4. Stock always starts at 0 — add stock later via Goods Receipt / Stock Lots.');
-    line('5. Save as .xlsx (or .csv) and upload it back on the Items page.');
+    line('2. Matching is case-insensitive ("johnson" = "Johnson").');
+    line('3. Category, Sub Category, Manufacturer and Origin: type any value — if it doesn\'t exist yet it is created automatically. Inventory Type must be one listed below.');
+    line('4. Sub Category is created under the Category on the same row.');
+    line('5. Stock always starts at 0 — add stock later via Goods Receipt / Stock Lots.');
+    line('6. Save as .xlsx (or .csv) and upload it back on the Items page.');
     line();
     title('Inventory Types (type the key or label)');
     for (const t of lk.invTypes) line(t.key, t.label);
@@ -175,7 +195,8 @@ export class ItemImportService {
     }
 
     const lk = await this.loadLookups(tenantId);
-    const result: ImportResult = { total: 0, created: 0, failed: 0, errors: [] };
+    const nc: NewConfig = { manufacturers: [], origins: [], categories: [], subCategories: [] };
+    const result: ImportResult = { total: 0, created: 0, failed: 0, errors: [], createdConfig: nc };
 
     const rows = ws.getRows(2, ws.rowCount) ?? [];
     for (const row of rows) {
@@ -187,7 +208,7 @@ export class ItemImportService {
       result.total++;
       const rowNo = row.number;
 
-      const { data, issues } = this.resolveRow(rec, lk);
+      const { data, issues } = await this.resolveRow(tenantId, rec, lk, nc);
       if (issues.length) {
         result.failed++;
         result.errors.push({ row: rowNo, sku: rec.sku || '', message: issues.join('; ') });
@@ -206,7 +227,48 @@ export class ItemImportService {
     return result;
   }
 
-  private resolveRow(rec: Record<string, string>, lk: Awaited<ReturnType<ItemImportService['loadLookups']>>) {
+  // ---- Auto-create missing config (case-insensitive match first) --------
+
+  private async getOrCreateManufacturer(tenantId: string, name: string, lk: Lookups, nc: NewConfig): Promise<string> {
+    const existing = lk.mfrByName.get(name.toLowerCase());
+    if (existing) return existing;
+    const m = await this.prisma.manufacturer.create({ data: { tenantId, name } });
+    lk.mfrByName.set(name.toLowerCase(), m.id);
+    nc.manufacturers.push(name);
+    return m.id;
+  }
+
+  private async getOrCreateOrigin(tenantId: string, name: string, lk: Lookups, nc: NewConfig): Promise<string> {
+    const existing = lk.originByName.get(name.toLowerCase());
+    if (existing) return existing;
+    const o = await this.prisma.origin.create({ data: { tenantId, name } });
+    lk.originByName.set(name.toLowerCase(), o.id);
+    nc.origins.push(name);
+    return o.id;
+  }
+
+  private async getOrCreateCategory(tenantId: string, name: string, lk: Lookups, nc: NewConfig): Promise<string> {
+    const existing = lk.catByName.get(name.toLowerCase());
+    if (existing) return existing;
+    const c = await this.prisma.category.create({ data: { tenantId, name, code: slugCode(name) } });
+    lk.catByName.set(name.toLowerCase(), c.id);
+    lk.subByParent.set(c.id, new Map());
+    nc.categories.push(name);
+    return c.id;
+  }
+
+  private async getOrCreateSubCategory(tenantId: string, name: string, parentId: string, parentName: string, lk: Lookups, nc: NewConfig): Promise<string> {
+    let subs = lk.subByParent.get(parentId);
+    if (!subs) { subs = new Map(); lk.subByParent.set(parentId, subs); }
+    const existing = subs.get(name.toLowerCase());
+    if (existing) return existing;
+    const c = await this.prisma.category.create({ data: { tenantId, name, code: slugCode(name), parentId } });
+    subs.set(name.toLowerCase(), c.id);
+    nc.subCategories.push(`${parentName} ▸ ${name}`);
+    return c.id;
+  }
+
+  private async resolveRow(tenantId: string, rec: Record<string, string>, lk: Lookups, nc: NewConfig) {
     const issues: string[] = [];
     const data: any = {};
 
@@ -214,50 +276,35 @@ export class ItemImportService {
     else data.name = rec.name;
     if (!rec.sku) issues.push('SKU is required');
     else data.sku = rec.sku;
+    // Don't auto-create config for clearly-empty/broken rows
+    if (issues.length) return { data, issues };
 
-    // Inventory type (defaults to "product" when blank)
+    // Inventory type — controlled vocabulary: match (case-insensitive) or default "product"
     if (!rec.inventoryType) data.inventoryType = 'product';
     else {
       const key = lk.invTypeByName.get(rec.inventoryType.toLowerCase());
-      if (!key) issues.push(`Unknown inventory type "${rec.inventoryType}"`);
+      if (!key) issues.push(`Unknown inventory type "${rec.inventoryType}" (add it in Settings → Inventory Types first)`);
       else data.inventoryType = key;
     }
 
-    // Category (required) + optional sub-category
-    let categoryId: string | undefined;
+    // Category (required) + optional sub-category — auto-created if missing
     if (!rec.category) issues.push('Category is required');
-    else {
-      categoryId = lk.catByName.get(rec.category.toLowerCase());
-      if (!categoryId) issues.push(`Unknown category "${rec.category}"`);
-      else data.categoryId = categoryId;
-    }
+    else data.categoryId = await this.getOrCreateCategory(tenantId, rec.category, lk, nc);
     if (rec.subCategory) {
-      if (!categoryId) issues.push('Sub Category given without a valid Category');
-      else {
-        const subId = lk.subByParent.get(categoryId)?.get(rec.subCategory.toLowerCase());
-        if (!subId) issues.push(`Unknown sub category "${rec.subCategory}" under "${rec.category}"`);
-        else data.subCategoryId = subId;
-      }
+      if (!data.categoryId) issues.push('Sub Category given without a valid Category');
+      else data.subCategoryId = await this.getOrCreateSubCategory(tenantId, rec.subCategory, data.categoryId, rec.category, lk, nc);
     }
 
-    // Manufacturer + origin (required)
+    // Manufacturer + origin (required) — auto-created if missing
     if (!rec.manufacturer) issues.push('Manufacturer is required');
-    else {
-      const id = lk.mfrByName.get(rec.manufacturer.toLowerCase());
-      if (!id) issues.push(`Unknown manufacturer "${rec.manufacturer}"`);
-      else data.manufacturerId = id;
-    }
+    else data.manufacturerId = await this.getOrCreateManufacturer(tenantId, rec.manufacturer, lk, nc);
     if (!rec.origin) issues.push('Origin is required');
-    else {
-      const id = lk.originByName.get(rec.origin.toLowerCase());
-      if (!id) issues.push(`Unknown origin "${rec.origin}"`);
-      else data.originId = id;
-    }
+    else data.originId = await this.getOrCreateOrigin(tenantId, rec.origin, lk, nc);
 
-    // Unit (validate against configured UOMs if any exist)
+    // Unit — lenient: use the configured UOM's canonical casing if it matches, else accept as typed
     if (rec.unit) {
-      if (lk.uomCodes.size > 0 && !lk.uomCodes.has(rec.unit.toLowerCase())) issues.push(`Unknown unit "${rec.unit}"`);
-      else data.unit = rec.unit;
+      const match = lk.uoms.find((u) => u.code.toLowerCase() === rec.unit.toLowerCase());
+      data.unit = match ? match.code : rec.unit;
     }
 
     // Plain optional fields
