@@ -207,6 +207,7 @@ model Tenant {
   deliveryTypes      DeliveryType[]
   roles              Role[]
   inventoryTypes     InventoryType[]
+  dashboardWidgets   DashboardWidget[]
 }
 
 // Tenant-scoped inventory types (Product.inventoryType stores the `key`).
@@ -372,6 +373,30 @@ model RolePermission {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, role, module])
+}
+
+// One shared, admin-configured dashboard per tenant. Each row is a placed widget.
+// `type` maps to the widget catalog; `config` holds per-widget settings (months,
+// limit, metric, notes text...); `allowedRoles` gates visibility (empty = everyone).
+// x/y/w/h are the react-grid-layout coordinates (12-col grid).
+model DashboardWidget {
+  id           String   @id @default(cuid())
+  tenantId     String
+  type         String // catalog key, e.g. 'kpi-total-prs', 'chart-procurement-spend'
+  title        String? // optional title override (falls back to the catalog default)
+  config       Json? // per-widget settings
+  allowedRoles String[] @default([]) // Role.keys allowed to see it; empty = all roles
+  x            Int      @default(0)
+  y            Int      @default(0)
+  w            Int      @default(3)
+  h            Int      @default(2)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
 }
 
 model Category {

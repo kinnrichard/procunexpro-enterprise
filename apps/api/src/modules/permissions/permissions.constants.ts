@@ -3,6 +3,7 @@ export const CONFIGURABLE_ROLES = ['MANAGER', 'PROCUREMENT_OFFICER', 'WAREHOUSE_
 export const FULL_ACCESS_ROLES = ['SUPERADMIN', 'ADMIN'];
 
 export const MODULES: Array<{ key: string; label: string }> = [
+  { key: 'dashboard', label: 'Dashboard (manage widgets)' },
   { key: 'purchase-requests', label: 'Purchase Requests' },
   { key: 'purchase-orders', label: 'Purchase Orders' },
   { key: 'rfq', label: 'RFQ' },

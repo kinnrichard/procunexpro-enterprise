@@ -28,6 +28,7 @@ import { StockTransfersModule } from './modules/stock-transfers/stock-transfers.
 import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { DeliveryReceiptsModule } from './modules/delivery-receipts/delivery-receipts.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { DashboardWidgetsModule } from './modules/dashboard-widgets/dashboard-widgets.module';
 import { HealthModule } from './modules/health/health.module';
 import { BudgetsModule } from './modules/budgets/budgets.module';
 import { ContractsModule } from './modules/contracts/contracts.module';
@@ -83,6 +84,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     ApprovalsModule,
     DeliveryReceiptsModule,
     DashboardModule,
+    DashboardWidgetsModule,
     HealthModule,
     BudgetsModule,
     ContractsModule,
