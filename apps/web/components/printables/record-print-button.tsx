@@ -5,11 +5,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Printer, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { writeAndPrint } from './print-document';
+import { printHtml } from './print-document';
 
-// Print trigger for records on list-only pages (no detail page). Opens the print
-// window synchronously on click (so it isn't popup-blocked), fetches the full
-// record, renders it hidden, then writes the markup into the window and prints.
+// Print trigger for records on list-only pages (no detail page). Fetches the
+// full record on click, renders it hidden, then prints it via a hidden iframe.
 export function RecordPrintButton({
   fetchUrl, queryKey, render, title = 'Print', className,
 }: Readonly<{
@@ -20,7 +19,6 @@ export function RecordPrintButton({
   className?: string;
 }>) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const winRef = useRef<Window | null>(null);
   const [active, setActive] = useState(false);
 
   const { data, isFetching } = useQuery({
@@ -31,25 +29,18 @@ export function RecordPrintButton({
   });
 
   useEffect(() => {
-    if (active && data && winRef.current) {
-      writeAndPrint(winRef.current, hostRef.current?.innerHTML ?? '');
-      winRef.current = null;
+    if (active && data) {
+      printHtml(hostRef.current?.innerHTML ?? '');
       setActive(false);
     }
   }, [active, data]);
-
-  const onClick = () => {
-    // Open synchronously inside the click (avoids the popup blocker).
-    winRef.current = globalThis.open('', '_blank');
-    setActive(true);
-  };
 
   return (
     <>
       <button
         type="button"
         title={title}
-        onClick={onClick}
+        onClick={() => setActive(true)}
         className={cn('inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground', className)}
       >
         {active && isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
