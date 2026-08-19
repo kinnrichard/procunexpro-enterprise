@@ -10,8 +10,8 @@ function ItemCell({ name, sku, description }: Readonly<{ name?: string; sku?: st
   return (
     <div>
       <div className="item-name">{name || description || '—'}</div>
-      {sku && <div className="item-sub">{sku}</div>}
-      {name && description && description !== name && <div className="item-sub">{description}</div>}
+      {sku && <div className="items-desc">{sku}</div>}
+      {name && description && description !== name && <div className="items-desc">{description}</div>}
     </div>
   );
 }
