@@ -25,8 +25,10 @@ import { useAuthStore } from '@/lib/auth';
 import {
   ArrowLeft, Loader2, Send, CheckCircle, XCircle, Trophy,
   Clock, FileText, Ban, ChevronRight, Calendar, StickyNote,
-  Package, BarChart3, Plus, User, Check, X, ShieldCheck,
+  Package, BarChart3, Plus, User, Check, X, ShieldCheck, Printer,
 } from 'lucide-react';
+import { usePrintDoc, PrintDocHost } from '@/components/printables/print-document';
+import { RFQDocument } from '@/components/printables/documents';
 
 // ─── Status Timeline ──────────────────────────────────────
 const statusOrder = ['DRAFT', 'PUBLISHED', 'CLOSED', 'AWARDED'];
@@ -97,6 +99,7 @@ export default function RFQDetailPage() {
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const [awardConfirmOpen, setAwardConfirmOpen] = useState(false);
+  const { ref: printRef, print: handlePrint } = usePrintDoc();
   const [awardQuoteId, setAwardQuoteId] = useState('');
   const [compareOpen, setCompareOpen] = useState(false);
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
@@ -201,6 +204,9 @@ export default function RFQDetailPage() {
     const eligible = isAdmin || (!!appr?.currentRole && user?.role === appr.currentRole);
     return (
       <div className="flex items-center gap-2">
+        <Button variant="outline" onClick={handlePrint}>
+          <Printer className="h-4 w-4 mr-2" /> Print
+        </Button>
         {rfq.status === 'DRAFT' && pending && (
           <>
             <span className="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1.5">
@@ -244,6 +250,7 @@ export default function RFQDetailPage() {
 
   return (
     <div className="space-y-6">
+      <PrintDocHost innerRef={printRef}><RFQDocument rfq={rfq} /></PrintDocHost>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { formatDate, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
+import { RecordPrintButton } from '@/components/printables/record-print-button';
+import { DRDocument } from '@/components/printables/documents';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
@@ -124,6 +126,7 @@ export default function DeliveriesPage() {
       }
       return (
         <div className="flex items-center gap-0.5 justify-end">
+          <RecordPrintButton fetchUrl={`/delivery-receipts/${row.id}`} queryKey={['dr-print', row.id]} title="Print delivery receipt" className="h-7 w-7" render={(dr) => <DRDocument dr={dr} />} />
           {row.status !== 'DRAFT' && <button onClick={() => copyLink(row.signUrl)} title="Copy sign link" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Link2 className="h-3.5 w-3.5" /></button>}
           {row.status === 'RELEASED' && can('deliveries', 'edit') && (
             <button onClick={() => cancelMut.mutate(row.id)} title="Cancel" className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><XCircle className="h-3.5 w-3.5" /></button>

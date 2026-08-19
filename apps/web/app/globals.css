@@ -152,3 +152,6 @@
     height: auto;
   }
 }
+
+/* Letterhead documents (PO/PR/RFQ/DR/GRN) print in a separate window with their
+   own inline CSS (see components/printables/document-css.ts) — no rules needed here. */

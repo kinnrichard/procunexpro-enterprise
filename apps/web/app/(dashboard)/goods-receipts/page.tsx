@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
+import { RecordPrintButton } from '@/components/printables/record-print-button';
+import { GRNDocument } from '@/components/printables/documents';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { Button } from '@/components/ui/button';
@@ -112,7 +114,12 @@ export default function GoodsReceiptsPage() {
     { key: '_count', label: 'Items', className: 'text-center', render: (v: any) => <span className="font-mono text-sm">{v?.items ?? 0}</span> },
     { key: 'status', label: 'Status', render: (_: any, row: any) => <ApprovalStatusBadge approval={row.approval} fallback={row.status} /> },
     { key: 'receiptDate', label: 'Date', render: (v: string) => formatDate(v) },
-    { key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => <ApprovalActions endpoint="/goods-receipts" id={row.id} approval={row.approval} fallback={row.status} invalidateKeys={['goods-receipts', 'products', 'stock-lots']} appliedLabel="Received & posted" /> },
+    { key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => (
+      <div className="flex items-center gap-0.5 justify-end">
+        <RecordPrintButton fetchUrl={`/goods-receipts/${row.id}`} queryKey={['grn-print', row.id]} title="Print goods received note" className="h-7 w-7" render={(gr) => <GRNDocument gr={gr} />} />
+        <ApprovalActions endpoint="/goods-receipts" id={row.id} approval={row.approval} fallback={row.status} invalidateKeys={['goods-receipts', 'products', 'stock-lots']} appliedLabel="Received & posted" />
+      </div>
+    ) },
   ];
 
   const canSave = !!warehouseId && rows.length > 0 && rows.some((r) => r.quantity > 0);

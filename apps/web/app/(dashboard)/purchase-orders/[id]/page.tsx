@@ -26,8 +26,10 @@ import { usePermissions } from '@/lib/permissions';
 import { useAuthStore } from '@/lib/auth';
 import {
   ArrowLeft, Loader2, Send, CheckCircle, XCircle, Truck, PackageCheck,
-  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, CreditCard, MapPin, Info, ShieldCheck,
+  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, CreditCard, MapPin, Info, ShieldCheck, Printer,
 } from 'lucide-react';
+import { usePrintDoc, PrintDocHost } from '@/components/printables/print-document';
+import { PODocument } from '@/components/printables/documents';
 
 // ─── Status Timeline ──────────────────────────────────────
 const statusOrder = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'RECEIVED'];
@@ -193,6 +195,7 @@ export default function PurchaseOrderDetailPage() {
   const [receiveConfirmOpen, setReceiveConfirmOpen] = useState(false);
   const [coaModalOpen, setCoaModalOpen] = useState(false);
   const [coaItemId, setCoaItemId] = useState('');
+  const { ref: printRef, print: handlePrint } = usePrintDoc();
   const [coaFormData, setCoaFormData] = useState({ glAccountId: '', debitAmount: 0, creditAmount: 0, accountRemarks: '' });
 
   const { data: poData, isLoading } = useQuery({
@@ -253,6 +256,9 @@ export default function PurchaseOrderDetailPage() {
     if (!po) return null;
     return (
       <div className="flex items-center gap-2">
+        <Button variant="outline" onClick={handlePrint}>
+          <Printer className="h-4 w-4 mr-2" /> Print
+        </Button>
         {po.status === 'DRAFT' && (
           <Button onClick={() => setSubmitConfirmOpen(true)} disabled={submitMutation.isPending || (po.items?.length || 0) === 0} className="bg-gradient-to-r from-slate-700 to-[#1e3a5f] text-white hover:opacity-90">
             {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />} Submit
@@ -294,6 +300,7 @@ export default function PurchaseOrderDetailPage() {
 
   return (
     <div className="space-y-6">
+      <PrintDocHost innerRef={printRef}><PODocument po={po} /></PrintDocHost>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">

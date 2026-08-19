@@ -29,8 +29,10 @@ import { usePermissions } from '@/lib/permissions';
 import { useAuthStore } from '@/lib/auth';
 import {
   ArrowLeft, Plus, Trash2, Loader2, Send, CheckCircle, XCircle, X, Filter,
-  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info, Package, FileSearch, ShieldCheck,
+  Clock, FileText, Link2, Ban, ChevronRight, Building2, Calendar, Pencil, Info, Package, FileSearch, ShieldCheck, Printer,
 } from 'lucide-react';
+import { usePrintDoc, PrintDocHost } from '@/components/printables/print-document';
+import { PRDocument } from '@/components/printables/documents';
 
 type Vendor = { id: string; name: string };
 
@@ -514,6 +516,7 @@ export default function PurchaseRequestDetailPage() {
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const { ref: printRef, print: handlePrint } = usePrintDoc();
 
   // Line item search, filter & pagination
   const [itemSearch, setItemSearch] = useState('');
@@ -905,6 +908,9 @@ export default function PurchaseRequestDetailPage() {
   function renderHeaderActions() {
     return (
       <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={handlePrint}>
+          <Printer className="h-3.5 w-3.5 mr-1.5" /> Print
+        </Button>
         {isDraft && (
           <Button variant="outline" size="sm" onClick={openEditPr}>
             <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
@@ -948,6 +954,7 @@ export default function PurchaseRequestDetailPage() {
 
   return (
     <div className="space-y-6">
+      <PrintDocHost innerRef={printRef}><PRDocument pr={pr} /></PrintDocHost>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
