@@ -8,7 +8,7 @@ export const DOC_PRINT_CSS = `
 
   .receipt-header { border-bottom: 2px solid #000; padding-bottom: 16px; margin-bottom: 24px; }
   .receipt-header .flex { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
-  .receipt-header img { height: 64px; max-width: 240px; object-fit: contain; }
+  .receipt-header img { height: 84px; max-width: 300px; object-fit: contain; }
   .receipt-header h1 { font-size: 24px; font-weight: 700; color: #111827; margin: 0; }
   .receipt-header h2 { font-size: 20px; font-weight: 700; color: #111827; margin: 0; text-transform: uppercase; }
   .receipt-header p { margin: 4px 0 0; font-size: 14px; color: #6B7280; }
