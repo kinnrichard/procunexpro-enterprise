@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { formatDate, cn } from '@/lib/utils';
@@ -11,7 +12,6 @@ import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { FilterPopover, FilterField } from '@/components/filter-popover';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -22,9 +22,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
 import { ApprovalStatusBadge, ApprovalActions } from '@/components/approval-controls';
-import { Send, Plus, Trash2, Link2, XCircle, CheckCircle2 } from 'lucide-react';
-
-interface Row { productId: string; quantity: number; }
+import { Send, Plus, Link2, XCircle, CheckCircle2 } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
   RELEASED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -36,6 +34,7 @@ const statusColors: Record<string, string> = {
 export default function DeliveriesPage() {
   const { toast } = useToast();
   const { can } = usePermissions();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -46,7 +45,6 @@ export default function DeliveriesPage() {
   const [areaId, setAreaId] = useState('');
   const [locationId, setLocationId] = useState('');
   const [notes, setNotes] = useState('');
-  const [rows, setRows] = useState<Row[]>([]);
 
   // Advanced filters
   const [filterCustomerId, setFilterCustomerId] = useState('');
@@ -71,30 +69,24 @@ export default function DeliveriesPage() {
     } }),
   });
   const { data: custData } = useQuery({ queryKey: ['customers-active'], queryFn: () => api.get('/customers/active') });
-  const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
 
   const items = response?.data?.data || [];
   const total = response?.data?.total || 0;
   const customers = (custData?.data?.data || []).map((c: any) => ({ value: c.id, label: `${c.name} (${c.code})` }));
-  // Only finished goods / components make sense to deliver
-  const products = (prodData?.data?.data || []).filter((p: any) => ['product', 'component'].includes(p.inventoryType)).map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
   const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
-  const usedIds = new Set(rows.map((r) => r.productId).filter(Boolean));
 
-  const addRow = () => setRows((r) => [...r, { productId: '', quantity: 1 }]);
-  const removeRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
-  const updateRow = (i: number, patch: Partial<Row>) => setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
-
+  // Header-only create → land on the detail page to add items and release.
   const saveMut = useMutation({
-    mutationFn: () => api.post('/delivery-receipts', { customerId, warehouseId: warehouseId || undefined, areaId: areaId || undefined, locationId: locationId || undefined, notes: notes || undefined, items: rows.filter((r) => r.productId && r.quantity > 0) }),
+    mutationFn: () => api.post('/delivery-receipts', { customerId, warehouseId: warehouseId || undefined, areaId: areaId || undefined, locationId: locationId || undefined, notes: notes || undefined }),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['delivery-receipts'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
       setModalOpen(false);
-      toast({ title: res?.data?.status === 'RELEASED' ? `Released — ${res?.data?.drNumber || ''}` : `Delivery ${res?.data?.drNumber || ''} submitted for approval` });
+      const id = res?.data?.id;
+      toast({ title: `Draft ${res?.data?.drNumber || ''} created — add items to release` });
+      if (id) router.push(`/deliveries/${id}`);
     },
-    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to release', variant: 'destructive' }),
+    onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to create', variant: 'destructive' }),
   });
 
   const cancelMut = useMutation({
@@ -103,7 +95,7 @@ export default function DeliveriesPage() {
     onError: (e: any) => toast({ title: e?.response?.data?.message || 'Failed to cancel', variant: 'destructive' }),
   });
 
-  const openCreate = () => { setCustomerId(''); setWarehouseId(''); setAreaId(''); setLocationId(''); setNotes(''); setRows([{ productId: '', quantity: 1 }]); setModalOpen(true); };
+  const openCreate = () => { setCustomerId(''); setWarehouseId(''); setAreaId(''); setLocationId(''); setNotes(''); setModalOpen(true); };
   const copyLink = (url: string) => { globalThis.navigator?.clipboard?.writeText(url); toast({ title: 'Sign link copied' }); };
 
   const columns = [
@@ -120,23 +112,24 @@ export default function DeliveriesPage() {
         )
     ) },
     { key: 'deliveryDate', label: 'Date', render: (v: string) => formatDate(v) },
-    { key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => {
-      if (row.status === 'DRAFT' && row.approval?.status === 'PENDING') {
-        return <ApprovalActions endpoint="/delivery-receipts" id={row.id} approval={row.approval} invalidateKeys={['delivery-receipts', 'products', 'stock-lots', 'stock-movements']} appliedLabel="Goods released" />;
-      }
-      return (
-        <div className="flex items-center gap-0.5 justify-end">
-          <RecordPrintButton fetchUrl={`/delivery-receipts/${row.id}`} queryKey={['dr-print', row.id]} title="Print delivery receipt" className="h-7 w-7" render={(dr) => <DRDocument dr={dr} />} />
-          {row.status !== 'DRAFT' && <button onClick={() => copyLink(row.signUrl)} title="Copy sign link" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Link2 className="h-3.5 w-3.5" /></button>}
-          {row.status === 'RELEASED' && can('deliveries', 'edit') && (
-            <button onClick={() => cancelMut.mutate(row.id)} title="Cancel" className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><XCircle className="h-3.5 w-3.5" /></button>
-          )}
-        </div>
-      );
-    } },
+    { key: 'actions', label: '', className: 'text-right', render: (_: any, row: any) => (
+      <div className="flex items-center gap-0.5 justify-end" onClick={(e) => e.stopPropagation()}>
+        {row.status === 'DRAFT' && row.approval?.status === 'PENDING' ? (
+          <ApprovalActions endpoint="/delivery-receipts" id={row.id} approval={row.approval} invalidateKeys={['delivery-receipts', 'products', 'stock-lots', 'stock-movements']} appliedLabel="Goods released" />
+        ) : (
+          <>
+            <RecordPrintButton fetchUrl={`/delivery-receipts/${row.id}`} queryKey={['dr-print', row.id]} title="Print delivery receipt" className="h-7 w-7" render={(dr) => <DRDocument dr={dr} />} />
+            {row.status !== 'DRAFT' && <button onClick={() => copyLink(row.signUrl)} title="Copy sign link" className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent"><Link2 className="h-3.5 w-3.5" /></button>}
+            {row.status === 'RELEASED' && can('deliveries', 'edit') && (
+              <button onClick={() => cancelMut.mutate(row.id)} title="Cancel" className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50"><XCircle className="h-3.5 w-3.5" /></button>
+            )}
+          </>
+        )}
+      </div>
+    ) },
   ];
 
-  const canSave = !!customerId && !!warehouseId && rows.some((r) => r.productId && r.quantity > 0);
+  const canSave = !!customerId && !!warehouseId;
 
   const statusFilters = ['', 'DRAFT', 'RELEASED', 'SIGNED', 'CANCELLED'];
   const statusLabels: Record<string, string> = { '': 'All', DRAFT: 'Pending', RELEASED: 'Awaiting sign', SIGNED: 'Signed', CANCELLED: 'Cancelled' };
@@ -153,7 +146,7 @@ export default function DeliveriesPage() {
         <StatCard title="Awaiting sign" value={items.filter((i: any) => i.status === 'RELEASED').length} icon={<Send className="h-5 w-5" />} />
       </div>
 
-      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} searchPlaceholder="Search deliveries..." isLoading={isLoading} emptyMessage="No deliveries yet"
+      <DataTable columns={columns} data={items} total={total} page={page} limit={10} onPageChange={setPage} onSearch={setSearch} onRowClick={(row: any) => router.push(`/deliveries/${row.id}`)} searchPlaceholder="Search deliveries..." isLoading={isLoading} emptyMessage="No deliveries yet"
         toolbar={
           <div className="flex items-center gap-3 flex-wrap">
             <FilterPopover activeCount={activeFilterCount} onClear={clearFilters}>
@@ -182,7 +175,8 @@ export default function DeliveriesPage() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-2xl p-0 gap-0">
           <DialogHeader className="px-6 pt-5 pb-4 bg-muted/50 border-b rounded-t-2xl">
-            <DialogTitle>Release Goods — New Delivery Receipt</DialogTitle>
+            <DialogTitle>New Delivery Receipt</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">Create the delivery, then add items and release it on the next page.</p>
           </DialogHeader>
           <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
@@ -204,18 +198,6 @@ export default function DeliveriesPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-[13px]">Items to release</Label>
-              {rows.map((row, i) => (
-                <div key={i} className="grid grid-cols-[1fr_110px_40px] gap-2 items-center">
-                  <SearchableSelect options={products.filter((o: any) => o.value === row.productId || !usedIds.has(o.value))} value={row.productId} onChange={(v) => updateRow(i, { productId: v })} placeholder="Select finished product" />
-                  <Input type="number" step="any" value={row.quantity || ''} placeholder="0" onChange={(e) => updateRow(i, { quantity: Number.parseFloat(e.target.value) || 0 })} className="h-9 rounded-lg text-right" />
-                  <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:text-red-700" onClick={() => removeRow(i)}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={addRow}><Plus className="h-4 w-4 mr-1.5" /> Add item</Button>
-            </div>
-
             <div className="space-y-1.5">
               <Label className="text-[13px]">Notes</Label>
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-lg" rows={2} />
@@ -224,7 +206,7 @@ export default function DeliveriesPage() {
           <div className="px-6 py-4 border-t border-border flex justify-between">
             <Button type="button" variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
             <Button type="button" onClick={() => saveMut.mutate()} className="bg-gradient-primary text-white" disabled={!canSave || saveMut.isPending}>
-              <Send className="h-4 w-4 mr-2" />{saveMut.isPending ? 'Releasing…' : 'Release Goods'}
+              {saveMut.isPending ? 'Creating…' : 'Create & Add Items'}
             </Button>
           </div>
         </DialogContent>

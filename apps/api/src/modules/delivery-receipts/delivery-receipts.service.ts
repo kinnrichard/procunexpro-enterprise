@@ -62,30 +62,23 @@ export class DeliveryReceiptsService {
   }
 
   /**
-   * Records a delivery. Stock is NOT drawn until the DELIVERY workflow is satisfied —
-   * on final approval the finished goods are consumed FEFO, on-hand is decremented,
-   * a SALE movement is written and the DR is RELEASED. No workflow → releases now.
+   * Creates a DRAFT delivery receipt (header only by default). Items are added
+   * on the detail page, then `release()` runs the workflow + FEFO draw. Items may
+   * still be passed here (optional) but nothing is released at create time.
    */
   async create(tenantId: string, userId: string, data: any) {
     const customer = await this.prisma.customer.findFirst({ where: { id: data.customerId, tenantId } });
     if (!customer) throw new NotFoundException('Customer not found');
 
     const rows: any[] = Array.isArray(data?.items) ? data.items.filter((i: any) => i.productId && i.quantity > 0) : [];
-    if (rows.length === 0) throw new BadRequestException('No items to release');
-
-    const products = await this.prisma.product.findMany({
-      where: { tenantId, id: { in: rows.map((r) => r.productId) } },
-      select: { id: true, name: true, unit: true, currentStock: true },
-    });
-    const prodMap = new Map(products.map((p) => [p.id, p]));
-
-    // Pre-check stock availability for a better UX; authoritative check runs on release.
-    for (const r of rows) {
-      const prod = prodMap.get(r.productId);
-      if (!prod) throw new NotFoundException('Product not found');
-      if (prod.currentStock < round(r.quantity)) {
-        throw new BadRequestException(`Insufficient stock for ${prod.name} (available ${prod.currentStock}, need ${round(r.quantity)})`);
-      }
+    let itemCreate: any;
+    if (rows.length) {
+      const products = await this.prisma.product.findMany({
+        where: { tenantId, id: { in: rows.map((r) => r.productId) } },
+        select: { id: true, unit: true },
+      });
+      const prodMap = new Map(products.map((p) => [p.id, p]));
+      itemCreate = { create: rows.map((r) => ({ productId: r.productId, quantity: round(r.quantity), uom: r.uom || prodMap.get(r.productId)?.unit || 'pcs' })) };
     }
 
     const today = new Date();
@@ -100,13 +93,102 @@ export class DeliveryReceiptsService {
         status: 'DRAFT', notes: data.notes || null,
         deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : today,
         token: randomUUID(), createdById: userId,
-        items: { create: rows.map((r) => ({ productId: r.productId, quantity: round(r.quantity), uom: r.uom || prodMap.get(r.productId)?.unit || 'pcs' })) },
+        ...(itemCreate ? { items: itemCreate } : {}),
       },
     });
-
-    const { required } = await this.approvals.ensureRequest(tenantId, 'DELIVERY', dr.id, userId);
-    if (!required) await this.applyRelease(tenantId, dr.id, userId);
     return this.findOne(tenantId, dr.id);
+  }
+
+  // A DR can only be edited while it's a DRAFT that hasn't been submitted for approval.
+  private async assertEditable(tenantId: string, id: string) {
+    const dr = await this.prisma.deliveryReceipt.findFirst({ where: { id, tenantId } });
+    if (!dr) throw new NotFoundException('Delivery receipt not found');
+    if (dr.status !== 'DRAFT') throw new BadRequestException('Only draft deliveries can be edited');
+    const approval = await this.approvals.getRequest(tenantId, 'DELIVERY', id);
+    if (approval?.status === 'PENDING') throw new BadRequestException('This delivery is awaiting approval and cannot be edited');
+    return dr;
+  }
+
+  /** Update draft header fields (customer/warehouse/location/date/notes). */
+  async updateHeader(tenantId: string, id: string, data: any) {
+    await this.assertEditable(tenantId, id);
+    if (data.customerId) {
+      const customer = await this.prisma.customer.findFirst({ where: { id: data.customerId, tenantId } });
+      if (!customer) throw new NotFoundException('Customer not found');
+    }
+    await this.prisma.deliveryReceipt.update({
+      where: { id },
+      data: {
+        ...(data.customerId !== undefined && { customerId: data.customerId }),
+        ...(data.warehouseId !== undefined && { warehouseId: data.warehouseId || null }),
+        ...(data.areaId !== undefined && { areaId: data.areaId || null }),
+        ...(data.locationId !== undefined && { locationId: data.locationId || null }),
+        ...(data.notes !== undefined && { notes: data.notes || null }),
+        ...(data.deliveryDate !== undefined && { deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : new Date() }),
+      },
+    });
+    return this.findOne(tenantId, id);
+  }
+
+  async addItem(tenantId: string, id: string, data: any) {
+    await this.assertEditable(tenantId, id);
+    if (!data?.productId || !(data.quantity > 0)) throw new BadRequestException('Product and a quantity greater than 0 are required');
+    const product = await this.prisma.product.findFirst({ where: { id: data.productId, tenantId }, select: { id: true, unit: true } });
+    if (!product) throw new NotFoundException('Product not found');
+    await this.prisma.deliveryReceiptItem.create({
+      data: { deliveryReceiptId: id, productId: data.productId, quantity: round(data.quantity), uom: data.uom || product.unit || 'pcs' },
+    });
+    return this.findOne(tenantId, id);
+  }
+
+  async updateItem(tenantId: string, id: string, itemId: string, data: any) {
+    await this.assertEditable(tenantId, id);
+    const item = await this.prisma.deliveryReceiptItem.findFirst({ where: { id: itemId, deliveryReceiptId: id } });
+    if (!item) throw new NotFoundException('Item not found');
+    await this.prisma.deliveryReceiptItem.update({
+      where: { id: itemId },
+      data: {
+        ...(data.quantity !== undefined && { quantity: round(data.quantity) }),
+        ...(data.uom !== undefined && { uom: data.uom || item.uom }),
+      },
+    });
+    return this.findOne(tenantId, id);
+  }
+
+  async removeItem(tenantId: string, id: string, itemId: string) {
+    await this.assertEditable(tenantId, id);
+    await this.prisma.deliveryReceiptItem.deleteMany({ where: { id: itemId, deliveryReceiptId: id } });
+    return this.findOne(tenantId, id);
+  }
+
+  /**
+   * Releases a draft: validates items, then runs the DELIVERY workflow. If a
+   * workflow is configured the DR is submitted for approval (stays DRAFT until
+   * cleared); otherwise the FEFO draw runs now and it becomes RELEASED.
+   */
+  async release(tenantId: string, id: string, userId: string) {
+    const dr = await this.prisma.deliveryReceipt.findFirst({ where: { id, tenantId }, include: { items: true } });
+    if (!dr) throw new NotFoundException('Delivery receipt not found');
+    if (dr.status !== 'DRAFT') throw new BadRequestException('Only draft deliveries can be released');
+    if (dr.items.length === 0) throw new BadRequestException('Add at least one item before releasing');
+
+    // Pre-check stock for a better error before we start the workflow.
+    const products = await this.prisma.product.findMany({
+      where: { tenantId, id: { in: dr.items.map((r) => r.productId) } },
+      select: { id: true, name: true, currentStock: true },
+    });
+    const prodMap = new Map(products.map((p) => [p.id, p]));
+    for (const r of dr.items) {
+      const prod = prodMap.get(r.productId);
+      if (!prod) throw new NotFoundException('Product not found');
+      if (prod.currentStock < round(r.quantity)) {
+        throw new BadRequestException(`Insufficient stock for ${prod.name} (available ${prod.currentStock}, need ${round(r.quantity)})`);
+      }
+    }
+
+    const { required } = await this.approvals.ensureRequest(tenantId, 'DELIVERY', id, userId);
+    if (!required) await this.applyRelease(tenantId, id, userId);
+    return this.findOne(tenantId, id);
   }
 
   /** Records an approval on the current stage; releases the goods once fully approved. */

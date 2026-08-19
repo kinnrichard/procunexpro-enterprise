@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Body, Param, Query, Req, UseGuards,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -46,6 +46,36 @@ export class DeliveryReceiptsController {
   @RequirePermission(MODULE, 'create')
   create(@Req() req: any, @Body() body: any) {
     return this.service.create(req.user.tenantId, req.user.id, body);
+  }
+
+  @Put(':id')
+  @RequirePermission(MODULE, 'edit')
+  update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.updateHeader(req.user.tenantId, id, body);
+  }
+
+  @Post(':id/items')
+  @RequirePermission(MODULE, 'edit')
+  addItem(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.addItem(req.user.tenantId, id, body);
+  }
+
+  @Put(':id/items/:itemId')
+  @RequirePermission(MODULE, 'edit')
+  updateItem(@Req() req: any, @Param('id') id: string, @Param('itemId') itemId: string, @Body() body: any) {
+    return this.service.updateItem(req.user.tenantId, id, itemId, body);
+  }
+
+  @Delete(':id/items/:itemId')
+  @RequirePermission(MODULE, 'edit')
+  removeItem(@Req() req: any, @Param('id') id: string, @Param('itemId') itemId: string) {
+    return this.service.removeItem(req.user.tenantId, id, itemId);
+  }
+
+  @Post(':id/release')
+  @RequirePermission(MODULE, 'edit')
+  release(@Req() req: any, @Param('id') id: string) {
+    return this.service.release(req.user.tenantId, id, req.user.id);
   }
 
   @Post(':id/cancel')
