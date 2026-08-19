@@ -27,6 +27,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select'
 import { Textarea } from '@/components/ui/textarea'
 import { WarehousesConfig } from '@/components/warehouses-config'
 import { ApprovalWorkflowsConfig } from '@/components/approval-workflows-config'
+import { CompanyProfileSettings } from '@/components/company-profile-settings'
 
 import {
   Building2, Palette, Bell, Shield, Factory, Globe, Network, Users, Coins, Star, Percent, FileText, Truck,
@@ -2620,7 +2621,8 @@ export default function SettingsPage() {
           <TabsTrigger value="general" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">General</TabsTrigger>
           <TabsTrigger value="roles" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Roles &amp; Permissions</TabsTrigger>
           <TabsTrigger value="approvals" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Approval Workflows</TabsTrigger>
-          <TabsTrigger value="company" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Company</TabsTrigger>
+          <TabsTrigger value="company-profile" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Company Profile</TabsTrigger>
+          <TabsTrigger value="company" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Companies</TabsTrigger>
           <TabsTrigger value="departments" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Departments</TabsTrigger>
           <TabsTrigger value="warehouses" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Warehouses</TabsTrigger>
           <TabsTrigger value="inventory-types" className="w-full justify-start rounded-md px-3 py-2 text-sm font-medium text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">Inventory Types</TabsTrigger>
@@ -2789,7 +2791,12 @@ export default function SettingsPage() {
           </div>
         </TabsContent>
 
-        {/* Company Tab */}
+        {/* Company Profile Tab */}
+        <TabsContent value="company-profile" className="mt-0">
+          <CompanyProfileSettings />
+        </TabsContent>
+
+        {/* Companies Tab */}
         <TabsContent value="company" className="mt-0">
           <CompanyConfig />
         </TabsContent>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuthStore } from '@/lib/auth';
+import { useBranding, resolveAssetUrl } from '@/lib/company-settings';
 import {
   Tooltip,
   TooltipContent,
@@ -128,6 +129,8 @@ export function Sidebar({ collapsed, onToggle }: Readonly<SidebarProps>) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const { sidebarLogo } = useBranding();
+  const logoSrc = resolveAssetUrl(sidebarLogo) || '/logo-primary.png';
 
   const handleLogout = async () => {
     await logout();
@@ -147,10 +150,13 @@ export function Sidebar({ collapsed, onToggle }: Readonly<SidebarProps>) {
         )}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center border-b border-sidebar-border px-4">
-          <div className="flex items-center overflow-hidden">
-            <img src="/logo-primary.png" alt="Procunex" className={cn('shrink-0 transition-all duration-300', collapsed ? 'h-7' : 'h-9')} />
-          </div>
+        <div className={cn('flex h-16 items-center justify-center border-b border-sidebar-border', collapsed ? 'px-2' : 'px-4')}>
+          <img
+            src={logoSrc}
+            alt="Logo"
+            className={cn('object-contain transition-all duration-300', collapsed ? 'max-h-9 max-w-[44px]' : 'max-h-10 max-w-[184px]')}
+            onError={(e) => { (e.target as HTMLImageElement).src = '/logo-primary.png'; }}
+          />
         </div>
 
         {/* Navigation */}
