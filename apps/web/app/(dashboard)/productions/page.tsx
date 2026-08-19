@@ -22,6 +22,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
 import { ApprovalStatusBadge, ApprovalActions } from '@/components/approval-controls';
+import { ProductCompositionDialog } from '@/components/product-composition-dialog';
 import { Factory, Plus, CheckCircle2, FileEdit, XCircle, AlertTriangle } from 'lucide-react';
 
 interface PreviewRow {
@@ -45,6 +46,7 @@ export default function ProductionsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [compOpen, setCompOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ row: any; action: 'complete' | 'cancel' } | null>(null);
 
   // Advanced filters
@@ -106,6 +108,7 @@ export default function ProductionsPage() {
   const products = (prodData?.data?.data || [])
     .filter((p: any) => producibleTypes.has(p.inventoryType))
     .map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
+  const selectedProductName = (prodData?.data?.data || []).find((p: any) => p.id === productId)?.name;
   const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
   const preview: PreviewRow[] = previewData?.data || [];
   const hasShortage = preview.some((r) => !r.sufficient);
@@ -311,7 +314,12 @@ export default function ProductionsPage() {
               {productId && !previewLoading && preview.length === 0 && (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-900/40 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>This product has no composition defined. Set up its Bill of Materials on the product page first.</span>
+                  <span className="flex-1">This product has no composition defined yet. Add its Bill of Materials to produce it.</span>
+                  {can('products', 'edit') && (
+                    <Button type="button" size="sm" variant="outline" onClick={() => setCompOpen(true)} className="shrink-0 h-8 border-amber-300 bg-white text-amber-800 hover:bg-amber-100 dark:bg-transparent dark:text-amber-300">
+                      <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Composition
+                    </Button>
+                  )}
                 </div>
               )}
               {preview.length > 0 && (
@@ -397,6 +405,18 @@ export default function ProductionsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Quick-add composition without leaving the New Production flow */}
+      <ProductCompositionDialog
+        productId={productId || null}
+        productName={selectedProductName}
+        open={compOpen}
+        onOpenChange={(open) => {
+          setCompOpen(open);
+          // Refresh the BOM preview when returning (materials may have just been added)
+          if (!open) queryClient.invalidateQueries({ queryKey: ['production-preview'] });
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirmTarget}
