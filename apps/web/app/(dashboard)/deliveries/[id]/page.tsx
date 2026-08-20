@@ -42,6 +42,7 @@ export default function DeliveryDetailPage() {
   const { ref: printRef, print: handlePrint } = usePrintDoc();
 
   const [addOpen, setAddOpen] = useState(false);
+  const [addType, setAddType] = useState('');
   const [addProductId, setAddProductId] = useState('');
   const [addQty, setAddQty] = useState<number>(0);
   const [releaseConfirm, setReleaseConfirm] = useState(false);
@@ -55,10 +56,17 @@ export default function DeliveryDetailPage() {
 
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
+  const { data: invTypeData } = useQuery({ queryKey: ['inventory-types-active'], queryFn: () => api.get('/inventory-types/active') });
   const warehouseName = (whData?.data?.data || []).find((w: any) => w.id === dr?.warehouseId)?.name;
-  const productList = (prodData?.data?.data || []).filter((p: any) => ['product', 'component'].includes(p.inventoryType));
-  const productOptions = productList.map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
-  const stockByProduct = useMemo(() => new Map<string, number>(productList.map((p: any) => [p.id, p.currentStock])), [productList]);
+  const allProducts: any[] = prodData?.data?.data || [];
+  const invTypeOptions = (invTypeData?.data?.data || []).map((t: any) => ({ value: t.key, label: t.label }));
+  const stockByProduct = useMemo(() => new Map<string, number>(allProducts.map((p: any) => [p.id, p.currentStock])), [allProducts]);
+  // Only items of the chosen type WITH stock on hand are selectable.
+  const itemOptions = allProducts
+    .filter((p: any) => (!addType || p.inventoryType === addType) && (p.currentStock ?? 0) > 0)
+    .map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku}) — ${p.currentStock} ${p.unit || ''}`.trim() }));
+  const addStock = addProductId ? (stockByProduct.get(addProductId) ?? 0) : 0;
+  const addOver = !!addProductId && addQty > addStock;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['dr-detail', drId] });
@@ -180,7 +188,7 @@ export default function DeliveryDetailPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold">Items {items.length > 0 && <span className="text-muted-foreground font-normal">({items.length})</span>}</h2>
-              {editable && <Button size="sm" variant="outline" onClick={() => { setAddProductId(''); setAddQty(0); setAddOpen(true); }}><Plus className="h-4 w-4 mr-1.5" /> Add Item</Button>}
+              {editable && <Button size="sm" variant="outline" onClick={() => { setAddType(''); setAddProductId(''); setAddQty(0); setAddOpen(true); }}><Plus className="h-4 w-4 mr-1.5" /> Add Item</Button>}
             </div>
             <div className="rounded-lg border overflow-hidden">
               <table className="w-full text-sm">
@@ -211,7 +219,12 @@ export default function DeliveryDetailPage() {
                         <td className="px-3 py-2.5 text-xs text-muted-foreground">{it.uom?.toUpperCase() || '—'}</td>
                         <td className="px-3 py-2 text-right">
                           {editable
-                            ? <Input type="number" step="any" min={0} defaultValue={it.quantity} onBlur={(e) => { const v = Number.parseFloat(e.target.value) || 0; if (v !== it.quantity) updateItemMut.mutate({ itemId: it.id, quantity: v }); }} className={cn('h-8 w-24 ml-auto rounded-lg text-right font-mono', short && 'border-red-300')} />
+                            ? <Input type="number" step="any" min={0} defaultValue={it.quantity} onBlur={(e) => {
+                                const v = Number.parseFloat(e.target.value) || 0;
+                                if (v <= 0) { e.target.value = String(it.quantity); return; }
+                                if (typeof stock === 'number' && v > stock) { toast({ title: `Only ${stock} in stock for ${it.product?.name || 'this item'}`, variant: 'destructive' }); e.target.value = String(it.quantity); return; }
+                                if (v !== it.quantity) updateItemMut.mutate({ itemId: it.id, quantity: v });
+                              }} className={cn('h-8 w-24 ml-auto rounded-lg text-right font-mono', short && 'border-red-300')} />
                             : <span className={cn('font-mono font-semibold', short && 'text-red-600')}>{it.quantity}</span>}
                         </td>
                         {editable && (
@@ -256,20 +269,24 @@ export default function DeliveryDetailPage() {
           </DialogHeader>
           <div className="px-6 py-5 space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Product <span className="text-red-500">*</span></Label>
-              <SearchableSelect options={productOptions} value={addProductId} onChange={setAddProductId} placeholder="Select finished product" />
-              {addProductId && typeof stockByProduct.get(addProductId) === 'number' && (
-                <p className="text-xs text-muted-foreground">On hand: {stockByProduct.get(addProductId)}</p>
-              )}
+              <Label className="text-[13px]">Inventory Type <span className="text-red-500">*</span></Label>
+              <SearchableSelect options={invTypeOptions} value={addType} onChange={(v) => { setAddType(v); setAddProductId(''); }} placeholder="Select inventory type" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[13px]">Item <span className="text-red-500">*</span></Label>
+              <SearchableSelect options={itemOptions} value={addProductId} onChange={setAddProductId} placeholder="Select item (with stock)" />
+              {itemOptions.length === 0 && <p className="text-xs text-muted-foreground">No items with stock{addType ? ' for this type' : ''}.</p>}
+              {addProductId && <p className="text-xs text-muted-foreground">On hand: <span className="font-mono font-medium text-foreground">{addStock}</span></p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
-              <Input type="number" step="any" min={0} value={addQty || ''} placeholder="0" onChange={(e) => setAddQty(Number.parseFloat(e.target.value) || 0)} className="h-9 rounded-lg" />
+              <Input type="number" step="any" min={0} value={addQty || ''} placeholder="0" onChange={(e) => setAddQty(Number.parseFloat(e.target.value) || 0)} className={cn('h-9 rounded-lg', addOver && 'border-red-300')} />
+              {addOver && <p className="text-xs text-red-600">Quantity ({addQty}) exceeds on-hand stock ({addStock}).</p>}
             </div>
           </div>
           <div className="px-6 py-4 border-t flex justify-between">
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={() => addItemMut.mutate()} disabled={!addProductId || !(addQty > 0) || addItemMut.isPending} className="bg-gradient-primary text-white">
+            <Button onClick={() => addItemMut.mutate()} disabled={!addProductId || !(addQty > 0) || addOver || addItemMut.isPending} className="bg-gradient-primary text-white">
               {addItemMut.isPending ? 'Adding…' : 'Add Item'}
             </Button>
           </div>

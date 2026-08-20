@@ -130,11 +130,22 @@ export class DeliveryReceiptsService {
     return this.findOne(tenantId, id);
   }
 
+  // Strict stock guard: can't deliver an out-of-stock item or more than on-hand.
+  private assertStock(product: { name: string; currentStock: number; unit: string | null }, quantity: number) {
+    if (product.currentStock <= 0) {
+      throw new BadRequestException(`${product.name} has no stock on hand and cannot be delivered`);
+    }
+    if (round(quantity) > product.currentStock) {
+      throw new BadRequestException(`Only ${product.currentStock} ${product.unit || ''} of ${product.name} in stock`.trim());
+    }
+  }
+
   async addItem(tenantId: string, id: string, data: any) {
     await this.assertEditable(tenantId, id);
     if (!data?.productId || !(data.quantity > 0)) throw new BadRequestException('Product and a quantity greater than 0 are required');
-    const product = await this.prisma.product.findFirst({ where: { id: data.productId, tenantId }, select: { id: true, unit: true } });
+    const product = await this.prisma.product.findFirst({ where: { id: data.productId, tenantId }, select: { id: true, name: true, unit: true, currentStock: true } });
     if (!product) throw new NotFoundException('Product not found');
+    this.assertStock(product, data.quantity);
     await this.prisma.deliveryReceiptItem.create({
       data: { deliveryReceiptId: id, productId: data.productId, quantity: round(data.quantity), uom: data.uom || product.unit || 'pcs' },
     });
@@ -145,6 +156,11 @@ export class DeliveryReceiptsService {
     await this.assertEditable(tenantId, id);
     const item = await this.prisma.deliveryReceiptItem.findFirst({ where: { id: itemId, deliveryReceiptId: id } });
     if (!item) throw new NotFoundException('Item not found');
+    if (data.quantity !== undefined) {
+      if (!(data.quantity > 0)) throw new BadRequestException('Quantity must be greater than 0');
+      const product = await this.prisma.product.findFirst({ where: { id: item.productId, tenantId }, select: { name: true, unit: true, currentStock: true } });
+      if (product) this.assertStock(product, data.quantity);
+    }
     await this.prisma.deliveryReceiptItem.update({
       where: { id: itemId },
       data: {
