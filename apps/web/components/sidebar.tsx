@@ -52,6 +52,14 @@ interface NavSection {
   items: NavItem[];
 }
 
+// Platform-developer section, only shown to SUPERADMIN.
+const platformSection: NavSection = {
+  title: 'PLATFORM',
+  items: [
+    { label: 'Organizations', href: '/organizations', icon: Building2 },
+  ],
+};
+
 const navigation: NavSection[] = [
   {
     title: 'OVERVIEW',
@@ -132,6 +140,8 @@ export function Sidebar({ collapsed, onToggle }: Readonly<SidebarProps>) {
   const { sidebarLogo } = useBranding();
   const logoSrc = resolveAssetUrl(sidebarLogo) || '/logo-primary.png';
 
+  const sections = user?.role === 'SUPERADMIN' ? [...navigation, platformSection] : navigation;
+
   const handleLogout = async () => {
     await logout();
     router.push('/login');
@@ -161,7 +171,7 @@ export function Sidebar({ collapsed, onToggle }: Readonly<SidebarProps>) {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-          {navigation.map((section) => (
+          {sections.map((section) => (
             <div key={section.title}>
               {!collapsed && (
                 <h3 className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
