@@ -51,6 +51,7 @@ services:
       PORT: 3004
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-procunexpro_enterprise}
       JWT_SECRET: ${JWT_SECRET}
+      PLATFORM_ADMIN_KEY: ${PLATFORM_ADMIN_KEY:-}
       FRONTEND_URL: https://${APP_DOMAIN}
       WEB_URL: https://${APP_DOMAIN}
       REDIS_URL: redis://redis:6379

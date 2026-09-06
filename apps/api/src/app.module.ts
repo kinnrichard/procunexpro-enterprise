@@ -43,6 +43,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { ManufacturersModule } from './modules/manufacturers/manufacturers.module';
 import { OriginsModule } from './modules/origins/origins.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { PlatformModule } from './modules/platform/platform.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { CurrenciesModule } from './modules/currencies/currencies.module';
 import { TaxesModule } from './modules/taxes/taxes.module';
@@ -99,6 +100,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     ManufacturersModule,
     OriginsModule,
     TenantsModule,
+    PlatformModule,
     CompaniesModule,
     CurrenciesModule,
     TaxesModule,
