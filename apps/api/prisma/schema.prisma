@@ -1030,6 +1030,8 @@ model StockMovement {
   productionId    String?
   reason          String?
   notes           String?
+  manufactureDate DateTime? // optional, captured on inbound movements → carried to the created lot
+  expiryDate      DateTime? // optional, captured on inbound movements → carried to the created lot
   performedBy     String?
   status          String            @default("APPROVED") // manual movements start PENDING; internal ones auto-APPROVED
   approvedById    String?
@@ -1133,6 +1135,7 @@ model StockLot {
   lotNumber    String
   quantity     Float     @default(0) // remaining, in product's stock unit
   initialQty   Float     @default(0)
+  manufactureDate DateTime?
   expiryDate   DateTime?
   source       String? // "PO receipt", "Production PRD-...", "Manual", supplier ref
   status       String    @default("AVAILABLE") // AVAILABLE | DEPLETED | EXPIRED | QUARANTINE

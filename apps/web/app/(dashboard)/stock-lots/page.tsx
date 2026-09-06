@@ -158,6 +158,7 @@ export default function StockLotsPage() {
     { key: 'product', label: 'Product', render: (_: any, row: any) => row.product?.name || '—' },
     { key: 'quantity', label: 'Qty', render: (v: number, row: any) => <span className="font-mono font-medium">{v} <span className="text-xs text-muted-foreground font-sans">{row.product?.unit}</span></span> },
     { key: 'location', label: 'Location', render: (_: any, row: any) => <span className="text-xs text-muted-foreground">{[row.warehouse?.name, row.area?.name, row.location?.name].filter(Boolean).join(' · ') || 'Unassigned'}</span> },
+    { key: 'manufactureDate', label: 'Manufactured', render: (v: string | null) => v ? <span className="text-sm">{formatDate(v)}</span> : <span className="text-muted-foreground">—</span> },
     { key: 'expiryDate', label: 'Expiry', render: renderExpiry },
     { key: 'status', label: 'Status', render: (v: string, row: any) => (
       row.approval && row.approval.status !== 'APPROVED'
