@@ -7,7 +7,10 @@ import { ProductsService } from './products.service';
 /** Template column headers (order defines the sheet layout). `*` marks required. */
 const COLUMNS: { header: string; field: string; width: number; note?: string }[] = [
   { header: 'Name*', field: 'name', width: 28 },
-  { header: 'SKU*', field: 'sku', width: 18 },
+  { header: 'SKU', field: 'sku', width: 18, note: 'leave blank to auto-generate' },
+  { header: 'Batch Code', field: 'batchCode', width: 16 },
+  { header: 'Item Code', field: 'itemCode', width: 16 },
+  { header: 'Remarks', field: 'remarks', width: 24 },
   { header: 'Inventory Type*', field: 'inventoryType', width: 18, note: 'key or label from Reference' },
   { header: 'Category*', field: 'category', width: 20 },
   { header: 'Sub Category', field: 'subCategory', width: 20 },
@@ -132,11 +135,12 @@ export class ItemImportService {
 
     title('How to use');
     line('1. Fill one item per row on the "Items" sheet. Columns marked * are required.');
-    line('2. Matching is case-insensitive ("johnson" = "Johnson").');
-    line('3. Category, Sub Category, Manufacturer and Origin: type any value — if it doesn\'t exist yet it is created automatically. Inventory Type must be one listed below.');
-    line('4. Sub Category is created under the Category on the same row.');
-    line('5. Stock always starts at 0 — add stock later via Goods Receipt / Stock Lots.');
-    line('6. Save as .xlsx (or .csv) and upload it back on the Items page.');
+    line('2. SKU is optional — leave it blank and a unique SKU is generated automatically.');
+    line('3. Matching is case-insensitive ("johnson" = "Johnson").');
+    line('4. Category, Sub Category, Manufacturer and Origin: type any value — if it doesn\'t exist yet it is created automatically. Inventory Type must be one listed below.');
+    line('5. Sub Category is created under the Category on the same row.');
+    line('6. Stock always starts at 0 — add stock later via Goods Receipt / Stock Lots.');
+    line('7. Save as .xlsx (or .csv) and upload it back on the Items page.');
     line();
     title('Inventory Types (type the key or label)');
     for (const t of lk.invTypes) line(t.key, t.label);
@@ -190,8 +194,8 @@ export class ItemImportService {
       const field = FIELD_BY_HEADER.get(norm(String(cell.value ?? '')));
       if (field) colToField.set(col, field);
     });
-    if (![...colToField.values()].includes('name') || ![...colToField.values()].includes('sku')) {
-      throw new BadRequestException('Missing required columns. Please use the downloadable template (Name and SKU are required).');
+    if (![...colToField.values()].includes('name')) {
+      throw new BadRequestException('Missing required column. Please use the downloadable template (Name is required).');
     }
 
     const lk = await this.loadLookups(tenantId);
@@ -274,8 +278,11 @@ export class ItemImportService {
 
     if (!rec.name) issues.push('Name is required');
     else data.name = rec.name;
-    if (!rec.sku) issues.push('SKU is required');
-    else data.sku = rec.sku;
+    // SKU optional — blank means auto-generate in ProductsService.create
+    if (rec.sku) data.sku = rec.sku;
+    if (rec.batchCode) data.batchCode = rec.batchCode;
+    if (rec.itemCode) data.itemCode = rec.itemCode;
+    if (rec.remarks) data.remarks = rec.remarks;
     // Don't auto-create config for clearly-empty/broken rows
     if (issues.length) return { data, issues };
 

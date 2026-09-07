@@ -398,11 +398,25 @@ export class ProductsService {
     return this.getComponents(tenantId, productId);
   }
 
+  // Generate a unique SKU for the tenant when one isn't supplied.
+  private async generateUniqueSku(tenantId: string): Promise<string> {
+    for (let i = 0; i < 15; i++) {
+      const sku = 'ITM-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      const clash = await this.prisma.product.findFirst({ where: { tenantId, sku } });
+      if (!clash) return sku;
+    }
+    return 'ITM-' + Date.now().toString(36).toUpperCase();
+  }
+
   async create(tenantId: string, data: any) {
-    const existing = await this.prisma.product.findFirst({
-      where: { tenantId, sku: data.sku },
-    });
-    if (existing) throw new ConflictException('Product SKU already exists');
+    let sku = (data.sku ?? '').toString().trim();
+    if (!sku) {
+      // Blank SKU → auto-generate a unique one.
+      sku = await this.generateUniqueSku(tenantId);
+    } else {
+      const existing = await this.prisma.product.findFirst({ where: { tenantId, sku } });
+      if (existing) throw new ConflictException('Product SKU already exists');
+    }
 
     // Generate unique slug
     let slug = generateSlug(data.name);
@@ -417,8 +431,11 @@ export class ProductsService {
         slug,
         manufacturerId: data.manufacturerId,
         modelNumber: data.modelNumber,
-        sku: data.sku,
+        sku,
         barcode: data.barcode || null,
+        batchCode: data.batchCode || null,
+        itemCode: data.itemCode || null,
+        remarks: data.remarks || null,
         description: data.description || null,
         categoryId: data.categoryId,
         subCategoryId: data.subCategoryId || null,
@@ -473,6 +490,7 @@ export class ProductsService {
     const updateData: any = {};
     const fields = [
       'inventoryType', 'name', 'slug', 'manufacturerId', 'modelNumber', 'sku', 'barcode',
+      'batchCode', 'itemCode', 'remarks',
       'description', 'categoryId', 'subCategoryId', 'vendorId', 'originId',
       'length', 'depth', 'height', 'weight',
       'minStock', 'maxStock', 'reorderQuantity', 'shelfLifeDays', 'qcRequired',

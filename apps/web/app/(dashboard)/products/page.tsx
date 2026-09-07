@@ -38,6 +38,9 @@ const productSchema = z.object({
   modelNumber: z.string().min(1, 'Model number is required'),
   sku: z.string().min(1, 'SKU is required'),
   barcode: z.string().optional().or(z.literal('')),
+  batchCode: z.string().optional().or(z.literal('')),
+  itemCode: z.string().optional().or(z.literal('')),
+  remarks: z.string().optional().or(z.literal('')),
   categoryId: z.string().min(1, 'Category is required'),
   subCategoryId: z.string().min(1, 'Sub category is required'),
   originId: z.string().min(1, 'Origin is required'),
@@ -91,6 +94,9 @@ type Product = {
   modelNumber: string
   sku: string
   barcode: string | null
+  batchCode: string | null
+  itemCode: string | null
+  remarks: string | null
   description: string | null
   manufacturer: { id: string; name: string }
   origin: { id: string; name: string }
@@ -192,6 +198,7 @@ export default function ProductsPage() {
   const defaultValues: ProductFormData = {
     inventoryType: 'product',
     name: '', manufacturerId: '', modelNumber: '', sku: '', barcode: '',
+    batchCode: '', itemCode: '', remarks: '',
     categoryId: '', subCategoryId: '', originId: '',
     length: '', depth: '', height: '', weight: '',
     unit: 'pcs', minStock: 1, maxStock: 1, reorderQuantity: 1, shelfLifeDays: '', qcRequired: false,
@@ -350,6 +357,9 @@ export default function ProductsPage() {
       modelNumber: product.modelNumber,
       sku: product.sku,
       barcode: product.barcode || '',
+      batchCode: product.batchCode || '',
+      itemCode: product.itemCode || '',
+      remarks: product.remarks || '',
       categoryId: catId,
       subCategoryId: product.subCategory?.id || '',
       originId: product.origin?.id || '',
@@ -739,6 +749,18 @@ export default function ProductsPage() {
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Barcode</Label>
                   <Input {...register('barcode')} placeholder="UPC / EAN / any code (optional)" className="h-9 rounded-lg" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Batch Code</Label>
+                  <Input {...register('batchCode')} placeholder="Optional" className="h-9 rounded-lg" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Item Code</Label>
+                  <Input {...register('itemCode')} placeholder="Optional" className="h-9 rounded-lg" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Remarks</Label>
+                  <Input {...register('remarks')} placeholder="Optional" className="h-9 rounded-lg" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Origin <span className="text-red-500">*</span></Label>

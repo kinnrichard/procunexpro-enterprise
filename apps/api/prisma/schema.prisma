@@ -704,6 +704,9 @@ model Product {
   modelNumber    String
   sku            String
   barcode        String?
+  batchCode      String?
+  itemCode       String?
+  remarks        String?
   description    String?
   categoryId     String
   subCategoryId  String?
