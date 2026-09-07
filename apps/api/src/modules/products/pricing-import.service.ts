@@ -69,7 +69,8 @@ export class PricingImportService {
     line('2. Identify the item by SKU or Batch Code (optional); else the Item name is matched (must be unique).');
     line('3. Enter Unit Cost (VAT Ex). Pick a Tax to get the VAT-inclusive cost = cost x (1 + rate).');
     line('4. Vendor must already exist and be Approved. Re-uploading updates the existing price for that vendor.');
-    line('5. Save as .xlsx (or .csv) and upload it back on the Items page.');
+    line('5. Each uploaded price is set as the item\'s APPLIED (default) price (updates the item cost/selling price).');
+    line('6. Save as .xlsx (or .csv) and upload it back on the Items page.');
     line();
     title('Vendors (name  ▸  code)');
     for (const v of vendors) line(v.name, v.code || '');
@@ -164,7 +165,9 @@ export class PricingImportService {
       for (const f of INT_FIELDS) { if (rec[f]) { const n = Number.parseInt(rec[f], 10); if (!Number.isNaN(n)) data[f] = n; } }
 
       try {
-        await this.products.upsertPricing(tenantId, product.id, data);
+        const pricing = await this.products.upsertPricing(tenantId, product.id, data);
+        // Set this uploaded price as the product's applied (default) price.
+        if (pricing?.id) await this.products.applyPricing(tenantId, product.id, pricing.id);
         result.created++;
       } catch (e: any) {
         result.failed++;
