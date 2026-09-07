@@ -730,6 +730,8 @@ function StockTab({ product }: Readonly<{ product: any }>) {
                 <tr className="border-b bg-muted/50 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
                   <th className="text-left px-4 py-3">Lot #</th>
                   <th className="text-left px-4 py-3">Warehouse</th>
+                  <th className="text-left px-4 py-3">Area</th>
+                  <th className="text-left px-4 py-3">Location</th>
                   <th className="text-right px-4 py-3">Qty</th>
                   <th className="text-center px-4 py-3">Status</th>
                   <th className="text-center px-4 py-3">QC</th>
@@ -742,6 +744,8 @@ function StockTab({ product }: Readonly<{ product: any }>) {
                   <tr key={l.id} className="hover:bg-accent/30 transition-colors">
                     <td className="px-4 py-2.5 font-mono text-sm font-medium">{l.lotNumber}</td>
                     <td className="px-4 py-2.5"><span className="flex items-center gap-1.5"><Warehouse className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> {l.warehouse?.name || <span className="text-muted-foreground">Unassigned</span>}</span></td>
+                    <td className="px-4 py-2.5">{l.area?.name || <span className="text-muted-foreground">—</span>}</td>
+                    <td className="px-4 py-2.5">{l.location?.name || <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-2.5 text-right font-mono font-medium">{(l.quantity ?? 0).toLocaleString()} <span className="text-xs text-muted-foreground font-sans">{unit}</span></td>
                     <td className="px-4 py-2.5 text-center"><span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', LOT_STATUS_CLASS[l.status] || LOT_STATUS_CLASS.DEPLETED)}>{l.status}</span></td>
                     <td className="px-4 py-2.5 text-center"><span className={cn('inline-flex px-2 py-0.5 rounded-full text-xs font-medium', LOT_QC_CLASS[l.qcStatus] || LOT_QC_CLASS.PASSED)}>{l.qcStatus}</span></td>
