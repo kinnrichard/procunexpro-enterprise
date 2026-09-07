@@ -1024,6 +1024,8 @@ model StockMovement {
   quantity        Float
   fromWarehouseId String?
   toWarehouseId   String?
+  fromAreaId      String?
+  toAreaId        String?
   fromLocationId  String?
   toLocationId    String?
   purchaseOrderId String?

@@ -18,6 +18,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { AreaSelect } from '@/components/area-select';
+import { LocationSelect } from '@/components/location-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
@@ -36,6 +38,10 @@ const movementSchema = z.object({
   quantity: z.coerce.number().gt(0, 'Must be greater than 0'),
   fromWarehouseId: z.string().optional(),
   toWarehouseId: z.string().optional(),
+  fromAreaId: z.string().optional(),
+  toAreaId: z.string().optional(),
+  fromLocationId: z.string().optional(),
+  toLocationId: z.string().optional(),
   manufactureDate: z.date().optional(),
   expiryDate: z.date().optional(),
   reason: z.string().optional(),
@@ -115,7 +121,7 @@ export default function StockMovementsPage() {
   const form = useForm<MovementFormData>({
     resolver: zodResolver(movementSchema),
     mode: 'onChange',
-    defaultValues: { productId: '', type: 'PURCHASE', quantity: undefined as unknown as number, fromWarehouseId: '', toWarehouseId: '', manufactureDate: undefined, expiryDate: undefined, reason: '', notes: '' },
+    defaultValues: { productId: '', type: 'PURCHASE', quantity: undefined as unknown as number, fromWarehouseId: '', toWarehouseId: '', fromAreaId: '', toAreaId: '', fromLocationId: '', toLocationId: '', manufactureDate: undefined, expiryDate: undefined, reason: '', notes: '' },
   });
 
   const watchType = form.watch('type');
@@ -126,6 +132,10 @@ export default function StockMovementsPage() {
   const showFrom = ['TRANSFER_OUT', 'SALE', 'WRITE_OFF', 'ADJUSTMENT'].includes(watchType);
   const showTo = ['PURCHASE', 'TRANSFER_IN', 'RETURN'].includes(watchType);
   const isOut = !inTypes.has(watchType); // outbound types reduce stock
+  // Area/Location bind to the active warehouse side (To for inbound, From for outbound).
+  const areaField = showTo ? 'toAreaId' : 'fromAreaId';
+  const locField = showTo ? 'toLocationId' : 'fromLocationId';
+  const watchArea = form.watch(areaField);
 
   // Filter by inventory type; require existing stock only for OUTBOUND (inbound adds stock)
   const itemOptions = productList
@@ -181,7 +191,7 @@ export default function StockMovementsPage() {
 
   const openCreate = () => {
     setInvType('');
-    form.reset({ productId: '', type: 'PURCHASE', quantity: undefined as unknown as number, fromWarehouseId: '', toWarehouseId: '', manufactureDate: undefined, expiryDate: undefined, reason: '', notes: '' });
+    form.reset({ productId: '', type: 'PURCHASE', quantity: undefined as unknown as number, fromWarehouseId: '', toWarehouseId: '', fromAreaId: '', toAreaId: '', fromLocationId: '', toLocationId: '', manufactureDate: undefined, expiryDate: undefined, reason: '', notes: '' });
     setModalOpen(true);
   };
 
@@ -343,7 +353,7 @@ export default function StockMovementsPage() {
               <div className="space-y-1.5">
                 <Label className="text-[13px]">From Warehouse <span className="text-red-500">*</span></Label>
                 <Controller control={form.control} name="fromWarehouseId" render={({ field }) => (
-                  <SearchableSelect options={warehouses} value={field.value || ''} onChange={field.onChange} placeholder="Select warehouse" />
+                  <SearchableSelect options={warehouses} value={field.value || ''} onChange={(v) => { field.onChange(v); form.setValue('fromAreaId', ''); form.setValue('fromLocationId', ''); }} placeholder="Select warehouse" />
                 )} />
               </div>
             )}
@@ -351,8 +361,24 @@ export default function StockMovementsPage() {
               <div className="space-y-1.5">
                 <Label className="text-[13px]">To Warehouse <span className="text-red-500">*</span></Label>
                 <Controller control={form.control} name="toWarehouseId" render={({ field }) => (
-                  <SearchableSelect options={warehouses} value={field.value || ''} onChange={field.onChange} placeholder="Select warehouse" />
+                  <SearchableSelect options={warehouses} value={field.value || ''} onChange={(v) => { field.onChange(v); form.setValue('toAreaId', ''); form.setValue('toLocationId', ''); }} placeholder="Select warehouse" />
                 )} />
+              </div>
+            )}
+            {needsWarehouse && !!activeWh && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Area</Label>
+                  <Controller control={form.control} name={areaField} render={({ field }) => (
+                    <AreaSelect warehouseId={activeWh} value={field.value || ''} onChange={(v) => { field.onChange(v); form.setValue(locField, ''); }} />
+                  )} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[13px]">Location</Label>
+                  <Controller control={form.control} name={locField} render={({ field }) => (
+                    <LocationSelect warehouseId={activeWh} areaId={watchArea || undefined} value={field.value || ''} onChange={field.onChange} />
+                  )} />
+                </div>
               </div>
             )}
             <div className="space-y-1.5">
@@ -377,13 +403,13 @@ export default function StockMovementsPage() {
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Manufacturing Date</Label>
                   <Controller control={form.control} name="manufactureDate" render={({ field }) => (
-                    <DatePicker value={field.value} onChange={field.onChange} placeholder="Optional" />
+                    <DatePicker value={field.value} onChange={field.onChange} />
                   )} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Expiration Date</Label>
                   <Controller control={form.control} name="expiryDate" render={({ field }) => (
-                    <DatePicker value={field.value} onChange={field.onChange} placeholder="Optional" />
+                    <DatePicker value={field.value} onChange={field.onChange} />
                   )} />
                   {form.formState.errors.expiryDate && <p className="text-xs text-red-500">{form.formState.errors.expiryDate.message}</p>}
                 </div>
