@@ -795,7 +795,8 @@ model ProductPricing {
   pcsPerPack           Int    @default(1)
   originalPackagingUom String @default("pcs")
 
-  unitCost      Float     @default(0)
+  unitCost      Float     @default(0) // Unit Cost (VAT-exclusive) — canonical
+  taxId         String? // selected Tax (settings) for VAT-inclusive cost = unitCost * (1 + rate)
   sellingPrice  Float     @default(0)
   currency      String    @default("USD")
   minOrderQty   Int       @default(1)

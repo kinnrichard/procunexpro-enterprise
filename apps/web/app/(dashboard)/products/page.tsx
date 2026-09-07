@@ -148,6 +148,7 @@ export default function ProductsPage() {
   const { toast } = useToast()
   const { can } = usePermissions()
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkPricingOpen, setBulkPricingOpen] = useState(false)
 
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -574,6 +575,9 @@ export default function ProductsPage() {
             <Button variant="outline" onClick={() => setBulkOpen(true)}>
               <Upload className="h-4 w-4 mr-2" /> Bulk Upload
             </Button>
+            <Button variant="outline" onClick={() => setBulkPricingOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" /> Bulk Pricing
+            </Button>
             <Button onClick={openAdd} className="bg-gradient-primary text-white hover:opacity-90">
               <Plus className="h-4 w-4 mr-2" /> New Item
             </Button>
@@ -929,6 +933,17 @@ export default function ProductsPage() {
         templateFilename="items-import-template.xlsx"
         title="Bulk Upload Items"
         description="Download the template, fill one item per row, then upload it. Items are created at 0 stock — add stock later via Goods Receipt / Stock Lots."
+        onImported={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
+      />
+
+      <BulkImportDialog
+        open={bulkPricingOpen}
+        onOpenChange={setBulkPricingOpen}
+        templateUrl="/products/pricing-import-template"
+        importUrl="/products/pricing-import"
+        templateFilename="pricing-import-template.xlsx"
+        title="Bulk Upload Pricing"
+        description="One vendor price per row. Enter Unit Cost (VAT Ex) and pick a Tax for the VAT-inclusive cost. Re-uploading updates the existing price for that item+vendor."
         onImported={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
       />
 

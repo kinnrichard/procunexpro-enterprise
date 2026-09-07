@@ -10,6 +10,7 @@ import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { ProductsService } from './products.service';
 import { ItemImportService } from './item-import.service';
+import { PricingImportService } from './pricing-import.service';
 
 const MODULE = 'products';
 
@@ -19,7 +20,26 @@ export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
     private readonly itemImport: ItemImportService,
+    private readonly pricingImport: PricingImportService,
   ) {}
+
+  // --- Bulk pricing import ---
+
+  @Get('pricing-import-template')
+  @RequirePermission(MODULE, 'create')
+  async pricingImportTemplate(@Req() req: any, @Res() res: Response) {
+    const buffer = await this.pricingImport.buildTemplate(req.user.tenantId);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="pricing-import-template.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('pricing-import')
+  @RequirePermission(MODULE, 'create')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
+  importPricing(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+    return this.pricingImport.importPricing(req.user.tenantId, file);
+  }
 
   @Get('low-stock')
   @RequirePermission(MODULE, 'view')

@@ -253,6 +253,7 @@ export class ProductsService {
         pcsPerPack: data.pcsPerPack ?? 1,
         originalPackagingUom: data.originalPackagingUom || 'pcs',
         unitCost: data.unitCost ?? 0,
+        taxId: data.taxId || null,
         sellingPrice: data.sellingPrice ?? 0,
         currency: data.currency || 'USD',
         minOrderQty: data.minOrderQty ?? 1,
@@ -278,7 +279,7 @@ export class ProductsService {
     }
 
     const updateData: any = {};
-    const fields = ['vendorId', 'type', 'originalPackagingQty', 'pcsPerPack', 'originalPackagingUom', 'unitCost', 'sellingPrice', 'currency', 'minOrderQty', 'leadTimeDays', 'notes', 'isActive'];
+    const fields = ['vendorId', 'type', 'originalPackagingQty', 'pcsPerPack', 'originalPackagingUom', 'unitCost', 'taxId', 'sellingPrice', 'currency', 'minOrderQty', 'leadTimeDays', 'notes', 'isActive'];
     for (const f of fields) {
       if (data[f] !== undefined) updateData[f] = data[f];
     }
@@ -290,6 +291,17 @@ export class ProductsService {
       data: updateData,
       include: { vendor: { select: { id: true, name: true } } },
     });
+  }
+
+  // Create-or-update the pricing for a product+vendor (used by bulk import).
+  async upsertPricing(tenantId: string, productId: string, data: any) {
+    const product = await this.prisma.product.findFirst({ where: { id: productId, tenantId } });
+    if (!product) throw new NotFoundException('Product not found');
+    const existing = await this.prisma.productPricing.findUnique({
+      where: { productId_vendorId: { productId, vendorId: data.vendorId } },
+    });
+    if (existing) return this.updatePricing(tenantId, productId, existing.id, data);
+    return this.addPricing(tenantId, productId, data);
   }
 
   async applyPricing(tenantId: string, productId: string, pricingId: string) {

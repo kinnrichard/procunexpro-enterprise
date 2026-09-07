@@ -900,6 +900,7 @@ const pricingSchema = z.object({
   pcsPerPack: z.coerce.number().int().min(1),
   originalPackagingUom: z.string().min(1, 'Required'),
   unitCost: z.coerce.number().min(0),
+  taxId: z.string().optional().or(z.literal('')),
   sellingPrice: z.coerce.number().min(0),
   currency: z.string().min(1),
   minOrderQty: z.coerce.number().int().min(1),
@@ -928,6 +929,13 @@ function PricingTab({ product }: Readonly<{ product: any }>) {
     queryKey: ['currencies-active'],
     queryFn: async () => (await api.get<{ data: { id: string; name: string; code: string; symbol: string | null; isDefault: boolean }[] }>('/currencies/active')).data,
   })
+  const { data: taxesRes } = useQuery({
+    queryKey: ['taxes-active'],
+    queryFn: async () => (await api.get<{ data: { id: string; name: string; rate: number }[] }>('/taxes/active')).data,
+  })
+  const taxes: any[] = Array.isArray(taxesRes?.data) ? taxesRes.data : []
+  const taxOptions = [{ value: '', label: 'No tax' }, ...taxes.map((t: any) => ({ value: t.id, label: `${t.name} (${t.rate}%)` }))]
+
   const currencies: any[] = Array.isArray(currenciesRes?.data) ? currenciesRes.data : []
   const currencyOptions = currencies.map((c: any) => {
     const symbolPart = c.symbol ? ` (${c.symbol})` : ''
@@ -935,7 +943,7 @@ function PricingTab({ product }: Readonly<{ product: any }>) {
   })
   const defaultCurrency = currencies.find((c: any) => c.isDefault)?.code || 'USD'
 
-  const { register, handleSubmit, reset, control, formState: { errors, isValid } } = useForm<PricingFormData>({
+  const { register, handleSubmit, reset, control, watch, formState: { errors, isValid } } = useForm<PricingFormData>({
     resolver: zodResolver(pricingSchema),
     mode: 'onChange',
   })
@@ -967,7 +975,7 @@ function PricingTab({ product }: Readonly<{ product: any }>) {
   const usedVendorIds = new Set((product.pricings || []).map((p: any) => p.vendor?.id || p.vendorId))
 
   function openAdd() {
-    reset({ vendorId: '', type: 'local', originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'pcs', unitCost: 0, sellingPrice: 0, currency: defaultCurrency, minOrderQty: 1, leadTimeDays: '', effectiveDate: new Date().toISOString().split('T')[0], expiryDate: '', notes: '' })
+    reset({ vendorId: '', type: 'local', originalPackagingQty: 1, pcsPerPack: 1, originalPackagingUom: 'pcs', unitCost: 0, taxId: '', sellingPrice: 0, currency: defaultCurrency, minOrderQty: 1, leadTimeDays: '', effectiveDate: new Date().toISOString().split('T')[0], expiryDate: '', notes: '' })
     setEditing(null)
     setModalOpen(true)
   }
@@ -980,6 +988,7 @@ function PricingTab({ product }: Readonly<{ product: any }>) {
       pcsPerPack: p.pcsPerPack || 1,
       originalPackagingUom: p.originalPackagingUom || 'pcs',
       unitCost: p.unitCost,
+      taxId: p.taxId || '',
       sellingPrice: p.sellingPrice,
       currency: p.currency,
       minOrderQty: p.minOrderQty,
@@ -1196,11 +1205,28 @@ function PricingTab({ product }: Readonly<{ product: any }>) {
               </div>
             </div>
 
-            <div className="grid grid-cols-[1fr_1fr_2fr] gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-sm">Unit Cost <span className="text-red-500">*</span></Label>
+                <Label className="text-sm">Unit Cost (VAT Ex) <span className="text-red-500">*</span></Label>
                 <Input type="number" step="0.01" {...register('unitCost')} />
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Tax</Label>
+                <Controller control={control} name="taxId" render={({ field }) => (
+                  <SearchableSelect options={taxOptions} value={field.value || ''} onChange={(val) => field.onChange(val)} placeholder="No tax" />
+                )} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Unit Cost (VAT Inc)</Label>
+                {(() => {
+                  const rate = taxes.find((t) => t.id === watch('taxId'))?.rate ?? 0
+                  const inc = (Number(watch('unitCost')) || 0) * (1 + rate / 100)
+                  return <Input value={inc.toFixed(2)} readOnly disabled className="bg-muted/50" />
+                })()}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-sm">Selling Price <span className="text-red-500">*</span></Label>
                 <Input type="number" step="0.01" {...register('sellingPrice')} />
