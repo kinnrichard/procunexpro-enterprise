@@ -8,8 +8,9 @@ import { StockMovementsService } from './stock-movements.service';
  *  existing "Stock Movements.xlsx" so those files upload as-is. */
 const COLUMNS: { header: string; field: string; width: number; note?: string }[] = [
   { header: 'Movement Type', field: 'type', width: 18, note: 'default TRANSFER_IN' },
-  { header: 'Item', field: 'itemName', width: 28, note: 'item name (used if SKU blank)' },
-  { header: 'SKU', field: 'identifier', width: 20, note: 'SKU, Batch Code or Item Code' },
+  { header: 'Item', field: 'itemName', width: 28, note: 'item name (used if SKU & Batch Code blank)' },
+  { header: 'SKU', field: 'sku', width: 20, note: 'optional' },
+  { header: 'Batch Code', field: 'batchCode', width: 20, note: 'optional' },
   { header: 'Quantity*', field: 'quantity', width: 12 },
   { header: 'Warehouse*', field: 'warehouse', width: 20 },
   { header: 'Area', field: 'area', width: 18 },
@@ -48,7 +49,7 @@ export class StockMovementImportService {
   async buildTemplate(tenantId: string): Promise<Buffer> {
     const [warehouses, products] = await Promise.all([
       this.prisma.warehouse.findMany({ where: { tenantId }, select: { id: true, name: true } }),
-      this.prisma.product.findMany({ where: { tenantId }, select: { name: true, sku: true }, take: 200, orderBy: { name: 'asc' } }),
+      this.prisma.product.findMany({ where: { tenantId }, select: { name: true, sku: true, batchCode: true }, take: 200, orderBy: { name: 'asc' } }),
     ]);
     const areas = warehouses.length
       ? await this.prisma.warehouseArea.findMany({ where: { warehouseId: { in: warehouses.map((w) => w.id) } }, select: { name: true, warehouseId: true } })
@@ -78,8 +79,8 @@ export class StockMovementImportService {
     title('How to use');
     line('1. One movement per row on the "Movements" sheet. Columns marked * are required.');
     line('2. Movement Type: leave blank for TRANSFER_IN, or use one of the types below.');
-    line('3. Identify the item by SKU, Batch Code or Item Code in the SKU column (case-insensitive).');
-    line('4. If SKU is blank, the Item column is matched by name (must be unique).');
+    line('3. Identify the item by SKU or Batch Code (both optional, case-insensitive).');
+    line('4. If SKU and Batch Code are blank, the Item column is matched by name (must be unique).');
     line('5. Warehouse must already exist. Area/Location are optional and matched within the warehouse.');
     line('6. Manufacturing/Expiration dates are optional (inbound movements carry them to the created lot).');
     line('7. Save as .xlsx (or .csv) and upload it back on the Stock Movements page.');
@@ -100,8 +101,8 @@ export class StockMovementImportService {
       if (wLocs.length) line(w.name, wLocs.join(', '));
     }
     line();
-    title('Items (name  ▸  SKU) — first 200');
-    for (const p of products) line(p.name, p.sku);
+    title('Items (name  ▸  SKU  ▸  Batch Code) — first 200');
+    for (const p of products) line(p.name, `${p.sku}${p.batchCode ? '  ▸  ' + p.batchCode : ''}`);
 
     const buf = await wb.xlsx.writeBuffer();
     return Buffer.from(buf as ArrayBuffer);
@@ -129,8 +130,8 @@ export class StockMovementImportService {
       if (field) colToField.set(col, field);
     });
     const mapped = [...colToField.values()];
-    if (!mapped.includes('quantity') || !mapped.includes('warehouse') || (!mapped.includes('identifier') && !mapped.includes('itemName'))) {
-      throw new BadRequestException('Missing required columns. Use the template (Quantity, Warehouse, and Item/SKU are required).');
+    if (!mapped.includes('quantity') || !mapped.includes('warehouse') || (!mapped.includes('sku') && !mapped.includes('batchCode') && !mapped.includes('itemName'))) {
+      throw new BadRequestException('Missing required columns. Use the template (Quantity, Warehouse, and one of SKU / Batch Code / Item are required).');
     }
 
     // Lookups
@@ -145,16 +146,18 @@ export class StockMovementImportService {
     const nameCount = new Map<string, number>();
     for (const p of products) nameCount.set(p.name.toLowerCase(), (nameCount.get(p.name.toLowerCase()) ?? 0) + 1);
 
-    const findProduct = (identifier: string, itemName: string) => {
-      const id = identifier.trim().toLowerCase();
-      if (id) {
-        const hit = products.find((p) => [p.sku, p.batchCode, p.itemCode].some((v) => v && v.toLowerCase() === id));
-        if (hit) return { product: hit };
-        return { error: `no item with SKU/Batch/Item code "${identifier}"` };
+    const matchCode = (val: string) => products.find((p) => [p.sku, p.batchCode, p.itemCode].some((v) => v && v.toLowerCase() === val));
+    const findProduct = (sku: string, batchCode: string, itemName: string) => {
+      const s = sku.trim().toLowerCase();
+      if (s) { const hit = matchCode(s); return hit ? { product: hit } : { error: `no item with SKU "${sku}"` }; }
+      const b = batchCode.trim().toLowerCase();
+      if (b) {
+        const hit = products.find((p) => p.batchCode && p.batchCode.toLowerCase() === b) || matchCode(b);
+        return hit ? { product: hit } : { error: `no item with Batch Code "${batchCode}"` };
       }
       const nm = itemName.trim().toLowerCase();
-      if (!nm) return { error: 'Item or SKU is required' };
-      if ((nameCount.get(nm) ?? 0) > 1) return { error: `item name "${itemName}" matches multiple items — use SKU/Batch Code` };
+      if (!nm) return { error: 'SKU, Batch Code or Item is required' };
+      if ((nameCount.get(nm) ?? 0) > 1) return { error: `item name "${itemName}" matches multiple items — use SKU or Batch Code` };
       const hit = products.find((p) => p.name.toLowerCase() === nm);
       return hit ? { product: hit } : { error: `no item named "${itemName}"` };
     };
@@ -167,7 +170,7 @@ export class StockMovementImportService {
       if (Object.values(rec).every((v) => v === '')) continue;
       result.total++;
       const rowNo = row.number;
-      const label = rec.identifier || rec.itemName || '';
+      const label = rec.sku || rec.batchCode || rec.itemName || '';
 
       const issues: string[] = [];
       const type = (rec.type ? rec.type.trim().toUpperCase().replace(/\s+/g, '_') : 'TRANSFER_IN');
@@ -175,7 +178,7 @@ export class StockMovementImportService {
       const qty = Number(rec.quantity);
       if (!rec.quantity || Number.isNaN(qty) || qty <= 0) issues.push(`Quantity must be a number > 0 (got "${rec.quantity}")`);
 
-      const { product, error } = findProduct(rec.identifier || '', rec.itemName || '');
+      const { product, error } = findProduct(rec.sku || '', rec.batchCode || '', rec.itemName || '');
       if (error) issues.push(error);
 
       const whId = whByName.get((rec.warehouse || '').toLowerCase());
