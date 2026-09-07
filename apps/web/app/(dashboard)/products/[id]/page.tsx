@@ -9,6 +9,7 @@ import { z } from 'zod'
 import api from '@/lib/api'
 import { cn, formatNumber } from '@/lib/utils'
 import { usePermissions } from '@/lib/permissions'
+import { ProductFormDialog } from '@/components/product-form-dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ItemCodes } from '@/components/item-codes'
 import { Card, CardContent } from '@/components/ui/card'
@@ -67,8 +68,7 @@ function Field({ label, value, mono, icon: Icon }: Readonly<{ label: string; val
 // Profile Tab
 // ============================================================
 
-function HeroBanner({ product }: Readonly<{ product: any }>) {
-  const router = useRouter()
+function HeroBanner({ product, onEdit }: Readonly<{ product: any; onEdit: () => void }>) {
   const { can } = usePermissions()
   const apiBase = process.env.NEXT_PUBLIC_API_URL?.replaceAll('/api', '') || 'http://localhost:3004'
   const primaryImage = (product.images || []).find((img: any) => img.isPrimary) || (product.images || [])[0]
@@ -99,7 +99,7 @@ function HeroBanner({ product }: Readonly<{ product: any }>) {
             {can('products', 'edit') && (
               <Button
                 size="sm"
-                onClick={() => router.push(`/products?edit=${product.id}`)}
+                onClick={onEdit}
                 className="bg-white/15 hover:bg-white/25 text-white border border-white/20"
               >
                 <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
@@ -1307,7 +1307,9 @@ function PricingTab({ product }: Readonly<{ product: any }>) {
 export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const id = params.id as string
+  const [editOpen, setEditOpen] = useState(false)
 
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', id],
@@ -1342,7 +1344,14 @@ export default function ProductDetailPage() {
         <ArrowLeft className="h-4 w-4" /> Back to Items
       </button>
 
-      <HeroBanner product={product} />
+      <HeroBanner product={product} onEdit={() => setEditOpen(true)} />
+
+      <ProductFormDialog
+        open={editOpen}
+        product={product}
+        onOpenChange={setEditOpen}
+        onSaved={() => queryClient.invalidateQueries({ queryKey: ['product', id] })}
+      />
 
       <Tabs defaultValue="profile" className="w-full mt-4">
         <TabsList className="w-full justify-start rounded-none border-b bg-transparent h-auto p-0">
