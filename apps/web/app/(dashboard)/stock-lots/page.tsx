@@ -79,35 +79,39 @@ export default function StockLotsPage() {
   }
 
   const expiringMode = filter === 'expiring';
+  const expiredMode = filter === 'EXPIRED';
   const qcFilter = filter === 'PENDING_QC' ? 'PENDING' : undefined;
-  const statusFilter = ['AVAILABLE', 'EXPIRED', 'DEPLETED'].includes(filter) ? filter : undefined;
+  const statusFilter = ['AVAILABLE', 'DEPLETED'].includes(filter) ? filter : undefined;
 
   const { data: response, isLoading } = useQuery({
     queryKey: ['stock-lots', page, search, filter, filterProductId, filterQcStatus, filterWarehouseId, filterDateFrom, filterDateTo],
-    queryFn: () => expiringMode
-      ? api.get('/stock-lots/expiring', { params: { days: 30 } })
-      : api.get('/stock-lots', { params: {
-          page, limit: 10, search,
-          ...(statusFilter && { status: statusFilter }),
-          ...(qcFilter && { qcStatus: qcFilter }),
-          ...(filterProductId && { productId: filterProductId }),
-          ...(filterQcStatus && { qcStatus: filterQcStatus }),
-          ...(filterWarehouseId && { warehouseId: filterWarehouseId }),
-          ...(filterDateFrom && { dateFrom: toDateStr(filterDateFrom) }),
-          ...(filterDateTo && { dateTo: toDateStr(filterDateTo) }),
-        } }),
+    queryFn: () => {
+      if (expiringMode) return api.get('/stock-lots/expiring', { params: { days: 30 } });
+      if (expiredMode) return api.get('/stock-lots/expired');
+      return api.get('/stock-lots', { params: {
+        page, limit: 10, search,
+        ...(statusFilter && { status: statusFilter }),
+        ...(qcFilter && { qcStatus: qcFilter }),
+        ...(filterProductId && { productId: filterProductId }),
+        ...(filterQcStatus && { qcStatus: filterQcStatus }),
+        ...(filterWarehouseId && { warehouseId: filterWarehouseId }),
+        ...(filterDateFrom && { dateFrom: toDateStr(filterDateFrom) }),
+        ...(filterDateTo && { dateTo: toDateStr(filterDateTo) }),
+      } });
+    },
   });
 
   const { data: expData } = useQuery({ queryKey: ['stock-lots-expiring'], queryFn: () => api.get('/stock-lots/expiring', { params: { days: 30 } }) });
+  const { data: expiredData } = useQuery({ queryKey: ['stock-lots-expired'], queryFn: () => api.get('/stock-lots/expired') });
   const { data: prodData } = useQuery({ queryKey: ['products-all'], queryFn: () => api.get('/products', { params: { limit: 1000 } }) });
   const { data: whData } = useQuery({ queryKey: ['warehouses-all'], queryFn: () => api.get('/warehouses', { params: { limit: 1000 } }) });
   const warehouses = (whData?.data?.data || []).map((w: any) => ({ value: w.id, label: w.name }));
 
-  const rawItems = expiringMode ? (response?.data?.data || []) : (response?.data?.data || []);
+  const rawItems = response?.data?.data || [];
   const items = Array.isArray(rawItems) ? rawItems : [];
-  const total = expiringMode ? items.length : (response?.data?.total || 0);
+  const total = (expiringMode || expiredMode) ? items.length : (response?.data?.total || 0);
   const expiringList = expData?.data?.data || [];
-  const expiredCount = expiringList.filter((l: any) => (daysUntil(l.expiryDate) ?? 1) < 0).length;
+  const expiredCount = (expiredData?.data?.data || []).length;
   const products = (prodData?.data?.data || []).map((p: any) => ({ value: p.id, label: `${p.name} (${p.sku})` }));
 
   const saveMut = useMutation({
@@ -117,6 +121,7 @@ export default function StockLotsPage() {
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
       queryClient.invalidateQueries({ queryKey: ['stock-lots-expiring'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-lots-expired'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setModalOpen(false);
       const pending = !editing && res?.data?.status === 'QUARANTINE';
@@ -169,7 +174,7 @@ export default function StockLotsPage() {
     { key: 'source', label: 'Source', render: (v: string) => <span className="text-xs text-muted-foreground">{v || '—'}</span> },
     { key: 'actions', label: '', render: (_: any, row: any) => (
       <div className="flex items-center gap-0.5 justify-end">
-        <ApprovalActions endpoint="/stock-lots" id={row.id} approval={row.approval} invalidateKeys={['stock-lots', 'stock-lots-expiring', 'products']} appliedLabel="Lot approved & released" />
+        <ApprovalActions endpoint="/stock-lots" id={row.id} approval={row.approval} invalidateKeys={['stock-lots', 'stock-lots-expiring', 'stock-lots-expired', 'products']} appliedLabel="Lot approved & released" />
         {can('products', 'edit') && ['PENDING', 'HOLD'].includes(row.qcStatus) && (
           <>
             <button onClick={() => qcMut.mutate({ id: row.id, qcStatus: 'PASSED' })} title="Pass QC" className="p-1.5 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>

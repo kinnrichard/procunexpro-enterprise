@@ -19,6 +19,12 @@ export class StockLotsController {
     return this.service.expiring(req.user.tenantId, days ? Number.parseInt(days) : 30);
   }
 
+  @Get('expired')
+  @RequirePermission(MODULE, 'view')
+  expired(@Req() req: any) {
+    return this.service.expired(req.user.tenantId);
+  }
+
   @Get()
   @RequirePermission(MODULE, 'view')
   findAll(

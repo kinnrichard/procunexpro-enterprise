@@ -65,20 +65,48 @@ export class StockLotsService {
     return { data: withApproval, total, page, limit };
   }
 
-  // Lots already expired or expiring within `days`, still holding stock
+  // Lots expiring within `days` but NOT yet expired (date is in the future), still holding stock
   async expiring(tenantId: string, days = 30) {
+    const now = new Date();
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() + days);
     const data = await this.prisma.stockLot.findMany({
       where: {
         tenantId,
         quantity: { gt: 0 },
-        expiryDate: { not: null, lte: cutoff },
+        expiryDate: { not: null, gte: now, lte: cutoff },
         status: { not: 'DEPLETED' },
       },
       orderBy: [{ expiryDate: 'asc' }],
-      include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
+      include: {
+        product: { select: { id: true, name: true, sku: true, unit: true } },
+        warehouse: { select: { id: true, name: true } },
+        area: { select: { id: true, name: true } },
+        location: { select: { id: true, name: true } },
+      },
       take: 100,
+    });
+    return { data };
+  }
+
+  // Lots already past their expiry date, still holding stock
+  async expired(tenantId: string) {
+    const now = new Date();
+    const data = await this.prisma.stockLot.findMany({
+      where: {
+        tenantId,
+        quantity: { gt: 0 },
+        expiryDate: { not: null, lt: now },
+        status: { not: 'DEPLETED' },
+      },
+      orderBy: [{ expiryDate: 'asc' }],
+      include: {
+        product: { select: { id: true, name: true, sku: true, unit: true } },
+        warehouse: { select: { id: true, name: true } },
+        area: { select: { id: true, name: true } },
+        location: { select: { id: true, name: true } },
+      },
+      take: 200,
     });
     return { data };
   }
