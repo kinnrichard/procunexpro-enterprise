@@ -20,11 +20,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { AreaSelect } from '@/components/area-select';
 import { LocationSelect } from '@/components/location-select';
+import { BulkImportDialog } from '@/components/bulk-import-dialog';
 import { DatePicker } from '@/components/ui/date-picker';
 import { useToast } from '@/components/ui/use-toast';
 import { usePermissions } from '@/lib/permissions';
 import { useAuthStore } from '@/lib/auth';
-import { ArrowLeftRight, Plus, ArrowDownRight, ArrowUpRight, RefreshCw, Package, Check, X, Loader2 } from 'lucide-react';
+import { ArrowLeftRight, Plus, ArrowDownRight, ArrowUpRight, RefreshCw, Package, Check, X, Loader2, Upload } from 'lucide-react';
 
 const statusStyles: Record<string, string> = {
   PENDING: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
@@ -77,6 +78,7 @@ export default function StockMovementsPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [invType, setInvType] = useState('');
 
   // Advanced filters
@@ -263,9 +265,14 @@ export default function StockMovementsPage() {
     <div className="space-y-6">
       <PageHeader title="Stock Movements" description="Track all inventory changes">
         {can('products', 'create') && (
-          <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
-            <Plus className="h-4 w-4 mr-2" /> New Movement
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setBulkOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" /> Bulk Upload
+            </Button>
+            <Button onClick={openCreate} className="bg-gradient-primary text-white hover:opacity-90">
+              <Plus className="h-4 w-4 mr-2" /> New Movement
+            </Button>
+          </div>
         )}
       </PageHeader>
 
@@ -432,6 +439,20 @@ export default function StockMovementsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <BulkImportDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        templateUrl="/stock-movements/import-template"
+        importUrl="/stock-movements/import"
+        templateFilename="stock-movements-import-template.xlsx"
+        title="Bulk Upload Stock Movements"
+        onImported={() => {
+          queryClient.invalidateQueries({ queryKey: ['stock-movements'] });
+          queryClient.invalidateQueries({ queryKey: ['products'] });
+          queryClient.invalidateQueries({ queryKey: ['stock-lots'] });
+        }}
+      />
     </div>
   );
 }

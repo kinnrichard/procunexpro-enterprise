@@ -1,17 +1,43 @@
 import {
-  Controller, Get, Post, Put, Body, Param, Query, Req, UseGuards,
+  Controller, Get, Post, Put, Body, Param, Query, Req, Res, UseGuards,
+  UseInterceptors, UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { StockMovementsService } from './stock-movements.service';
+import { StockMovementImportService } from './stock-movement-import.service';
 
 const MODULE = 'products';
 
 @Controller('stock-movements')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class StockMovementsController {
-  constructor(private readonly stockMovementsService: StockMovementsService) {}
+  constructor(
+    private readonly stockMovementsService: StockMovementsService,
+    private readonly importService: StockMovementImportService,
+  ) {}
+
+  // --- Bulk import ---
+
+  @Get('import-template')
+  @RequirePermission(MODULE, 'create')
+  async importTemplate(@Req() req: any, @Res() res: Response) {
+    const buffer = await this.importService.buildTemplate(req.user.tenantId);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="stock-movements-import-template.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('import')
+  @RequirePermission(MODULE, 'create')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
+  importMovements(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+    return this.importService.importMovements(req.user.tenantId, req.user.id, file);
+  }
 
   @Get()
   @RequirePermission(MODULE, 'view')
