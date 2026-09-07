@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/lib/api'
 import { cn, formatNumber } from '@/lib/utils'
+import { usePermissions } from '@/lib/permissions'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ItemCodes } from '@/components/item-codes'
 import { Card, CardContent } from '@/components/ui/card'
@@ -67,6 +68,8 @@ function Field({ label, value, mono, icon: Icon }: Readonly<{ label: string; val
 // ============================================================
 
 function HeroBanner({ product }: Readonly<{ product: any }>) {
+  const router = useRouter()
+  const { can } = usePermissions()
   const apiBase = process.env.NEXT_PUBLIC_API_URL?.replaceAll('/api', '') || 'http://localhost:3004'
   const primaryImage = (product.images || []).find((img: any) => img.isPrimary) || (product.images || [])[0]
   let primarySrc: string | null = null
@@ -92,9 +95,20 @@ function HeroBanner({ product }: Readonly<{ product: any }>) {
               <p className="text-sm text-white/60 mt-2 line-clamp-2 max-w-2xl">{product.description}</p>
             )}
           </div>
-          <Badge className={cn('shrink-0 mt-1', product.isActive ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-400 text-white')}>
-            {product.isActive ? 'Active' : 'Inactive'}
-          </Badge>
+          <div className="shrink-0 flex items-center gap-2 mt-1">
+            {can('products', 'edit') && (
+              <Button
+                size="sm"
+                onClick={() => router.push(`/products?edit=${product.id}`)}
+                className="bg-white/15 hover:bg-white/25 text-white border border-white/20"
+              >
+                <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+              </Button>
+            )}
+            <Badge className={cn(product.isActive ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-400 text-white')}>
+              {product.isActive ? 'Active' : 'Inactive'}
+            </Badge>
+          </div>
         </div>
       </div>
 

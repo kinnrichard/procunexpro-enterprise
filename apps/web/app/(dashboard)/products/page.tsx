@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -240,6 +240,19 @@ export default function ProductsPage() {
 
   const products = response?.data ?? []
   const total = response?.total ?? 0
+
+  // Auto-open the edit form when arriving from the item detail page (?edit=<id>).
+  const searchParams = useSearchParams()
+  const editParam = searchParams.get('edit')
+  const handledEditRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!editParam || handledEditRef.current === editParam) return
+    handledEditRef.current = editParam
+    const inList = products.find((p: Product) => p.id === editParam)
+    const open = (p: Product) => { openEdit(p); router.replace('/products') }
+    if (inList) open(inList)
+    else api.get(`/products/${editParam}`).then((res) => open(res.data)).catch(() => router.replace('/products'))
+  }, [editParam])
 
   // Manufacturers
   const { data: manufacturersRes } = useQuery({
