@@ -17,8 +17,19 @@ export function formatCurrency(amount: number, currency?: string): string {
   try {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(amount);
   } catch {
-    return `${code} ${amount.toFixed(2)}`;
+    return `${code} ${formatNumber(amount, 2)}`;
   }
+}
+
+/**
+ * Format a number with thousands separators (comma grouping).
+ * Trims trailing zeros up to `maxDecimals` (e.g. 1234 -> "1,234", 1234.5 -> "1,234.5").
+ * Non-finite / null / undefined render as "0".
+ */
+export function formatNumber(value: number | string | null | undefined, maxDecimals = 2): string {
+  const n = typeof value === 'string' ? Number(value) : value;
+  if (n == null || Number.isNaN(n) || !Number.isFinite(n)) return '0';
+  return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: maxDecimals }).format(n);
 }
 
 export function formatDate(date: string | Date): string {

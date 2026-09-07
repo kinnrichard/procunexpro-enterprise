@@ -27,7 +27,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/use-toast'
-import { cn } from '@/lib/utils'
+import { cn, formatNumber } from '@/lib/utils'
 
 // --- Schema ---
 
@@ -501,7 +501,7 @@ export default function ProductsPage() {
         return (
           <div className="flex items-center gap-1.5">
             <span className={cn('font-mono text-sm font-semibold', isLow ? 'text-red-600' : 'text-foreground')}>
-              {row.currentStock}
+              {formatNumber(row.currentStock)}
             </span>
             <span className="text-xs text-muted-foreground">{row.unit}</span>
             {isLow && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}

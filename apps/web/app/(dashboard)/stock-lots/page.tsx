@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { formatDate, cn } from '@/lib/utils';
+import { formatDate, formatNumber, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -156,7 +156,7 @@ export default function StockLotsPage() {
   const columns = [
     { key: 'lotNumber', label: 'Lot #', render: (v: string) => <span className="font-mono text-sm font-medium">{v}</span> },
     { key: 'product', label: 'Product', render: (_: any, row: any) => row.product?.name || '—' },
-    { key: 'quantity', label: 'Qty', render: (v: number, row: any) => <span className="font-mono font-medium">{v} <span className="text-xs text-muted-foreground font-sans">{row.product?.unit}</span></span> },
+    { key: 'quantity', label: 'Qty', render: (v: number, row: any) => <span className="font-mono font-medium">{formatNumber(v)} <span className="text-xs text-muted-foreground font-sans">{row.product?.unit}</span></span> },
     { key: 'location', label: 'Location', render: (_: any, row: any) => <span className="text-xs text-muted-foreground">{[row.warehouse?.name, row.area?.name, row.location?.name].filter(Boolean).join(' · ') || 'Unassigned'}</span> },
     { key: 'manufactureDate', label: 'Manufactured', render: (v: string | null) => v ? <span className="text-sm">{formatDate(v)}</span> : <span className="text-muted-foreground">—</span> },
     { key: 'expiryDate', label: 'Expiry', render: renderExpiry },

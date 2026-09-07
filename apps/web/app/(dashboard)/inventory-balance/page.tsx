@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { formatCurrency, formatDateTime, cn } from '@/lib/utils';
+import { formatCurrency, formatDateTime, formatNumber, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -49,7 +49,7 @@ function MovementsPanel({ direction }: Readonly<{ direction: 'in' | 'out' }>) {
     ) },
     { key: 'quantity', label: 'Quantity', className: 'text-right', render: (v: number, row: any) => (
       <span className={cn('font-mono font-semibold', IN_TYPES.has(row.type) ? 'text-green-600' : 'text-red-600')}>
-        {IN_TYPES.has(row.type) ? '+' : '-'}{v} <span className="text-xs text-muted-foreground font-sans">{row.product?.unit}</span>
+        {IN_TYPES.has(row.type) ? '+' : '-'}{formatNumber(v)} <span className="text-xs text-muted-foreground font-sans">{row.product?.unit}</span>
       </span>
     ) },
     { key: 'warehouse', label: direction === 'in' ? 'To' : 'From', render: (_: any, row: any) => (direction === 'in' ? row.toWarehouse?.name : row.fromWarehouse?.name) || <span className="text-muted-foreground">—</span> },
@@ -96,13 +96,13 @@ export default function InventoryBalancePage() {
     { key: 'category', label: 'Category', render: (v: string) => v || <span className="text-muted-foreground">—</span> },
     { key: 'onHand', label: 'On-hand', render: (v: number, row: any) => (
       <div className="flex items-center gap-1.5">
-        <span className={cn('font-mono font-semibold', row.lowStock ? 'text-red-600' : 'text-foreground')}>{v}</span>
+        <span className={cn('font-mono font-semibold', row.lowStock ? 'text-red-600' : 'text-foreground')}>{formatNumber(v)}</span>
         <span className="text-xs text-muted-foreground">{row.unit}</span>
         {row.lowStock && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
       </div>
     ) },
     { key: 'warehouses', label: 'By location', render: (v: Array<{ warehouse: string; area: string | null; location: string | null; quantity: number }>) => v.length
-      ? <div className="flex flex-wrap gap-1">{v.map((w) => { const path = [w.warehouse, w.area, w.location].filter(Boolean).join(' · '); return <span key={`${w.warehouse}-${w.area ?? ''}-${w.location ?? ''}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs"><span className="text-muted-foreground">{path}:</span> <span className="font-mono font-medium">{w.quantity}</span></span>; })}</div>
+      ? <div className="flex flex-wrap gap-1">{v.map((w) => { const path = [w.warehouse, w.area, w.location].filter(Boolean).join(' · '); return <span key={`${w.warehouse}-${w.area ?? ''}-${w.location ?? ''}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-xs"><span className="text-muted-foreground">{path}:</span> <span className="font-mono font-medium">{formatNumber(w.quantity)}</span></span>; })}</div>
       : <span className="text-xs text-muted-foreground">—</span> },
     { key: 'unitCost', label: 'Unit Cost', className: 'text-right', render: (v: number) => <span className="font-mono text-sm">{formatCurrency(v)}</span> },
     { key: 'stockValue', label: 'Stock Value', className: 'text-right', render: (v: number) => <span className="font-mono font-medium">{formatCurrency(v)}</span> },

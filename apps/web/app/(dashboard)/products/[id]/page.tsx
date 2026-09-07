@@ -7,7 +7,7 @@ import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import api from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { cn, formatNumber } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ItemCodes } from '@/components/item-codes'
 import { Card, CardContent } from '@/components/ui/card'
@@ -156,10 +156,10 @@ function ProfileTab({ product }: Readonly<{ product: any }>) {
         <Field label="Category" value={product.category?.name} icon={Layers} />
         <Field label="Sub Category" value={product.subCategory?.name} icon={Layers} />
         <Field label="Origin" value={product.origin?.name} icon={Globe} />
-        <Field label="Current Stock" value={product.currentStock} icon={Boxes} />
-        <Field label="Min Stock" value={product.minStock} icon={ArrowDownUp} />
-        <Field label="Max Stock" value={product.maxStock} icon={ArrowDownUp} />
-        <Field label="Reorder Qty" value={product.reorderQuantity} icon={ArrowDownUp} />
+        <Field label="Current Stock" value={formatNumber(product.currentStock)} icon={Boxes} />
+        <Field label="Min Stock" value={formatNumber(product.minStock)} icon={ArrowDownUp} />
+        <Field label="Max Stock" value={formatNumber(product.maxStock)} icon={ArrowDownUp} />
+        <Field label="Reorder Qty" value={formatNumber(product.reorderQuantity)} icon={ArrowDownUp} />
       </div>
 
       <ItemCodes sku={product.sku} name={product.name} path={`/scan/${product.id}`} />

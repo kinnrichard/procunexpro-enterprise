@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
-import { formatDateTime, cn } from '@/lib/utils';
+import { formatDateTime, formatNumber, cn } from '@/lib/utils';
 import { DataTable } from '@/components/data-table';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
@@ -211,7 +211,7 @@ export default function StockMovementsPage() {
     {
       key: 'quantity', label: 'Quantity', render: (v: number, row: any) => (
         <span className={cn('font-mono font-semibold', inTypes.has(row.type) ? 'text-green-600' : 'text-red-600')}>
-          {inTypes.has(row.type) ? '+' : '-'}{v}
+          {inTypes.has(row.type) ? '+' : '-'}{formatNumber(v)}
         </span>
       ),
     },
@@ -392,7 +392,7 @@ export default function StockMovementsPage() {
               <div className="flex items-center justify-between">
                 <Label className="text-[13px]">Quantity <span className="text-red-500">*</span></Label>
                 {showStock && (
-                  <span className="text-xs text-muted-foreground">Current stock: <span className="font-mono font-medium text-foreground">{whStockLoading && needsWarehouse ? '…' : `${currentStock} ${stockUnit}`}</span></span>
+                  <span className="text-xs text-muted-foreground">Current stock: <span className="font-mono font-medium text-foreground">{whStockLoading && needsWarehouse ? '…' : `${formatNumber(currentStock)} ${stockUnit}`}</span></span>
                 )}
               </div>
               <Controller control={form.control} name="quantity" render={({ field }) => (
