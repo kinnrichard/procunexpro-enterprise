@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Inbox, X } from 'lucide-react'
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Inbox, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -275,6 +275,17 @@ export function DataTable<T extends Record<string, any>>({
             <span className="font-medium">{total}</span> results
           </p>
           <div className="flex items-center gap-1">
+            {page > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(1)}
+                className="h-8 px-2"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+                <span className="sr-only">First page</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -309,6 +320,17 @@ export function DataTable<T extends Record<string, any>>({
               <ChevronRight className="h-4 w-4" />
               <span className="sr-only">Next</span>
             </Button>
+            {page < totalPages && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onPageChange(totalPages)}
+                className="h-8 px-2"
+              >
+                <ChevronsRight className="h-4 w-4" />
+                <span className="sr-only">Last page</span>
+              </Button>
+            )}
           </div>
         </div>
       )}
