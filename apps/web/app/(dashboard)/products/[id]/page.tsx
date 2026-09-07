@@ -150,6 +150,9 @@ function ProfileTab({ product }: Readonly<{ product: any }>) {
         <Field label="Model Number" value={product.modelNumber} mono icon={Hash} />
         <Field label="SKU" value={product.sku} mono icon={Hash} />
         <Field label="Barcode" value={product.barcode} mono icon={Hash} />
+        <Field label="Batch Code" value={product.batchCode} mono icon={Hash} />
+        <Field label="Item Code" value={product.itemCode} mono icon={Hash} />
+        <Field label="Remarks" value={product.remarks} icon={Tag} />
         <Field label="Category" value={product.category?.name} icon={Layers} />
         <Field label="Sub Category" value={product.subCategory?.name} icon={Layers} />
         <Field label="Origin" value={product.origin?.name} icon={Globe} />
